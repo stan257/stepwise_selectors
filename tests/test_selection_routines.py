@@ -16,6 +16,7 @@ from selection.routines import (
     ForwardSelection,
     MixedSelection,
 )
+from selection.state import SelectionState
 
 
 def gram_from_small_problem():
@@ -380,3 +381,34 @@ def test_beam_search_deduplicates_active_sets():
     selector = BeamForwardSelection(beam_width=4)
     state = selector.fit(data=GramData(gram, cov, y_norm, 20), max_steps=1)
     assert len(state.active_set) == 1
+    assert len(set(state.active_set)) == 1
+
+
+def test_rank_deficient_backward_recovers_full_rank_subset():
+    gram = np.array(
+        [
+            [1.0, 0.0, 1.0],
+            [0.0, 1.0, 1.0],
+            [1.0, 1.0, 2.0 + 1e-6],
+        ]
+    )
+    cov = np.array([1.0, 2.0, 3.0])
+    y_norm = float(cov @ cov)
+    data = GramData(gram, cov, y_norm, n_samples=5)
+
+    # Direct backward update on a rank-deficient full model should drop one column.
+    direct_state = SelectionState(data)
+    direct_state.init_full()
+    direct_state.apply_backward_step(2)
+    assert len(direct_state.active_set) == 2
+    inv_direct = np.linalg.inv(
+        gram[np.ix_(direct_state.active_set, direct_state.active_set)]
+    )
+    assert np.isfinite(inv_direct).all()
+
+    # Beam backward on the same problem should also return a full-rank subset.
+    beam = BeamBackwardSelection(beam_width=2, criterion_cls=BestRSSCriterion)
+    beam_state = beam.fit(data=data, max_steps=1)
+    assert len(beam_state.active_set) == 2
+    inv_beam = np.linalg.inv(gram[np.ix_(beam_state.active_set, beam_state.active_set)])
+    assert np.isfinite(inv_beam).all()
