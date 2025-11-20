@@ -1,7 +1,5 @@
 """Selection routines orchestrating forward, backward, and mixed strategies."""
 
-from typing import List, Optional
-
 import inspect
 import numpy as np
 
@@ -36,7 +34,7 @@ class BaseSingleSelectionRoutine:
 
     def _init_run(
         self,
-        state: Optional[SelectionState],
+        state: SelectionState | None,
         data: GramData,
         *,
         mode: str,
@@ -62,7 +60,7 @@ class BaseSingleSelectionRoutine:
         return working_state, criterion
 
     @staticmethod
-    def _select_forward_candidate(state: SelectionState, criterion) -> Optional[tuple]:
+    def _select_forward_candidate(state: SelectionState, criterion) -> tuple | None:
         cache = state.compute_forward_deltas()
         if cache is None or not cache.candidates.size:
             return None
@@ -84,7 +82,7 @@ class BaseSingleSelectionRoutine:
     @staticmethod
     def _select_backward_candidate(
         state: SelectionState, criterion, allow_worse: bool = False
-    ) -> Optional[tuple]:
+    ) -> tuple | None:
         if not state.active_set:
             return None
         rss_values = state.compute_backward_scores()
@@ -118,7 +116,7 @@ class BaseSingleSelectionRoutine:
 class ForwardSelection(BaseSingleSelectionRoutine):
     def fit(
         self,
-        state: Optional[SelectionState] = None,
+        state: SelectionState | None = None,
         *,
         data: GramData,
         max_steps=None,
@@ -135,7 +133,7 @@ class ForwardSelection(BaseSingleSelectionRoutine):
 class BackwardSelection(BaseSingleSelectionRoutine):
     def fit(
         self,
-        state: Optional[SelectionState] = None,
+        state: SelectionState | None = None,
         *,
         data: GramData,
         max_steps=None,
@@ -152,7 +150,7 @@ class BackwardSelection(BaseSingleSelectionRoutine):
 class MixedSelection(BaseSingleSelectionRoutine):
     def fit(
         self,
-        state: Optional[SelectionState] = None,
+        state: SelectionState | None = None,
         *,
         data: GramData,
         max_forward_steps=None,
@@ -195,7 +193,7 @@ class BaseBeamSelectionRoutine(BaseSingleSelectionRoutine):
 class BeamForwardSelection(BaseBeamSelectionRoutine):
     def fit(
         self,
-        state: Optional[SelectionState] = None,
+        state: SelectionState | None = None,
         *,
         data: GramData,
         max_steps=None,
@@ -215,7 +213,7 @@ class BeamForwardSelection(BaseBeamSelectionRoutine):
 class BeamBackwardSelection(BaseBeamSelectionRoutine):
     def fit(
         self,
-        state: Optional[SelectionState] = None,
+        state: SelectionState | None = None,
         *,
         data: GramData,
         max_steps=None,
@@ -236,7 +234,7 @@ class BeamBackwardSelection(BaseBeamSelectionRoutine):
 class BeamMixedSelection(BaseBeamSelectionRoutine):
     def fit(
         self,
-        state: Optional[SelectionState] = None,
+        state: SelectionState | None = None,
         *,
         data: GramData,
         max_forward_steps=None,
@@ -270,7 +268,7 @@ class BaseCrossValSelection:
 
     def _init_run(
         self,
-        state: Optional[CrossValSelectionState],
+        state: CrossValSelectionState | None,
         data: CrossValGramData,
         *,
         mode: str,
@@ -347,7 +345,7 @@ class CrossValForwardSelection(BaseCrossValSelection):
 
     def fit(
         self,
-        state: Optional[CrossValSelectionState] = None,
+        state: CrossValSelectionState | None = None,
         *,
         data: CrossValGramData,
         max_steps=None,
@@ -366,7 +364,7 @@ class CrossValBackwardSelection(BaseCrossValSelection):
 
     def fit(
         self,
-        state: Optional[CrossValSelectionState] = None,
+        state: CrossValSelectionState | None = None,
         *,
         data: CrossValGramData,
         max_steps=None,
@@ -385,7 +383,7 @@ class CrossValMixedSelection(BaseCrossValSelection):
 
     def fit(
         self,
-        state: Optional[CrossValSelectionState] = None,
+        state: CrossValSelectionState | None = None,
         *,
         data: CrossValGramData,
         max_forward_steps=None,
@@ -432,7 +430,7 @@ class BeamCrossValForwardSelection(BaseBeamCrossValSelection):
 
     def fit(
         self,
-        state: Optional[CrossValSelectionState] = None,
+        state: CrossValSelectionState | None = None,
         *,
         data: CrossValGramData,
         max_steps=None,
@@ -454,7 +452,7 @@ class BeamCrossValBackwardSelection(BaseBeamCrossValSelection):
 
     def fit(
         self,
-        state: Optional[CrossValSelectionState] = None,
+        state: CrossValSelectionState | None = None,
         *,
         data: CrossValGramData,
         max_steps=None,
@@ -477,7 +475,7 @@ class BeamCrossValMixedSelection(BaseBeamCrossValSelection):
 
     def fit(
         self,
-        state: Optional[CrossValSelectionState] = None,
+        state: CrossValSelectionState | None = None,
         *,
         data: CrossValGramData,
         max_forward_steps=None,

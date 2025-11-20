@@ -1,4 +1,4 @@
-from typing import Callable, List, Optional
+from collections.abc import Callable
 
 import numpy as np
 
@@ -17,7 +17,7 @@ def run_beam_search(
     *,
     beam_width: int,
     max_steps: int | None,
-    expand_fn: Callable[[Beam], List[Beam]],
+    expand_fn: Callable[[Beam], list[Beam]],
     track_best=True,
 ) -> Beam:
     manager = BeamManager([initial_beam], beam_width)
@@ -41,7 +41,7 @@ def run_beam_mixed(
     beam_width: int,
     max_forward_steps: int | None,
     max_total_steps: int | None,
-    forward_expand: Callable[[Beam], List[Beam]],
+    forward_expand: Callable[[Beam], list[Beam]],
     backward_improve: Callable[[Beam], Beam | None],
 ) -> Beam:
     manager = BeamManager([initial_beam], beam_width)
@@ -60,7 +60,7 @@ def run_beam_mixed(
         if max_forward_steps is not None and forward_steps >= max_forward_steps:
             break
 
-        new_beams: List[Beam] = []
+        new_beams: list[Beam] = []
         for beam in manager.beams:
             while True:
                 if max_total_steps is not None and total_operations >= max_total_steps:
@@ -78,9 +78,9 @@ def run_beam_mixed(
 
 def cv_beam_forward_children(
     beam: Beam, beam_width: int, tol: float
-) -> List[Beam]:
+) -> list[Beam]:
     cv_state = beam.state  # type: ignore[assignment]
-    forward_data: Optional[CVForwardScores] = cv_forward_scores(cv_state, tol)
+    forward_data: CVForwardScores | None = cv_forward_scores(cv_state, tol)
     if forward_data is None:
         return []
     fold_caches = forward_data.fold_caches
@@ -92,7 +92,7 @@ def cv_beam_forward_children(
     )
     order = np.argsort(crit_scores)
 
-    children: List[Beam] = []
+    children: list[Beam] = []
     for idx in order[:beam_width]:
         candidate_score = float(crit_scores[idx])
         if not beam.criterion.is_improvement(candidate_score, beam.score):
@@ -115,10 +115,10 @@ def cv_beam_forward_children(
 
 def cv_beam_backward_children(
     beam: Beam, beam_width: int, tol: float, allow_worse: bool
-) -> List[Beam]:
+) -> list[Beam]:
     """Build CV beam children by removing one active feature across all folds."""
     cv_state = beam.state  # type: ignore[assignment]
-    backward_data: Optional[CVBackwardScores] = cv_backward_scores(cv_state, tol)
+    backward_data: CVBackwardScores | None = cv_backward_scores(cv_state, tol)
     if backward_data is None:
         return []
     aggregated_rss = backward_data.aggregated_rss
@@ -127,7 +127,7 @@ def cv_beam_backward_children(
     )
     order = np.argsort(crit_scores)
 
-    children: List[Beam] = []
+    children: list[Beam] = []
     for idx in order[:beam_width]:
         candidate_score = float(crit_scores[idx])
         if not allow_worse and not beam.criterion.is_improvement(
@@ -145,7 +145,7 @@ def cv_beam_backward_children(
     return children
 
 
-def cv_beam_best_backward_child(beam: Beam, tol: float) -> Optional[Beam]:
+def cv_beam_best_backward_child(beam: Beam, tol: float) -> Beam | None:
     """Return the first backward CV child that improves the given beam, if any."""
     for child in cv_beam_backward_children(beam, 1, tol, allow_worse=False):
         if beam.criterion.is_improvement(child.score, beam.score):

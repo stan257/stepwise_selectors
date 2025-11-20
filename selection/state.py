@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
 
 import numpy as np
 
@@ -11,17 +10,18 @@ from .definitions import CrossValGramData, GramData
 class ForwardDeltaCache:
     """Snapshot of all forward-candidate statistics for a given state."""
 
-    candidates: np.ndarray
-    rss_new: np.ndarray
-    resid_var: np.ndarray
-    resid_corr: np.ndarray
-    proj_col: Optional[np.ndarray]
-    active_rk: int
+    candidates: np.ndarray  # indices of inactive features considered
+    rss_new: np.ndarray  # resulting RSS after adding each candidate
+    resid_var: np.ndarray  # conditional variance (denominator) per candidate
+    resid_corr: np.ndarray  # residual correlation with response per candidate
+    proj_col: np.ndarray | None  # K @ G_Sj projections; None when S is empty
+    active_rk: int  # current active-set size k
 
 
 def _build_forward_cache(
     state: "SelectionState", tol: float
-) -> Optional[ForwardDeltaCache]:
+) -> ForwardDeltaCache | None:
+    # Reuse a shared mask buffer to mark inactive candidates.
     mask = np.ones(state.p, dtype=bool)
     if state.active_set:
         mask[np.array(state.active_set, dtype=int)] = False
@@ -88,26 +88,32 @@ def _apply_forward_from_cache(
     rss_new = cache.rss_new[idx]
     j = int(cache.candidates[idx])
     if cache.active_rk == 0:
-        beta_S_new = np.zeros(0)
         beta_j = resid_corr / resid_var
-        K_new = np.array([[1.0 / resid_var]])
+        K_new = state.K_buf[:1, :1]
+        K_new[0, 0] = 1.0 / resid_var
+        beta_new = state.beta_buf[:1]
+        beta_new[0] = beta_j
     else:
         proj_vec = cache.proj_col[:, idx]
         beta_j = resid_corr / resid_var
-        beta_S_new = state.beta_S - proj_vec * beta_j
         k_new = cache.active_rk + 1
-        K_new = np.zeros((k_new, k_new))
-        proj_proj_T = np.outer(proj_vec, proj_vec)
-        K_new[:-1, :-1] = state.K + proj_proj_T / resid_var
+        K_new = state.K_buf[:k_new, :k_new]
+        np.copyto(K_new[:-1, :-1], state.K)
+        outer = state.outer_buf[: cache.active_rk, : cache.active_rk]
+        np.multiply.outer(proj_vec, proj_vec, out=outer)
+        K_new[:-1, :-1] += outer / resid_var
         K_new[:-1, -1] = -proj_vec / resid_var
         K_new[-1, :-1] = -proj_vec / resid_var
         K_new[-1, -1] = 1.0 / resid_var
 
-    if cache.active_rk == 0:
-        state.beta_S = np.array([beta_j])
-    else:
-        state.beta_S = np.concatenate([beta_S_new, np.array([beta_j])])
-    state.K = K_new
+        beta_new = state.beta_buf[:k_new]
+        np.copyto(beta_new[:-1], state.beta_S)
+        beta_new[:-1] -= proj_vec * beta_j
+        beta_new[-1] = beta_j
+
+    # Keep views into buffers to avoid per-step allocations; clone() will deep copy.
+    state.beta_S = beta_new.view()
+    state.K = K_new.view()
     state.active_set.append(j)
     idx_array = np.array(state.active_set, dtype=int)
     state.beta[idx_array] = state.beta_S
@@ -117,7 +123,7 @@ def _apply_forward_from_cache(
 
 def _backward_components(
     state: "SelectionState", idx_local: int, tol: float
-) -> Optional[Tuple[int, List[int], np.ndarray, np.ndarray, float]]:
+) -> tuple[int, list[int], np.ndarray, np.ndarray, float] | None:
     k = len(state.active_set)
     if not 0 <= idx_local < k:
         return None
@@ -151,16 +157,23 @@ class SelectionState:
     p: int = field(init=False)
     gram_diag: np.ndarray = field(init=False)
 
-    active_set: List[int] = field(init=False, default_factory=list)
+    active_set: list[int] = field(init=False, default_factory=list)
     beta: np.ndarray = field(init=False)
     beta_S: np.ndarray = field(init=False)
-    K: Optional[np.ndarray] = field(init=False, default=None)
+    K: np.ndarray | None = field(init=False, default=None)
     rss: float = field(init=False)
+    # Scratch buffers reused to avoid per-step allocations; only live slices are used.
+    K_buf: np.ndarray = field(init=False)
+    beta_buf: np.ndarray = field(init=False)
+    outer_buf: np.ndarray = field(init=False)
 
     def __post_init__(self):
         self.p = self.data.gram.shape[0]
         self.gram_diag = np.diag(self.data.gram)
         self.beta = np.zeros(self.p)
+        self.K_buf = np.empty((self.p, self.p))
+        self.beta_buf = np.empty(self.p)
+        self.outer_buf = np.empty((self.p, self.p))
         self.init_empty()
 
     def init_empty(self):
@@ -169,27 +182,35 @@ class SelectionState:
         self.beta_S = np.zeros(0)
         self.K = None
         self.rss = self.data.y_norm
+        # Buffers are reused and will be overwritten on next use.
 
     def init_full(self):
         self.active_set = list(range(self.p))
         idx_S = np.array(self.active_set, dtype=int)
         G_S = self.data.gram[np.ix_(idx_S, idx_S)]
         try:
-            self.beta_S = np.linalg.solve(G_S, self.data.cov[idx_S])
-            self.K = np.linalg.solve(G_S, np.eye(len(idx_S)))
+            beta_S_val = np.linalg.solve(G_S, self.data.cov[idx_S])
+            K_val = np.linalg.solve(G_S, np.eye(len(idx_S)))
         except np.linalg.LinAlgError as err:
             raise np.linalg.LinAlgError(
                 "Active Gram matrix is singular or ill-conditioned during init_full."
             ) from err
 
         self.beta[:] = 0.0
-        self.beta[idx_S] = self.beta_S
+        self.beta[idx_S] = beta_S_val
         c_S = self.data.cov[idx_S]
-        self.rss = self.data.y_norm - c_S @ self.beta_S
+        self.rss = self.data.y_norm - c_S @ beta_S_val
+
+        # Store solutions into buffers and set views to avoid future allocations.
+        k = len(idx_S)
+        self.beta_buf[:k] = beta_S_val
+        self.beta_S = self.beta_buf[:k]
+        self.K_buf[:k, :k] = K_val
+        self.K = self.K_buf[:k, :k]
 
     def compute_forward_deltas(
-        self, tol: Optional[float] = None
-    ) -> Optional[ForwardDeltaCache]:
+        self, tol: float | None = None
+    ) -> ForwardDeltaCache | None:
         tol_value = ABS_TOL if tol is None else float(tol)
         return _build_forward_cache(self, tol_value)
 
@@ -199,8 +220,22 @@ class SelectionState:
         clone.p = self.p
         clone.gram_diag = self.gram_diag
         clone.beta = self.beta.copy()
-        clone.beta_S = self.beta_S.copy()
-        clone.K = None if self.K is None else self.K.copy()
+        # Deep copy live slices so clones do not share scratch buffers.
+        clone.beta_buf = self.beta_buf.copy()
+        clone.outer_buf = self.outer_buf.copy()
+        clone.K_buf = self.K_buf.copy()
+        if self.beta_S.size:
+            k_beta = self.beta_S.shape[0]
+            clone.beta_S = clone.beta_buf[:k_beta]
+            np.copyto(clone.beta_S, self.beta_S)
+        else:
+            clone.beta_S = np.zeros(0)
+        if self.K is None:
+            clone.K = None
+        else:
+            k = self.K.shape[0]
+            clone.K = clone.K_buf[:k, :k]
+            np.copyto(clone.K, self.K)
         clone.active_set = list(self.active_set)
         clone.rss = float(self.rss)
         return clone
@@ -211,8 +246,8 @@ class SelectionState:
         return _apply_forward_from_cache(self, cache, idx)
 
     def compute_backward_scores(
-        self, tol: Optional[float] = None
-    ) -> Optional[np.ndarray]:
+        self, tol: float | None = None
+    ) -> np.ndarray | None:
         k = len(self.active_set)
         if k == 0 or self.K is None:
             return None
@@ -224,7 +259,7 @@ class SelectionState:
             rss_new[safe] = self.rss + self.beta_S[safe] ** 2 / diag_K[safe]
         return rss_new
 
-    def apply_backward_step(self, idx_local: int, tol: Optional[float] = None) -> int:
+    def apply_backward_step(self, idx_local: int, tol: float | None = None) -> int:
         tol_value = ABS_TOL if tol is None else float(tol)
         update = _backward_components(self, idx_local, tol_value)
         if update is None:
@@ -247,8 +282,8 @@ class CrossValSelectionState:
     data: CrossValGramData
     p: int = field(init=False)
     n_folds: int = field(init=False)
-    train_states: List[SelectionState] = field(init=False)
-    active_set: List[int] = field(init=False, default_factory=list)
+    train_states: list[SelectionState] = field(init=False)
+    active_set: list[int] = field(init=False, default_factory=list)
     beta: np.ndarray = field(init=False)
     oos_rss_folds: np.ndarray = field(init=False)
     rss_cv: float = field(init=False)
@@ -321,7 +356,7 @@ class CrossValSelectionState:
         else:
             self.active_set = []
 
-    def apply_backward_step(self, idx_local: int, tol: Optional[float] = None) -> None:
+    def apply_backward_step(self, idx_local: int, tol: float | None = None) -> None:
         tol_value = ABS_TOL if tol is None else float(tol)
         for fold_state in self.train_states:
             fold_state.apply_backward_step(idx_local, tol_value)

@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import List, Optional
 
 import numpy as np
 
@@ -10,9 +9,9 @@ from .state import CrossValSelectionState, ForwardDeltaCache
 class CVForwardScores:
     """Per-fold caches and aggregated RSS for a CV forward step."""
 
-    fold_caches: List[ForwardDeltaCache]
-    candidate_maps: List[dict[int, int]]
-    candidates: List[int]
+    fold_caches: list[ForwardDeltaCache]
+    candidate_maps: list[dict[int, int]]
+    candidates: list[int]
     aggregated_rss: np.ndarray
 
 
@@ -26,9 +25,9 @@ class CVBackwardScores:
 
 def cv_forward_scores(
     cv_state: CrossValSelectionState, tol: float
-) -> Optional[CVForwardScores]:
-    fold_caches: List[ForwardDeltaCache] = []
-    candidate_maps: List[dict[int, int]] = []
+) -> CVForwardScores | None:
+    fold_caches: list[ForwardDeltaCache] = []
+    candidate_maps: list[dict[int, int]] = []
     for train_state in cv_state.train_states:
         cache = train_state.compute_forward_deltas(tol)
         if cache is None or not cache.candidates.size:
@@ -65,7 +64,7 @@ def cv_forward_scores(
 
 def cv_backward_scores(
     cv_state: CrossValSelectionState, tol: float
-) -> Optional[CVBackwardScores]:
+) -> CVBackwardScores | None:
     if not cv_state.active_set:
         return None
     num_active = len(cv_state.active_set)

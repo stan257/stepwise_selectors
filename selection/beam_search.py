@@ -1,5 +1,5 @@
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable, List, Optional, Tuple
 
 import numpy as np
 
@@ -13,23 +13,23 @@ class Beam:
     state: SelectionState
     criterion: SelectionCriterion
     score: float
-    _signature: Tuple[int, ...] = field(init=False, repr=False)
+    _signature: tuple[int, ...] = field(init=False, repr=False)
 
     def __post_init__(self):
         self._signature = tuple(sorted(self.state.active_set))
 
     @property
-    def signature(self) -> Tuple[int, ...]:
+    def signature(self) -> tuple[int, ...]:
         return self._signature
 
 
 @dataclass
 class BeamManager:
-    beams: List[Beam]
+    beams: list[Beam]
     num_beams: int
 
-    def expand(self, expand_fn: Callable[[Beam], List[Beam]]) -> bool:
-        candidates: List[Beam] = []
+    def expand(self, expand_fn: Callable[[Beam], list[Beam]]) -> bool:
+        candidates: list[Beam] = []
         for beam in self.beams:
             candidates.extend(expand_fn(beam))
         if not candidates:
@@ -47,14 +47,14 @@ class BeamManager:
 
 def beam_forward_children(
     beam: Beam, beam_width: int, tol: float = ABS_TOL
-) -> List[Beam]:
+) -> list[Beam]:
     cache = beam.state.compute_forward_deltas(tol)
     if cache is None or not cache.candidates.size:
         return []
     rss_scores = np.asarray(cache.rss_new)
     crit_scores = np.asarray(beam.criterion.evaluate(rss_scores, cache.active_rk + 1))
     order = np.argsort(crit_scores)
-    children: List[Beam] = []
+    children: list[Beam] = []
     for idx in order[:beam_width]:
         candidate_score = float(crit_scores[idx])
         if not beam.criterion.is_improvement(candidate_score, beam.score):
@@ -69,7 +69,7 @@ def beam_forward_children(
 
 def beam_backward_children(
     beam: Beam, beam_width: int, tol: float = ABS_TOL, allow_worse: bool = False
-) -> List[Beam]:
+) -> list[Beam]:
     rss_values = beam.state.compute_backward_scores()
     if rss_values is None or not len(rss_values):
         return []
@@ -77,7 +77,7 @@ def beam_backward_children(
     k = max(len(beam.state.active_set) - 1, 0)
     crit_scores = np.asarray(beam.criterion.evaluate(rss_scores, k))
     order = np.argsort(crit_scores)
-    children: List[Beam] = []
+    children: list[Beam] = []
     for idx in order[:beam_width]:
         candidate_score = float(crit_scores[idx])
         if not allow_worse and not beam.criterion.is_improvement(
@@ -95,7 +95,7 @@ def beam_backward_children(
     return children
 
 
-def beam_best_backward_child(beam: Beam, tol: float = ABS_TOL) -> Optional[Beam]:
+def beam_best_backward_child(beam: Beam, tol: float = ABS_TOL) -> Beam | None:
     children = beam_backward_children(beam, 1, tol)
     for child in children:
         if beam.criterion.is_improvement(child.score, beam.score):
@@ -103,9 +103,9 @@ def beam_best_backward_child(beam: Beam, tol: float = ABS_TOL) -> Optional[Beam]
     return None
 
 
-def beam_prune(candidates: List[Beam], beam_limit: int) -> List[Beam]:
+def beam_prune(candidates: list[Beam], beam_limit: int) -> list[Beam]:
     seen = set()
-    result: List[Beam] = []
+    result: list[Beam] = []
     for beam in sorted(candidates, key=lambda b: b.score):
         sig = beam.signature
         if sig in seen:
