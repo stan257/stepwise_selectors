@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from math import ceil
 
 import numpy as np
 
@@ -29,57 +28,36 @@ def cv_forward_scores(
 ) -> CVForwardScores | None:
     fold_caches: list[ForwardDeltaCache] = []
     candidate_maps: list[dict[int, int]] = []
-    # Collect per-fold caches and mappings; we will later aggregate over the union.
     for train_state in cv_state.train_states:
         cache = train_state.compute_forward_deltas(tol)
         if cache is None or not cache.candidates.size:
-            candidate_maps.append({})
-            fold_caches.append(cache if cache is not None else ForwardDeltaCache(
-                candidates=np.array([], dtype=int),
-                rss_new=np.array([], dtype=float),
-                resid_var=np.array([], dtype=float),
-                resid_corr=np.array([], dtype=float),
-                proj_col=None,
-                active_rk=len(train_state.active_set),
-            ))
-            continue
+            return None
         fold_caches.append(cache)
         candidate_maps.append({int(c): idx for idx, c in enumerate(cache.candidates)})
 
-    # Build the union of all candidates across folds.
-    candidate_set = set()
-    for mapping in candidate_maps:
-        candidate_set |= set(mapping.keys())
-    if not candidate_set:
+    common = set(candidate_maps[0].keys())
+    for mapping in candidate_maps[1:]:
+        common &= set(mapping.keys())
+    if not common:
         return None
-
-    candidates = sorted(candidate_set)
+    candidates = sorted(common)
     num_candidates = len(candidates)
-    rss_matrix = np.full((cv_state.n_folds, num_candidates), np.nan, dtype=float)
-    # Minimum number of folds that must support a candidate to consider it.
-    min_support = ceil(cv_state.n_folds / 2)
-    col_index = {c: idx for idx, c in enumerate(candidates)}
-
+    rss_matrix = np.full((cv_state.n_folds, num_candidates), np.inf, dtype=float)
     for fold_idx, cache in enumerate(fold_caches):
         mapping = candidate_maps[fold_idx]
-        for candidate, idx_local in mapping.items():
-            col = col_index[candidate]
+        for col, candidate in enumerate(candidates):
+            idx_local = mapping.get(candidate)
+            if idx_local is None:
+                raise RuntimeError("Candidate mapping missing during CV forward scoring.")
             rss_matrix[fold_idx, col] = cv_state.validation_rss_for_candidate(
                 fold_idx, cache, idx_local
             )
 
-    support_counts = np.sum(~np.isnan(rss_matrix), axis=0)
-    support_mask = support_counts >= min_support
-    if not np.any(support_mask):
-        return None
-
-    aggregated = np.nanmean(rss_matrix[:, support_mask], axis=0)
-    supported_candidates = [c for c, keep in zip(candidates, support_mask) if keep]
-
+    aggregated = np.mean(rss_matrix, axis=0)
     return CVForwardScores(
         fold_caches=fold_caches,
         candidate_maps=candidate_maps,
-        candidates=supported_candidates,
+        candidates=candidates,
         aggregated_rss=aggregated,
     )
 

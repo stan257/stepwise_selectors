@@ -102,19 +102,14 @@ def cv_beam_forward_children(
         child_state: CrossValSelectionState = cv_state.clone()
         for fold_idx, fold_state in enumerate(child_state.train_states):
             cache = fold_caches[fold_idx]
-            # Under the union-based scoring, a candidate may be missing on some folds;
-            # only build a child when every fold can apply the cached forward step.
-            idx_local = candidate_maps[fold_idx].get(candidate)
-            if idx_local is None or cache is None:
-                break
+            idx_local = candidate_maps[fold_idx][candidate]
             fold_state.apply_forward_step(cache, idx_local)
-        else:
-            child_state._sync_active_set()
-            child_state.recompute_oos_rss()
+        child_state._sync_active_set()
+        child_state.recompute_oos_rss()
 
-            child_criterion = beam.criterion.clone()
-            child_criterion.update_current(candidate_score)
-            children.append(Beam(child_state, child_criterion, candidate_score))
+        child_criterion = beam.criterion.clone()
+        child_criterion.update_current(candidate_score)
+        children.append(Beam(child_state, child_criterion, candidate_score))
     return children
 
 
