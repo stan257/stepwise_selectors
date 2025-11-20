@@ -14,6 +14,7 @@ class GramData:
     def __post_init__(self):
         gram = np.asarray(self.gram, dtype=float)
         cov = np.asarray(self.cov, dtype=float)
+        object.__setattr__(self, "y_norm", float(self.y_norm))
         if gram.ndim != 2 or gram.shape[0] != gram.shape[1]:
             raise ValueError("Gram matrix must be square.")
         if cov.ndim != 1 or cov.shape[0] != gram.shape[0]:

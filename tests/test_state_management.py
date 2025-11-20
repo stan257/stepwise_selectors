@@ -11,7 +11,7 @@ def make_random_state(n=30, p=5, seed=0):
     rng = np.random.default_rng(seed)
     X = rng.standard_normal((n, p))
     y = rng.standard_normal(n)
-    data = GramData(X.T @ X, X.T @ y, float(y @ y), n_samples=n)
+    data = GramData(X.T @ X, X.T @ y, y @ y, n_samples=n)
     return SelectionState(data)
 
 
@@ -25,7 +25,7 @@ def test_selection_state_validates_input_shapes():
 def test_selection_state_init_full_populates_active_and_beta():
     X = np.array([[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]])
     y = np.array([1.0, 0.2, 0.9])
-    data = GramData(X.T @ X, X.T @ y, float(y @ y), n_samples=X.shape[0])
+    data = GramData(X.T @ X, X.T @ y, y @ y, n_samples=X.shape[0])
     state = SelectionState(data)
 
     state.init_full()

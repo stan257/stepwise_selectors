@@ -24,7 +24,7 @@ def gram_from_small_problem():
     y = np.array([1.0, 0.2, 0.9])
     gram = X.T @ X
     cov = X.T @ y
-    y_norm = float(y @ y)
+    y_norm = y @ y
     n_samples = X.shape[0]
     return gram, cov, y_norm, n_samples
 
@@ -57,7 +57,7 @@ def generate_esl_gramdata(
     y = X @ true_beta + epsilon
     gram = X.T @ X
     cov = X.T @ y
-    y_norm = float(y @ y)
+    y_norm = y @ y
     data = GramData(gram, cov, y_norm, n_samples)
     return data, sorted(active.tolist())
 
@@ -174,7 +174,7 @@ def make_cv_support_problem(p=50, support=15, folds=10, n=1000, seed=42):
         y = X @ beta + 0.01 * rng.standard_normal(n)
         gram = X.T @ X
         cov = X.T @ y
-        y_norm = float(y @ y)
+        y_norm = y @ y
         fold_data.append(GramData(gram, cov, y_norm, n))
     return CrossValGramData(fold_data), list(range(support))
 
@@ -328,7 +328,7 @@ def test_mixed_selection_matches_direct_solution():
     X = rng.standard_normal((n, p))
     beta_true = rng.standard_normal(p)
     y = X @ beta_true + 0.01 * rng.standard_normal(n)
-    gram, cov, y_norm = X.T @ X, X.T @ y, float(y @ y)
+    gram, cov, y_norm = X.T @ X, X.T @ y, y @ y
     state = MixedSelection().fit(
         data=GramData(gram, cov, y_norm, n),
         max_forward_steps=4,
