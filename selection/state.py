@@ -81,12 +81,12 @@ def _build_forward_cache(
 
 
 def _apply_forward_from_cache(
-    state: "SelectionState", cache: ForwardDeltaCache, idx: int
+    state: "SelectionState", cache: ForwardDeltaCache, cache_idx: int
 ) -> int:
-    resid_var = cache.resid_var[idx]
-    resid_corr = cache.resid_corr[idx]
-    rss_new = cache.rss_new[idx]
-    j = int(cache.candidates[idx])
+    resid_var = cache.resid_var[cache_idx]
+    resid_corr = cache.resid_corr[cache_idx]
+    rss_new = cache.rss_new[cache_idx]
+    feat_idx = int(cache.candidates[cache_idx])
     if cache.active_rk == 0:
         beta_j = resid_corr / resid_var
         K_new = state.K_buf[:1, :1]
@@ -94,7 +94,7 @@ def _apply_forward_from_cache(
         beta_new = state.beta_buf[:1]
         beta_new[0] = beta_j
     else:
-        proj_vec = cache.proj_col[:, idx]
+        proj_vec = cache.proj_col[:, cache_idx]
         beta_j = resid_corr / resid_var
         k_new = cache.active_rk + 1
         K_new = state.K_buf[:k_new, :k_new]
@@ -114,36 +114,36 @@ def _apply_forward_from_cache(
     # Keep views into buffers to avoid per-step allocations; clone() will deep copy.
     state.beta_S = beta_new.view()
     state.K = K_new.view()
-    state.active_set.append(j)
+    state.active_set.append(feat_idx)
     idx_array = np.array(state.active_set, dtype=int)
     state.beta[idx_array] = state.beta_S
     state.rss = float(rss_new)
-    return j
+    return feat_idx
 
 
 def _backward_components(
-    state: "SelectionState", idx_local: int, tol: float
+    state: "SelectionState", active_pos: int, tol: float
 ) -> tuple[int, list[int], np.ndarray, np.ndarray, float] | None:
     k = len(state.active_set)
-    if not 0 <= idx_local < k:
+    if not 0 <= active_pos < k:
         return None
 
     K_inv = state.K
-    idx_to_keep = np.delete(np.arange(k), idx_local)
+    idx_to_keep = np.delete(np.arange(k), active_pos)
 
     K_11 = K_inv[np.ix_(idx_to_keep, idx_to_keep)]
-    k_12 = K_inv[idx_to_keep, idx_local]
-    k_22 = K_inv[idx_local, idx_local]
+    k_12 = K_inv[idx_to_keep, active_pos]
+    k_22 = K_inv[active_pos, active_pos]
 
     if abs(k_22) <= tol:
         return None
 
     K_new = K_11 - np.outer(k_12, k_12) / k_22
 
-    removed_var = state.active_set[idx_local]
+    removed_var = state.active_set[active_pos]
     new_active_set_indices = [state.active_set[i] for i in idx_to_keep]
-    beta_removed = state.beta_S[idx_local]
-    beta_keep = np.delete(state.beta_S, idx_local)
+    beta_removed = state.beta_S[active_pos]
+    beta_keep = np.delete(state.beta_S, active_pos)
     beta_S_new = (
         beta_keep - (beta_removed / k_22) * k_12 if beta_keep.size else np.zeros(0)
     )
@@ -153,16 +153,21 @@ def _backward_components(
 
 @dataclass
 class SelectionState:
+    # Fixed sufficient statistics
     data: GramData
     p: int = field(init=False)
     gram_diag: np.ndarray = field(init=False)
 
+    # Mutable model state on the current support
     active_set: list[int] = field(init=False, default_factory=list)
-    beta: np.ndarray = field(init=False)
-    beta_S: np.ndarray = field(init=False)
-    K: np.ndarray | None = field(init=False, default=None)
-    rss: float = field(init=False)
-    # Scratch buffers reused to avoid per-step allocations; only live slices are used.
+    beta: np.ndarray = field(
+        init=False
+    )  # full-length coefficients with zeros off-support
+    beta_S: np.ndarray = field(init=False)  # coefficients on the active set
+    K: np.ndarray | None = field(init=False, default=None)  # G_SS^{-1}
+    rss: float = field(init=False)  # residual sum of squares for the current model
+
+    # Scratch buffers reused across updates to avoid per-step allocations
     K_buf: np.ndarray = field(init=False)
     beta_buf: np.ndarray = field(init=False)
     outer_buf: np.ndarray = field(init=False)
@@ -241,14 +246,12 @@ class SelectionState:
         clone.rss = float(self.rss)
         return clone
 
-    def apply_forward_step(self, cache: ForwardDeltaCache, idx: int) -> int:
-        if idx < 0 or idx >= cache.candidates.size:
+    def apply_forward_step(self, cache: ForwardDeltaCache, cache_idx: int) -> int:
+        if cache_idx < 0 or cache_idx >= cache.candidates.size:
             raise IndexError("Forward delta index out of bounds.")
-        return _apply_forward_from_cache(self, cache, idx)
+        return _apply_forward_from_cache(self, cache, cache_idx)
 
-    def compute_backward_scores(
-        self, tol: float | None = None
-    ) -> np.ndarray | None:
+    def compute_backward_scores(self, tol: float | None = None) -> np.ndarray | None:
         k = len(self.active_set)
         if k == 0 or self.K is None:
             return None
@@ -260,9 +263,9 @@ class SelectionState:
             rss_new[safe] = self.rss + self.beta_S[safe] ** 2 / diag_K[safe]
         return rss_new
 
-    def apply_backward_step(self, idx_local: int, tol: float | None = None) -> int:
+    def apply_backward_step(self, active_pos: int, tol: float | None = None) -> int:
         tol_value = ABS_TOL if tol is None else float(tol)
-        update = _backward_components(self, idx_local, tol_value)
+        update = _backward_components(self, active_pos, tol_value)
         if update is None:
             raise np.linalg.LinAlgError(
                 "Backward downdate failed; index invalid or numerically unstable."
@@ -371,16 +374,16 @@ class CrossValSelectionState:
         cache_idx: int,
     ) -> float:
         state_k = self.train_states[fold_idx]
-        candidate = int(cache.candidates[cache_idx])
+        feat_idx = int(cache.candidates[cache_idx])
         beta_j = cache.resid_corr[cache_idx] / cache.resid_var[cache_idx]
         if cache.active_rk == 0:
             beta_vec = np.array([beta_j])
-            active = [candidate]
+            active = [feat_idx]
         else:
             proj_vec = cache.proj_col[:, cache_idx]
             beta_S_new = state_k.beta_S - proj_vec * beta_j
             beta_vec = np.concatenate([beta_S_new, np.array([beta_j])])
-            active = state_k.active_set + [candidate]
+            active = state_k.active_set + [feat_idx]
 
         idx = np.array(active, dtype=int)
         G_val = self.data.gram_folds[fold_idx]
