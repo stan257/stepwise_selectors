@@ -215,6 +215,7 @@ class SelectionState:
         return _build_forward_cache(self, tol_value)
 
     def clone(self) -> "SelectionState":
+        """Clone mutable state while reusing shared read-only data."""
         clone = object.__new__(SelectionState)
         clone.data = self.data
         clone.p = self.p
@@ -421,6 +422,7 @@ class CrossValSelectionState:
         return rss
 
     def clone(self) -> "CrossValSelectionState":
+        """Clone mutable per-fold state while reusing shared read-only data."""
         clone = object.__new__(CrossValSelectionState)
         clone.data = self.data
         clone.p = self.p

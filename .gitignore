@@ -1,0 +1,16 @@
+# Bytecode and cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtualenvs and packaging
+.venv/
+*.egg-info/
+
+# Test and tool caches
+.pytest_cache/
+.mypy_cache/
+
+# OS / editor artifacts
+.DS_Store
+.vscode/
