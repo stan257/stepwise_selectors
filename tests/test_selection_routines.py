@@ -1,0 +1,382 @@
+import numpy as np
+import pytest
+from selection.criteria import BestRSSCriterion
+from selection.definitions import CrossValGramData, GramData
+from selection.routines import (
+    BackwardSelection,
+    BeamBackwardSelection,
+    BeamCrossValBackwardSelection,
+    BeamCrossValForwardSelection,
+    BeamCrossValMixedSelection,
+    BeamForwardSelection,
+    BeamMixedSelection,
+    CrossValBackwardSelection,
+    CrossValForwardSelection,
+    CrossValMixedSelection,
+    ForwardSelection,
+    MixedSelection,
+)
+
+
+def gram_from_small_problem():
+    X = np.array([[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]])
+    y = np.array([1.0, 0.2, 0.9])
+    gram = X.T @ X
+    cov = X.T @ y
+    y_norm = float(y @ y)
+    n_samples = X.shape[0]
+    return gram, cov, y_norm, n_samples
+
+
+def generate_esl_gramdata(
+    n_samples=300,
+    n_features=31,
+    rho=0.85,
+    n_true_vars=10,
+    beta_mean=0.0,
+    beta_variance=0.4,
+    noise_variance=6.25,
+    seed=None,
+    active_indices=None,
+):
+    rng = np.random.default_rng(seed)
+    cov_matrix = np.full((n_features, n_features), rho)
+    np.fill_diagonal(cov_matrix, 1.0)
+    mean_vector = np.zeros(n_features)
+    X = rng.multivariate_normal(mean_vector, cov_matrix, size=n_samples)
+    true_beta = np.zeros(n_features)
+    if active_indices is None:
+        active = np.arange(n_true_vars, dtype=int)
+    else:
+        active = np.array(active_indices, dtype=int)
+    beta_std = np.sqrt(beta_variance)
+    true_beta[active] = rng.normal(beta_mean, beta_std, size=n_true_vars)
+    noise_std = np.sqrt(noise_variance)
+    epsilon = rng.normal(0.0, noise_std, size=n_samples)
+    y = X @ true_beta + epsilon
+    gram = X.T @ X
+    cov = X.T @ y
+    y_norm = float(y @ y)
+    data = GramData(gram, cov, y_norm, n_samples)
+    return data, sorted(active.tolist())
+
+
+@pytest.fixture(scope="module")
+def esl_book():
+    gram_data, support = generate_esl_gramdata(noise_variance=0.0, seed=2024)
+    return gram_data, support
+
+
+@pytest.fixture(scope="module")
+def esl_cv_data():
+    support = list(range(10))
+    gram_data, _ = generate_esl_gramdata(
+        noise_variance=1e-6, seed=2025, active_indices=support
+    )
+    fold_data = [gram_data for _ in range(10)]
+    cv_data = CrossValGramData(fold_data)
+    return cv_data, support, gram_data
+
+
+def test_forward_selects_strongest_variable():
+    gram, cov, y_norm, n_samples = gram_from_small_problem()
+    state = ForwardSelection().fit(data=GramData(gram, cov, y_norm, n_samples))
+
+    assert state.active_set == [0]
+    assert np.isclose(state.beta[0], 0.95, atol=1e-6)
+
+
+def test_backward_prunes_to_best_single_variable():
+    gram, cov, y_norm, n_samples = gram_from_small_problem()
+    state = BackwardSelection().fit(data=GramData(gram, cov, y_norm, n_samples))
+
+    assert state.active_set == [0]
+    assert np.allclose(state.beta[1], 0.0, atol=1e-9)
+
+
+def test_stepwise_matches_forward_result():
+    gram, cov, y_norm, n_samples = gram_from_small_problem()
+    state = MixedSelection().fit(data=GramData(gram, cov, y_norm, n_samples))
+
+    assert state.active_set == [0]
+    assert np.isclose(state.beta[0], 0.95, atol=1e-6)
+
+
+def test_forward_with_best_rss_matches_standard():
+    gram, cov, y_norm, n_samples = gram_from_small_problem()
+    state = ForwardSelection(criterion_cls=BestRSSCriterion).fit(
+        data=GramData(gram, cov, y_norm, n_samples)
+    )
+
+    assert set(state.active_set) == {0, 1}
+    np.testing.assert_allclose(state.beta[:2], np.linalg.solve(gram, cov))
+
+
+def test_crossval_forward_selection_matches_forward():
+    gram, cov, y_norm, n_samples = gram_from_small_problem()
+    fold = GramData(gram, cov, y_norm, n_samples)
+    cv_data = CrossValGramData([fold, fold])
+    cv_selector = CrossValForwardSelection()
+    cv_state = cv_selector.fit(data=cv_data, max_steps=1)
+
+    assert cv_state.active_set == [0]
+
+
+def test_crossval_backward_selection_matches_backward():
+    gram, cov, y_norm, n_samples = gram_from_small_problem()
+    fold = GramData(gram, cov, y_norm, n_samples)
+    cv_data = CrossValGramData([fold, fold])
+    cv_selector = CrossValBackwardSelection()
+    cv_state = cv_selector.fit(data=cv_data, max_steps=1)
+
+    assert cv_state.active_set == [0]
+
+
+def test_crossval_mixed_selection_matches_mixed():
+    gram, cov, y_norm, n_samples = gram_from_small_problem()
+    fold = GramData(gram, cov, y_norm, n_samples)
+    cv_data = CrossValGramData([fold, fold])
+    cv_selector = CrossValMixedSelection()
+    cv_state = cv_selector.fit(data=cv_data, max_forward_steps=1, max_total_steps=2)
+
+    assert cv_state.active_set == [0]
+
+
+def test_forward_selection_recovers_esl_support(esl_book):
+    gram_data, support = esl_book
+    selector = ForwardSelection(criterion_cls=BestRSSCriterion)
+    state = selector.fit(data=gram_data, max_steps=len(support))
+    recovered = set(state.active_set)
+    assert len(recovered & set(support)) >= int(0.8 * len(support))
+
+
+def test_backward_selection_recovers_esl_support(esl_book):
+    gram_data, support = esl_book
+    forward_selector = ForwardSelection(criterion_cls=BestRSSCriterion)
+    forward_state = forward_selector.fit(data=gram_data, max_steps=len(support))
+    selector = BackwardSelection(criterion_cls=BestRSSCriterion)
+    p = gram_data.gram.shape[0]
+    state = selector.fit(data=gram_data, max_steps=p - len(support))
+
+    recovered = set(state.active_set)
+    forward_support = set(forward_state.active_set)
+    assert len(recovered & forward_support) >= int(0.8 * len(forward_support))
+
+
+def make_cv_support_problem(p=50, support=15, folds=10, n=1000, seed=42):
+    rng = np.random.default_rng(seed)
+    beta = np.zeros(p)
+    beta[:support] = 1.0
+    fold_data = []
+    for _ in range(folds):
+        X = rng.standard_normal((n, p))
+        y = X @ beta + 0.01 * rng.standard_normal(n)
+        gram = X.T @ X
+        cov = X.T @ y
+        y_norm = float(y @ y)
+        fold_data.append(GramData(gram, cov, y_norm, n))
+    return CrossValGramData(fold_data), list(range(support))
+
+
+def test_crossval_forward_selection_recovers_true_support():
+    cv_data, support_set = make_cv_support_problem()
+    selector = CrossValForwardSelection()
+    state = selector.fit(data=cv_data, max_steps=len(support_set))
+
+    assert set(state.active_set) == set(support_set)
+
+
+def test_crossval_backward_selection_recovers_true_support():
+    cv_data, support_set = make_cv_support_problem()
+    selector = CrossValBackwardSelection()
+    state = selector.fit(data=cv_data, max_steps=50 - len(support_set))
+
+    assert set(state.active_set) == set(support_set)
+
+
+def test_crossval_forward_selection_matches_full_run(esl_cv_data):
+    cv_data, support, full_data = esl_cv_data
+    ForwardSelection(criterion_cls=BestRSSCriterion).fit(
+        data=full_data, max_steps=len(support)
+    )
+    selector = CrossValForwardSelection(criterion_cls=BestRSSCriterion)
+    state = selector.fit(data=cv_data, max_steps=len(support))
+
+    recovered = set(state.active_set)
+    assert len(recovered & set(support)) >= int(0.8 * len(support))
+
+
+def test_crossval_backward_selection_matches_full_run(esl_cv_data):
+    cv_data, support, full_data = esl_cv_data
+    BackwardSelection(criterion_cls=BestRSSCriterion).fit(
+        data=full_data, max_steps=full_data.gram.shape[0] - len(support)
+    )
+    selector = CrossValBackwardSelection(criterion_cls=BestRSSCriterion)
+    p = cv_data.gram_total.shape[0]
+    state = selector.fit(data=cv_data, max_steps=p - len(support))
+
+    recovered = set(state.active_set)
+    assert len(recovered & set(support)) >= int(0.8 * len(support))
+
+
+def test_beam_crossval_forward_selection_recovers_true_support():
+    cv_data, support_set = make_cv_support_problem()
+    selector = BeamCrossValForwardSelection(beam_width=2)
+    state = selector.fit(data=cv_data, max_steps=len(support_set))
+    assert set(state.active_set) == set(support_set)
+
+
+def test_beam_crossval_backward_selection_recovers_true_support():
+    cv_data, support_set = make_cv_support_problem()
+    selector = BeamCrossValBackwardSelection(beam_width=2)
+    state = selector.fit(data=cv_data, max_steps=50 - len(support_set))
+    assert set(state.active_set) == set(support_set)
+
+
+def test_beam_crossval_mixed_selection_matches_forward():
+    gram, cov, y_norm, n_samples = gram_from_small_problem()
+    fold = GramData(gram, cov, y_norm, n_samples)
+    cv_data = CrossValGramData([fold, fold])
+    selector = BeamCrossValMixedSelection(beam_width=2)
+    cv_state = selector.fit(data=cv_data, max_forward_steps=1, max_total_steps=2)
+    assert cv_state.active_set == [0]
+
+
+def test_crossval_beam_matches_greedy_on_simple_problem():
+    cv_data, support_set = make_cv_support_problem()
+    greedy = CrossValForwardSelection()
+    beam = BeamCrossValForwardSelection(beam_width=2)
+
+    greedy_state = greedy.fit(data=cv_data, max_steps=len(support_set))
+    beam_state = beam.fit(data=cv_data, max_steps=len(support_set))
+
+    assert set(beam_state.active_set) == set(greedy_state.active_set)
+    assert beam_state.rss_cv <= greedy_state.rss_cv + 1e-9
+
+
+def test_forward_selection_permutation_invariance():
+    p, steps = 8, 4
+    gram, cov, y_norm, n_samples = make_diagonal_problem(p)
+    perm = np.array([3, 0, 5, 1, 6, 2, 7, 4], dtype=int)
+    P = np.eye(p)[perm]
+    gram_perm = P.T @ gram @ P
+    cov_perm = P.T @ cov
+
+    selector = ForwardSelection(criterion_cls=BestRSSCriterion)
+    base_state = selector.fit(
+        data=GramData(gram, cov, y_norm, n_samples), max_steps=steps
+    )
+    perm_state = selector.fit(
+        data=GramData(gram_perm, cov_perm, y_norm, n_samples), max_steps=steps
+    )
+
+    mapped = [int(perm[i]) for i in perm_state.active_set]
+    assert set(mapped) == set(base_state.active_set)
+
+
+def test_beam_pruning_is_deterministic_and_non_worsening():
+    gram = np.eye(4)
+    cov = np.ones(4)
+    y_norm = float(cov @ cov)
+    n_samples = 50
+
+    greedy = BeamForwardSelection(beam_width=1, criterion_cls=BestRSSCriterion)
+    wider = BeamForwardSelection(beam_width=3, criterion_cls=BestRSSCriterion)
+
+    greedy_state = greedy.fit(
+        data=GramData(gram, cov, y_norm, n_samples), max_steps=1
+    )
+    wider_state = wider.fit(
+        data=GramData(gram, cov, y_norm, n_samples), max_steps=1
+    )
+
+    assert greedy_state.active_set == [0]
+    assert wider_state.active_set == [0]
+    assert wider_state.rss <= greedy_state.rss + 1e-12
+
+
+def make_diagonal_problem(p):
+    idx = np.arange(1, p + 1, dtype=float)
+    gram = np.eye(p)
+    true_beta = 2**idx
+    cov = gram @ true_beta
+    y_norm = float(true_beta @ true_beta)
+    n_samples = 100
+    return gram, cov, y_norm, n_samples
+
+
+def expected_indices(p, k):
+    return list(range(p - k, p))
+
+
+@pytest.mark.parametrize("p,steps", [(5, 3), (10, 7), (15, 12)])
+def test_best_rss_selects_largest_coefficients_forward_and_backward(p, steps):
+    gram, cov, y_norm, n_samples = make_diagonal_problem(p)
+
+    forward_selector = ForwardSelection(criterion_cls=BestRSSCriterion)
+    forward_state = forward_selector.fit(
+        data=GramData(gram, cov, y_norm, n_samples), max_steps=steps
+    )
+
+    assert set(forward_state.active_set) == set(expected_indices(p, steps))
+
+
+def test_mixed_selection_matches_direct_solution():
+    rng = np.random.default_rng(123)
+    n, p = 40, 6
+    X = rng.standard_normal((n, p))
+    beta_true = rng.standard_normal(p)
+    y = X @ beta_true + 0.01 * rng.standard_normal(n)
+    gram, cov, y_norm = X.T @ X, X.T @ y, float(y @ y)
+    state = MixedSelection().fit(
+        data=GramData(gram, cov, y_norm, n),
+        max_forward_steps=4,
+        max_total_steps=7,
+    )
+    idx = np.array(state.active_set, dtype=int)
+    if len(idx):
+        gram_ss = gram[np.ix_(idx, idx)]
+        beta_expected = np.zeros(p)
+        beta_expected[idx] = np.linalg.solve(gram_ss, cov[idx])
+        np.testing.assert_allclose(state.beta, beta_expected, atol=1e-8)
+        rss_expected = y_norm - cov[idx] @ beta_expected[idx]
+    else:
+        np.testing.assert_allclose(state.beta, np.zeros(p))
+        rss_expected = y_norm
+    assert pytest.approx(state.rss, rel=1e-8, abs=1e-8) == rss_expected
+
+
+def test_forward_beam_search_selects_best_subset():
+    gram, cov, y_norm, n_samples = make_diagonal_problem(6)
+    selector = BeamForwardSelection(beam_width=3)
+    state = selector.fit(data=GramData(gram, cov, y_norm, n_samples), max_steps=3)
+    assert set(state.active_set) == set(expected_indices(6, 3))
+
+
+def test_backward_beam_search_selects_smallest_subset():
+    gram, cov, y_norm, n_samples = make_diagonal_problem(6)
+    y_norm += 1.0
+    selector = BeamBackwardSelection(beam_width=2)
+    state = selector.fit(data=GramData(gram, cov, y_norm, n_samples), max_steps=3)
+    assert len(state.active_set) == 3
+    assert set(state.active_set) == set(expected_indices(6, 3))
+
+
+def test_mixed_beam_search_handles_forward_and_backward():
+    gram, cov, y_norm, n_samples = make_diagonal_problem(5)
+    selector = BeamMixedSelection(beam_width=2)
+    state = selector.fit(
+        data=GramData(gram, cov, y_norm, n_samples),
+        max_forward_steps=3,
+        max_total_steps=9,
+    )
+    assert set(state.active_set) == set(expected_indices(5, 3))
+
+
+def test_beam_search_deduplicates_active_sets():
+    gram = np.eye(4)
+    cov = np.array([1.0, 1.0, 0.5, 0.25])
+    y_norm = float(cov @ cov)
+    selector = BeamForwardSelection(beam_width=4)
+    state = selector.fit(data=GramData(gram, cov, y_norm, 20), max_steps=1)
+    assert len(state.active_set) == 1

@@ -1,0 +1,398 @@
+from dataclasses import dataclass, field
+from typing import List, Optional, Tuple
+
+import numpy as np
+
+from .constants import ABS_TOL
+from .definitions import CrossValGramData, GramData
+
+
+@dataclass
+class ForwardDeltaCache:
+    """Snapshot of all forward-candidate statistics for a given state."""
+
+    candidates: np.ndarray
+    rss_new: np.ndarray
+    resid_var: np.ndarray
+    resid_corr: np.ndarray
+    proj_col: Optional[np.ndarray]
+    active_rk: int
+
+
+def _build_forward_cache(
+    state: "SelectionState", tol: float
+) -> Optional[ForwardDeltaCache]:
+    mask = np.ones(state.p, dtype=bool)
+    if state.active_set:
+        mask[np.array(state.active_set, dtype=int)] = False
+    candidates = np.where(mask)[0]
+    if not candidates.size:
+        return None
+
+    k = len(state.active_set)
+    if k == 0:
+        resid_var = state.gram_diag[candidates]
+        valid = resid_var > tol
+        if not np.any(valid):
+            return None
+        candidates = candidates[valid]
+        resid_var = resid_var[valid]
+        resid_corr = state.data.cov[candidates]
+        rss_new = state.rss - (resid_corr**2) / resid_var
+        valid_rss = rss_new > -tol
+        if not np.any(valid_rss):
+            return None
+        candidates = candidates[valid_rss]
+        resid_var = resid_var[valid_rss]
+        resid_corr = resid_corr[valid_rss]
+        rss_new = np.clip(rss_new[valid_rss], tol, None)
+        return ForwardDeltaCache(
+            candidates=candidates,
+            rss_new=rss_new,
+            resid_var=resid_var,
+            resid_corr=resid_corr,
+            proj_col=None,
+            active_rk=0,
+        )
+
+    idx_S = np.array(state.active_set, dtype=int)
+    g = state.data.gram[np.ix_(idx_S, candidates)]
+    proj_col = state.K @ g
+    resid_var = state.gram_diag[candidates] - np.sum(g * proj_col, axis=0)
+    valid = resid_var > tol
+    if not np.any(valid):
+        return None
+    candidates = candidates[valid]
+    resid_var = resid_var[valid]
+    proj_col = proj_col[:, valid]
+    resid_corr = state.data.cov[candidates] - state.beta_S @ g[:, valid]
+    rss_new = state.rss - (resid_corr**2) / resid_var
+    valid_rss = rss_new > -tol
+    if not np.any(valid_rss):
+        return None
+    return ForwardDeltaCache(
+        candidates=candidates[valid_rss],
+        rss_new=np.clip(rss_new[valid_rss], tol, None),
+        resid_var=resid_var[valid_rss],
+        resid_corr=resid_corr[valid_rss],
+        proj_col=proj_col[:, valid_rss],
+        active_rk=k,
+    )
+
+
+def _apply_forward_from_cache(
+    state: "SelectionState", cache: ForwardDeltaCache, idx: int
+) -> int:
+    resid_var = cache.resid_var[idx]
+    resid_corr = cache.resid_corr[idx]
+    rss_new = cache.rss_new[idx]
+    j = int(cache.candidates[idx])
+    if cache.active_rk == 0:
+        beta_S_new = np.zeros(0)
+        beta_j = resid_corr / resid_var
+        K_new = np.array([[1.0 / resid_var]])
+    else:
+        proj_vec = cache.proj_col[:, idx]
+        beta_j = resid_corr / resid_var
+        beta_S_new = state.beta_S - proj_vec * beta_j
+        k_new = cache.active_rk + 1
+        K_new = np.zeros((k_new, k_new))
+        proj_proj_T = np.outer(proj_vec, proj_vec)
+        K_new[:-1, :-1] = state.K + proj_proj_T / resid_var
+        K_new[:-1, -1] = -proj_vec / resid_var
+        K_new[-1, :-1] = -proj_vec / resid_var
+        K_new[-1, -1] = 1.0 / resid_var
+
+    if cache.active_rk == 0:
+        state.beta_S = np.array([beta_j])
+    else:
+        state.beta_S = np.concatenate([beta_S_new, np.array([beta_j])])
+    state.K = K_new
+    state.active_set.append(j)
+    idx_array = np.array(state.active_set, dtype=int)
+    state.beta[idx_array] = state.beta_S
+    state.rss = float(rss_new)
+    return j
+
+
+def _backward_components(
+    state: "SelectionState", idx_local: int, tol: float
+) -> Optional[Tuple[int, List[int], np.ndarray, np.ndarray, float]]:
+    k = len(state.active_set)
+    if not 0 <= idx_local < k:
+        return None
+
+    K_inv = state.K
+    idx_to_keep = np.delete(np.arange(k), idx_local)
+
+    K_11 = K_inv[np.ix_(idx_to_keep, idx_to_keep)]
+    k_12 = K_inv[idx_to_keep, idx_local]
+    k_22 = K_inv[idx_local, idx_local]
+
+    if abs(k_22) <= tol:
+        return None
+
+    K_new = K_11 - np.outer(k_12, k_12) / k_22
+
+    removed_var = state.active_set[idx_local]
+    new_active_set_indices = [state.active_set[i] for i in idx_to_keep]
+    beta_removed = state.beta_S[idx_local]
+    beta_keep = np.delete(state.beta_S, idx_local)
+    beta_S_new = (
+        beta_keep - (beta_removed / k_22) * k_12 if beta_keep.size else np.zeros(0)
+    )
+    rss_new = state.rss + (beta_removed**2) / k_22
+    return removed_var, new_active_set_indices, K_new, beta_S_new, float(rss_new)
+
+
+@dataclass
+class SelectionState:
+    data: GramData
+    p: int = field(init=False)
+    gram_diag: np.ndarray = field(init=False)
+
+    active_set: List[int] = field(init=False, default_factory=list)
+    beta: np.ndarray = field(init=False)
+    beta_S: np.ndarray = field(init=False)
+    K: Optional[np.ndarray] = field(init=False, default=None)
+    rss: float = field(init=False)
+
+    def __post_init__(self):
+        self.p = self.data.gram.shape[0]
+        self.gram_diag = np.diag(self.data.gram)
+        self.beta = np.zeros(self.p)
+        self.init_empty()
+
+    def init_empty(self):
+        self.active_set = []
+        self.beta[:] = 0.0
+        self.beta_S = np.zeros(0)
+        self.K = None
+        self.rss = self.data.y_norm
+
+    def init_full(self):
+        self.active_set = list(range(self.p))
+        idx_S = np.array(self.active_set, dtype=int)
+        G_S = self.data.gram[np.ix_(idx_S, idx_S)]
+        try:
+            self.beta_S = np.linalg.solve(G_S, self.data.cov[idx_S])
+            self.K = np.linalg.solve(G_S, np.eye(len(idx_S)))
+        except np.linalg.LinAlgError as err:
+            raise np.linalg.LinAlgError(
+                "Active Gram matrix is singular or ill-conditioned during init_full."
+            ) from err
+
+        self.beta[:] = 0.0
+        self.beta[idx_S] = self.beta_S
+        c_S = self.data.cov[idx_S]
+        self.rss = self.data.y_norm - c_S @ self.beta_S
+
+    def compute_forward_deltas(
+        self, tol: Optional[float] = None
+    ) -> Optional[ForwardDeltaCache]:
+        tol_value = ABS_TOL if tol is None else float(tol)
+        return _build_forward_cache(self, tol_value)
+
+    def clone(self) -> "SelectionState":
+        clone = object.__new__(SelectionState)
+        clone.data = self.data
+        clone.p = self.p
+        clone.gram_diag = self.gram_diag
+        clone.beta = self.beta.copy()
+        clone.beta_S = self.beta_S.copy()
+        clone.K = None if self.K is None else self.K.copy()
+        clone.active_set = list(self.active_set)
+        clone.rss = float(self.rss)
+        return clone
+
+    def apply_forward_step(self, cache: ForwardDeltaCache, idx: int) -> int:
+        if idx < 0 or idx >= cache.candidates.size:
+            raise IndexError("Forward delta index out of bounds.")
+        return _apply_forward_from_cache(self, cache, idx)
+
+    def compute_backward_scores(
+        self, tol: Optional[float] = None
+    ) -> Optional[np.ndarray]:
+        k = len(self.active_set)
+        if k == 0 or self.K is None:
+            return None
+        diag_K = np.diag(self.K)
+        rss_new = np.full(k, np.inf, dtype=float)
+        tol_value = ABS_TOL if tol is None else float(tol)
+        safe = np.abs(diag_K) > tol_value
+        if np.any(safe):
+            rss_new[safe] = self.rss + self.beta_S[safe] ** 2 / diag_K[safe]
+        return rss_new
+
+    def apply_backward_step(self, idx_local: int, tol: Optional[float] = None) -> int:
+        tol_value = ABS_TOL if tol is None else float(tol)
+        update = _backward_components(self, idx_local, tol_value)
+        if update is None:
+            raise np.linalg.LinAlgError(
+                "Backward downdate failed; index invalid or numerically unstable."
+            )
+        removed_var, new_active_set, K_new, beta_S_new, rss_new = update
+        self.beta[removed_var] = 0.0
+        if new_active_set:
+            self.beta[new_active_set] = beta_S_new
+        self.active_set = new_active_set
+        self.beta_S = beta_S_new
+        self.K = K_new if self.active_set else None
+        self.rss = float(rss_new)
+        return removed_var
+
+
+@dataclass
+class CrossValSelectionState:
+    data: CrossValGramData
+    p: int = field(init=False)
+    n_folds: int = field(init=False)
+    train_states: List[SelectionState] = field(init=False)
+    active_set: List[int] = field(init=False, default_factory=list)
+    beta: np.ndarray = field(init=False)
+    oos_rss_folds: np.ndarray = field(init=False)
+    rss_cv: float = field(init=False)
+
+    def __post_init__(self):
+        self.p = self.data.gram_total.shape[0]
+        self.n_folds = self.data.n_folds
+        self.beta = np.zeros(self.p, dtype=float)
+        self._init_train_states_empty()
+        self.oos_rss_folds = np.array(self.data.y_norm_folds, dtype=float)
+        self.rss_cv = float(self.oos_rss_folds.sum())
+
+    def _init_train_states_empty(self) -> None:
+        self.train_states = []
+        for k in range(self.n_folds):
+            train_data_k = self.data.train_data_for_fold(k)
+            state_k = SelectionState(train_data_k)
+            self.train_states.append(state_k)
+        self._sync_active_set()
+
+    def init_empty(self) -> None:
+        self._init_train_states_empty()
+        self.beta[:] = 0.0
+        self.oos_rss_folds = np.array(self.data.y_norm_folds, dtype=float)
+        self.rss_cv = float(self.oos_rss_folds.sum())
+
+    def init_full(self) -> None:
+        self.train_states = []
+        for k in range(self.n_folds):
+            train_data_k = self.data.train_data_for_fold(k)
+            state_k = SelectionState(train_data_k)
+            state_k.init_full()
+            self.train_states.append(state_k)
+        self._sync_active_set()
+        self.beta[:] = 0.0
+        self.recompute_oos_rss()
+
+    def recompute_oos_rss(self) -> float:
+        S = self.active_set
+        if not S:
+            self.oos_rss_folds = np.array(self.data.y_norm_folds, dtype=float)
+            self.rss_cv = float(self.oos_rss_folds.sum())
+            return self.rss_cv
+
+        idx_S = np.array(S, dtype=int)
+        oos = np.empty(self.n_folds, dtype=float)
+
+        for k in range(self.n_folds):
+            state_k = self.train_states[k]
+            beta_S_k = state_k.beta_S
+            G_val_k = self.data.gram_folds[k]
+            c_val_k = self.data.cov_folds[k]
+            y_norm_val_k = self.data.y_norm_folds[k]
+            G_val_SS = G_val_k[np.ix_(idx_S, idx_S)]
+            c_val_S = c_val_k[idx_S]
+            rss_k = (
+                y_norm_val_k
+                - 2.0 * float(beta_S_k @ c_val_S)
+                + float(beta_S_k @ (G_val_SS @ beta_S_k))
+            )
+            oos[k] = rss_k
+
+        self.oos_rss_folds = oos
+        self.rss_cv = float(oos.sum())
+        return self.rss_cv
+
+    def _sync_active_set(self) -> None:
+        if self.train_states:
+            self.active_set = list(self.train_states[0].active_set)
+        else:
+            self.active_set = []
+
+    def apply_backward_step(self, idx_local: int, tol: Optional[float] = None) -> None:
+        tol_value = ABS_TOL if tol is None else float(tol)
+        for fold_state in self.train_states:
+            fold_state.apply_backward_step(idx_local, tol_value)
+        self._sync_active_set()
+        self.recompute_oos_rss()
+
+    def validation_rss_for_candidate(
+        self,
+        fold_idx: int,
+        cache: ForwardDeltaCache,
+        cache_idx: int,
+    ) -> float:
+        state_k = self.train_states[fold_idx]
+        candidate = int(cache.candidates[cache_idx])
+        beta_j = cache.resid_corr[cache_idx] / cache.resid_var[cache_idx]
+        if cache.active_rk == 0:
+            beta_vec = np.array([beta_j])
+            active = [candidate]
+        else:
+            proj_vec = cache.proj_col[:, cache_idx]
+            beta_S_new = state_k.beta_S - proj_vec * beta_j
+            beta_vec = np.concatenate([beta_S_new, np.array([beta_j])])
+            active = state_k.active_set + [candidate]
+
+        idx = np.array(active, dtype=int)
+        G_val = self.data.gram_folds[fold_idx]
+        c_val = self.data.cov_folds[fold_idx]
+        y_norm_val = self.data.y_norm_folds[fold_idx]
+        G_val_SS = G_val[np.ix_(idx, idx)]
+        c_val_S = c_val[idx]
+        rss = (
+            y_norm_val
+            - 2.0 * float(beta_vec @ c_val_S)
+            + float(beta_vec @ (G_val_SS @ beta_vec))
+        )
+        return rss
+
+    def validation_rss_for_backward_candidate(
+        self, fold_idx: int, local_idx: int, tol: float
+    ) -> float:
+        state_k = self.train_states[fold_idx]
+        if not state_k.active_set or local_idx >= len(state_k.active_set):
+            return np.inf
+        update_components = _backward_components(state_k, local_idx, tol)
+        if update_components is None:
+            return np.inf
+        _, new_active_set, _, beta_S_new, _ = update_components
+        if not new_active_set:
+            return self.data.y_norm_folds[fold_idx]
+
+        idx = np.array(new_active_set, dtype=int)
+        G_val = self.data.gram_folds[fold_idx]
+        c_val = self.data.cov_folds[fold_idx]
+        y_norm_val = self.data.y_norm_folds[fold_idx]
+        G_val_SS = G_val[np.ix_(idx, idx)]
+        c_val_S = c_val[idx]
+        rss = (
+            y_norm_val
+            - 2.0 * float(beta_S_new @ c_val_S)
+            + float(beta_S_new @ (G_val_SS @ beta_S_new))
+        )
+        return rss
+
+    def clone(self) -> "CrossValSelectionState":
+        clone = object.__new__(CrossValSelectionState)
+        clone.data = self.data
+        clone.p = self.p
+        clone.n_folds = self.n_folds
+        clone.train_states = [s.clone() for s in self.train_states]
+        clone.active_set = list(self.active_set)
+        clone.beta = self.beta.copy()
+        clone.oos_rss_folds = self.oos_rss_folds.copy()
+        clone.rss_cv = float(self.rss_cv)
+        return clone
