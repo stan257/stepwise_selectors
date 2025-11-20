@@ -22,7 +22,8 @@ def _build_forward_cache(
     state: "SelectionState", tol: float
 ) -> ForwardDeltaCache | None:
     # Reuse a shared mask buffer to mark inactive candidates.
-    mask = np.ones(state.p, dtype=bool)
+    mask = state.mask_buf
+    mask.fill(True)
     if state.active_set:
         mask[np.array(state.active_set, dtype=int)] = False
     candidates = np.where(mask)[0]
@@ -32,14 +33,14 @@ def _build_forward_cache(
     k = len(state.active_set)
     if k == 0:
         resid_var = state.gram_diag[candidates]
-        valid = resid_var > tol
+        valid = resid_var > tol  # multicollinearity check: avoid near-singular updates
         if not np.any(valid):
             return None
         candidates = candidates[valid]
         resid_var = resid_var[valid]
         resid_corr = state.data.cov[candidates]
         rss_new = state.rss - (resid_corr**2) / resid_var
-        valid_rss = rss_new > -tol
+        valid_rss = rss_new > -tol  # valid rss check: forbid negative/invalid RSS
         if not np.any(valid_rss):
             return None
         candidates = candidates[valid_rss]
@@ -59,7 +60,7 @@ def _build_forward_cache(
     g = state.data.gram[np.ix_(idx_S, candidates)]
     proj_col = state.K @ g
     resid_var = state.gram_diag[candidates] - np.sum(g * proj_col, axis=0)
-    valid = resid_var > tol
+    valid = resid_var > tol  # multicollinearity check: avoid near-singular updates
     if not np.any(valid):
         return None
     candidates = candidates[valid]
@@ -67,7 +68,7 @@ def _build_forward_cache(
     proj_col = proj_col[:, valid]
     resid_corr = state.data.cov[candidates] - state.beta_S @ g[:, valid]
     rss_new = state.rss - (resid_corr**2) / resid_var
-    valid_rss = rss_new > -tol
+    valid_rss = rss_new > -tol  # valid rss check: forbid negative/invalid RSS
     if not np.any(valid_rss):
         return None
     return ForwardDeltaCache(
@@ -171,6 +172,7 @@ class SelectionState:
     K_buf: np.ndarray = field(init=False)
     beta_buf: np.ndarray = field(init=False)
     outer_buf: np.ndarray = field(init=False)
+    mask_buf: np.ndarray = field(init=False)
 
     def __post_init__(self):
         self.p = self.data.gram.shape[0]
@@ -179,6 +181,7 @@ class SelectionState:
         self.K_buf = np.empty((self.p, self.p))
         self.beta_buf = np.empty(self.p)
         self.outer_buf = np.empty((self.p, self.p))
+        self.mask_buf = np.empty(self.p, dtype=bool)
         self.init_empty()
 
     def init_empty(self):
@@ -194,8 +197,12 @@ class SelectionState:
         idx_S = np.array(self.active_set, dtype=int)
         G_S = self.data.gram[np.ix_(idx_S, idx_S)]
         try:
-            beta_S_val = np.linalg.solve(G_S, self.data.cov[idx_S])
-            K_val = np.linalg.solve(G_S, np.eye(len(idx_S)))
+            L = np.linalg.cholesky(G_S)
+            rhs = self.data.cov[idx_S]
+            # Solve G_S beta = cov via Cholesky: L L^T beta = rhs.
+            beta_S_val = np.linalg.solve(L.T, np.linalg.solve(L, rhs))
+            # Invert G_S using the same factorization to keep symmetry.
+            K_val = np.linalg.solve(L.T, np.linalg.solve(L, np.eye(len(idx_S))))
         except np.linalg.LinAlgError as err:
             raise np.linalg.LinAlgError(
                 "Active Gram matrix is singular or ill-conditioned during init_full."
@@ -230,6 +237,7 @@ class SelectionState:
         clone.beta_buf = self.beta_buf.copy()
         clone.outer_buf = self.outer_buf.copy()
         clone.K_buf = self.K_buf.copy()
+        clone.mask_buf = self.mask_buf.copy()
         if self.beta_S.size:
             k_beta = self.beta_S.shape[0]
             clone.beta_S = clone.beta_buf[:k_beta]
