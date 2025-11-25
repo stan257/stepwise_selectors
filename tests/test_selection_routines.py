@@ -1,4 +1,4 @@
-import numpy as np
+import numpy as np  # noqa: D100
 import pytest
 from selection.criteria import BestRSSCriterion
 from selection.definitions import CrossValGramData, GramData
@@ -16,7 +16,7 @@ from selection.routines import (
     ForwardSelection,
     MixedSelection,
 )
-from selection.state import SelectionState
+from selection.state import SelectionState  # noqa: F401
 
 
 # ---------------------------------------------------------------------------
@@ -187,7 +187,9 @@ def test_crossval_backward_selection_matches_backward(small_cv_problem):
 
 def test_crossval_mixed_selection_matches_mixed(small_cv_problem):
     cv_selector = CrossValMixedSelection()
-    cv_state = cv_selector.fit(data=small_cv_problem, max_forward_steps=1, max_total_steps=2)
+    cv_state = cv_selector.fit(
+        data=small_cv_problem, max_forward_steps=1, max_total_steps=2
+    )
 
     assert cv_state.active_set == [0]
 
@@ -280,7 +282,9 @@ def test_beam_crossval_backward_selection_recovers_true_support():
 
 def test_beam_crossval_mixed_selection_matches_forward(small_cv_problem):
     selector = BeamCrossValMixedSelection(beam_width=2)
-    cv_state = selector.fit(data=small_cv_problem, max_forward_steps=1, max_total_steps=2)
+    cv_state = selector.fit(
+        data=small_cv_problem, max_forward_steps=1, max_total_steps=2
+    )
     assert cv_state.active_set == [0]
 
 
@@ -316,12 +320,16 @@ def test_cv_beam_matches_greedy_on_heterogeneous_folds():
             CrossValForwardSelection().fit(data=cv_data, max_steps=k).rss_cv
         )
         beam_rss.append(
-            BeamCrossValForwardSelection(beam_width=3).fit(
-                data=cv_data, max_steps=k
-            ).rss_cv
+            BeamCrossValForwardSelection(beam_width=3)
+            .fit(data=cv_data, max_steps=k)
+            .rss_cv
         )
-    assert all(later <= earlier + 1e-9 for earlier, later in zip(greedy_rss, greedy_rss[1:]))
-    assert all(later <= earlier + 1e-9 for earlier, later in zip(beam_rss, beam_rss[1:]))
+    assert all(
+        later <= earlier + 1e-9 for earlier, later in zip(greedy_rss, greedy_rss[1:])
+    )
+    assert all(
+        later <= earlier + 1e-9 for earlier, later in zip(beam_rss, beam_rss[1:])
+    )
 
 
 def test_forward_beam_search_selects_best_subset():
@@ -370,12 +378,8 @@ def test_beam_pruning_is_deterministic_and_non_worsening():
     greedy = BeamForwardSelection(beam_width=1, criterion_cls=BestRSSCriterion)
     wider = BeamForwardSelection(beam_width=3, criterion_cls=BestRSSCriterion)
 
-    greedy_state = greedy.fit(
-        data=GramData(gram, cov, y_norm, n_samples), max_steps=1
-    )
-    wider_state = wider.fit(
-        data=GramData(gram, cov, y_norm, n_samples), max_steps=1
-    )
+    greedy_state = greedy.fit(data=GramData(gram, cov, y_norm, n_samples), max_steps=1)
+    wider_state = wider.fit(data=GramData(gram, cov, y_norm, n_samples), max_steps=1)
 
     assert greedy_state.active_set == [0]
     assert wider_state.active_set == [0]
@@ -433,7 +437,7 @@ def test_mixed_selection_matches_direct_solution():
     if len(idx):
         gram_ss = gram[np.ix_(idx, idx)]
         beta_expected = np.zeros(p)
-        beta_expected[idx] = np.linalg.solve(gram_ss, cov[idx])
+        beta_expected[idx] = np.linalg.solve(gram_ss, cov[idx])  # noqa: E501
         np.testing.assert_allclose(state.beta, beta_expected, atol=1e-8)
         rss_expected = y_norm - cov[idx] @ beta_expected[idx]
     else:
@@ -471,7 +475,7 @@ def test_crossval_mixed_keeps_fold_state_in_sync():
     desync between folds and the aggregated view.
     """
     cv_data, support_set = make_cv_support_problem(p=12, support=4, folds=3, n=200)
-    max_forward_steps = 3
+    max_forward_steps = 3  # noqa: F841
     max_total_steps = 5
 
     selector = CrossValMixedSelection()
@@ -489,7 +493,9 @@ def test_crossval_mixed_keeps_fold_state_in_sync():
             break
         if forward_steps >= max_forward_steps:
             break
-        if not selector._forward_step(cv_state, selector._init_criterion(cv_state, cv_data)):
+        if not selector._forward_step(
+            cv_state, selector._init_criterion(cv_state, cv_data)
+        ):
             break
         forward_steps += 1
         ops += 1
@@ -500,17 +506,23 @@ def test_crossval_mixed_keeps_fold_state_in_sync():
         assert list(fold_sets[0]) == cv_state.active_set
 
         # Assert cached rss_cv matches fresh recomputation.
-        assert pytest.approx(cv_state.rss_cv, rel=1e-9, abs=1e-9) == recompute_from_folds(cv_state)
+        assert pytest.approx(
+            cv_state.rss_cv, rel=1e-9, abs=1e-9
+        ) == recompute_from_folds(cv_state)
 
         # Try one backward step if budget allows.
         if max_total_steps is not None and ops >= max_total_steps:
             break
-        if selector._backward_step(cv_state, selector._init_criterion(cv_state, cv_data)):
+        if selector._backward_step(
+            cv_state, selector._init_criterion(cv_state, cv_data)
+        ):
             ops += 1
             fold_sets = [tuple(s.active_set) for s in cv_state.train_states]
             assert all(fs == fold_sets[0] for fs in fold_sets)
             assert list(fold_sets[0]) == cv_state.active_set
-            assert pytest.approx(cv_state.rss_cv, rel=1e-9, abs=1e-9) == recompute_from_folds(cv_state)
+            assert pytest.approx(
+                cv_state.rss_cv, rel=1e-9, abs=1e-9
+            ) == recompute_from_folds(cv_state)
 
 
 # ---------------------------------------------------------------------------
