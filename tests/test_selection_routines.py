@@ -342,7 +342,7 @@ def test_forward_beam_search_selects_best_subset():
 def test_backward_beam_search_selects_smallest_subset():
     gram, cov, y_norm, n_samples = make_diagonal_problem(6)
     y_norm += 1.0
-    selector = BeamBackwardSelection(beam_width=2)
+    selector = BeamBackwardSelection(beam_width=2, allow_worse=True)
     state = selector.fit(data=GramData(gram, cov, y_norm, n_samples), max_steps=3)
     assert len(state.active_set) == 3
     assert set(state.active_set) == set(expected_indices(6, 3))
@@ -551,7 +551,9 @@ def test_rank_deficient_backward_recovers_full_rank_subset():
     assert np.isfinite(inv_direct).all()
 
     # Beam backward on the same problem should also return a full-rank subset.
-    beam = BeamBackwardSelection(beam_width=2, criterion_cls=BestRSSCriterion)
+    beam = BeamBackwardSelection(
+        beam_width=2, criterion_cls=BestRSSCriterion, allow_worse=True
+    )
     beam_state = beam.fit(data=data, max_steps=1)
     assert len(beam_state.active_set) == 2
     inv_beam = np.linalg.inv(gram[np.ix_(beam_state.active_set, beam_state.active_set)])

@@ -131,6 +131,19 @@ class ForwardSelection(BaseSingleSelectionRoutine):
 
 
 class BackwardSelection(BaseSingleSelectionRoutine):
+    """Greedy backward selection.
+
+    Parameters
+    ----------
+    allow_worse : bool, default=False
+        If True, allows the selection to make a non-improving move at each step.
+        This can help escape local optima, especially when `max_steps` is limited.
+    """
+
+    def __init__(self, *, allow_worse: bool = False, **kwargs):
+        super().__init__(**kwargs)
+        self.allow_worse = allow_worse
+
     def fit(
         self,
         state: SelectionState | None = None,
@@ -141,7 +154,7 @@ class BackwardSelection(BaseSingleSelectionRoutine):
         run_state, criterion = self._init_run(state, data, mode="full")
         steps = 0
         while max_steps is None or steps < max_steps:
-            if not self._backward_step(run_state, criterion):
+            if not self._backward_step(run_state, criterion, allow_worse=self.allow_worse):
                 break
             steps += 1
         return run_state
@@ -211,6 +224,19 @@ class BeamForwardSelection(BaseBeamSelectionRoutine):
 
 
 class BeamBackwardSelection(BaseBeamSelectionRoutine):
+    """Backward selection with beam search.
+
+    Parameters
+    ----------
+    allow_worse : bool, default=False
+        If True, allows the search to explore non-improving moves. This can
+        help escape local optima, especially when `max_steps` is limited.
+    """
+
+    def __init__(self, *, allow_worse: bool = False, **kwargs):
+        super().__init__(**kwargs)
+        self.allow_worse = allow_worse
+
     def fit(
         self,
         state: SelectionState | None = None,
@@ -219,14 +245,13 @@ class BeamBackwardSelection(BaseBeamSelectionRoutine):
         max_steps=None,
     ) -> SelectionState:
         run_state, criterion = self._init_run(state, data, mode="full")
-        allow_worse = max_steps is not None
         initial = Beam(run_state, criterion, criterion.current_value)
         return run_beam_search(
             initial,
             beam_width=self.beam_width,
             max_steps=max_steps,
             expand_fn=lambda beam: beam_backward_children(
-                beam, self.beam_width, self.tol, allow_worse=allow_worse
+                beam, self.beam_width, self.tol, allow_worse=self.allow_worse
             ),
         )
 
