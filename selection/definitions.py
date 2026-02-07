@@ -10,15 +10,17 @@ class GramData:
     cov: np.ndarray
     y_norm: float
     n_samples: int
+    dtype: np.dtype | None = None
 
     def __post_init__(self):
         if not isinstance(self.gram, np.ndarray):
             raise TypeError("Gram matrix must be a numpy array.")
         if not isinstance(self.cov, np.ndarray):
             raise TypeError("cov vector must be a numpy array.")
-        # Ensure contiguous storage for BLAS-friendly access patterns.
-        object.__setattr__(self, "gram", np.ascontiguousarray(self.gram))
-        object.__setattr__(self, "cov", np.ascontiguousarray(self.cov))
+        # Ensure contiguous storage (and optional casting) for BLAS-friendly access.
+        dtype = None if self.dtype is None else np.dtype(self.dtype)
+        object.__setattr__(self, "gram", np.ascontiguousarray(self.gram, dtype=dtype))
+        object.__setattr__(self, "cov", np.ascontiguousarray(self.cov, dtype=dtype))
         if not isinstance(self.y_norm, Real):
             raise TypeError("y_norm must be a real number.")
         if not isinstance(self.n_samples, Integral):
