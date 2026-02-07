@@ -265,6 +265,36 @@ class SelectionState:
         self.K_buf[:k, :k] = K_val
         self.K = self.K_buf[:k, :k]
 
+    def init_from_active_set(self, active_set: list[int]) -> None:
+        """Initialize state from an explicit active set using a stable solve."""
+        self.active_set = list(active_set)
+        self._refresh_active_cache()
+        if not self.active_set:
+            self.init_empty()
+            return
+        idx_S = self.active_idx
+        G_S = self.data.gram[np.ix_(idx_S, idx_S)]
+        try:
+            L = np.linalg.cholesky(G_S)
+            rhs = self.data.cov[idx_S]
+            beta_S_val = np.linalg.solve(L.T, np.linalg.solve(L, rhs))
+            # Invert G_S using the same factorization to keep symmetry.
+            K_val = np.linalg.solve(L.T, np.linalg.solve(L, np.eye(len(idx_S))))
+        except np.linalg.LinAlgError as err:
+            raise np.linalg.LinAlgError(
+                "Active Gram matrix is singular or ill-conditioned."
+            ) from err
+
+        self.beta[:] = 0.0
+        self.beta[idx_S] = beta_S_val
+        self.rss = self.data.y_norm - self.data.cov[idx_S] @ beta_S_val
+
+        k = len(idx_S)
+        self.beta_buf[:k] = beta_S_val
+        self.beta_S = self.beta_buf[:k]
+        self.K_buf[:k, :k] = K_val
+        self.K = self.K_buf[:k, :k]
+
     def compute_forward_deltas(
         self, tol: float | None = None
     ) -> ForwardDeltaCache | None:
