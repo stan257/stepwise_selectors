@@ -60,10 +60,40 @@ def cv_forward_scores(
             if not np.array_equal(cache.candidates[idx_local], candidates):
                 raise RuntimeError("Candidate mapping mismatch during CV forward scoring.")
         candidate_indices.append(idx_local)
-        for col, cache_idx in enumerate(idx_local):
-            rss_matrix[fold_idx, col] = cv_state.validation_rss_for_candidate(
-                fold_idx, cache, int(cache_idx)
+        state_k = cv_state.train_states[fold_idx]
+        resid_corr = cache.resid_corr[idx_local]
+        resid_var = cache.resid_var[idx_local]
+        beta_j = resid_corr / resid_var
+
+        G_val = cv_state.data.gram_folds[fold_idx]
+        c_val = cv_state.data.cov_folds[fold_idx]
+        y_norm_val = cv_state.data.y_norm_folds[fold_idx]
+        c_val_j = c_val[candidates]
+        g_val_jj = np.diag(G_val)[candidates]
+
+        if cache.active_rk == 0:
+            rss_matrix[fold_idx] = (
+                y_norm_val - 2.0 * beta_j * c_val_j + (beta_j**2) * g_val_jj
             )
+            continue
+
+        if cache.proj_col is None:
+            raise RuntimeError("Missing projection cache for non-empty active set.")
+        idx_S = np.array(state_k.active_set, dtype=int)
+        c_val_S = c_val[idx_S]
+        G_val_SS = G_val[np.ix_(idx_S, idx_S)]
+        g_val_Sc = G_val[np.ix_(idx_S, candidates)]
+
+        proj_col = cache.proj_col[:, idx_local]
+        beta_S_new = state_k.beta_S[:, None] - proj_col * beta_j[None, :]
+
+        # Gram-only RSS formula for validation fold, vectorized across candidates.
+        term1 = -2.0 * (beta_S_new * c_val_S[:, None]).sum(axis=0)
+        term2 = -2.0 * beta_j * c_val_j
+        term3 = (beta_S_new * (G_val_SS @ beta_S_new)).sum(axis=0)
+        term4 = 2.0 * beta_j * (g_val_Sc * beta_S_new).sum(axis=0)
+        term5 = (beta_j**2) * g_val_jj
+        rss_matrix[fold_idx] = y_norm_val + term1 + term2 + term3 + term4 + term5
 
     # Use summed CV RSS to keep the scale consistent with rss_cv (sum over folds).
     aggregated = np.sum(rss_matrix, axis=0)
