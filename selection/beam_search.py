@@ -13,13 +13,17 @@ class Beam:
     state: SelectionState
     criterion: SelectionCriterion
     score: float
-    _signature: tuple[int, ...] = field(init=False, repr=False)
+    _signature: int = field(init=False, repr=False)
 
     def __post_init__(self):
-        self._signature = tuple(sorted(self.state.active_set))
+        # Order-insensitive bitmask speeds up deduplication across beams.
+        sig = 0
+        for idx in self.state.active_set:
+            sig |= 1 << int(idx)
+        self._signature = sig
 
     @property
-    def signature(self) -> tuple[int, ...]:
+    def signature(self) -> int:
         return self._signature
 
 
