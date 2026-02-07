@@ -16,6 +16,9 @@ class GramData:
             raise TypeError("Gram matrix must be a numpy array.")
         if not isinstance(self.cov, np.ndarray):
             raise TypeError("cov vector must be a numpy array.")
+        # Ensure contiguous storage for BLAS-friendly access patterns.
+        object.__setattr__(self, "gram", np.ascontiguousarray(self.gram))
+        object.__setattr__(self, "cov", np.ascontiguousarray(self.cov))
         if not isinstance(self.y_norm, Real):
             raise TypeError("y_norm must be a real number.")
         if not isinstance(self.n_samples, Integral):
