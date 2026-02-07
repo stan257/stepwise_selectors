@@ -2,7 +2,12 @@
 
 from .criteria import AICCriterion, BestRSSCriterion, SelectionCriterion
 from .definitions import CrossValGramData, GramData
-from .fast_routines import FastBeamForwardSelection, FastForwardSelection
+from .fast_routines import (
+    FastBackwardSelection,
+    FastBeamForwardSelection,
+    FastForwardSelection,
+    FastMixedSelection,
+)
 from .grouped_routines import GroupBackwardSelection, GroupForwardSelection
 from .routines import (
     BackwardSelection,
@@ -29,6 +34,8 @@ __all__ = [
     "GroupForwardSelection",
     "FastForwardSelection",
     "FastBeamForwardSelection",
+    "FastBackwardSelection",
+    "FastMixedSelection",
     "BackwardSelection",
     "BeamBackwardSelection",
     "BeamCrossValBackwardSelection",
