@@ -23,9 +23,8 @@ def _build_forward_cache(
 ) -> ForwardDeltaCache | None:
     # Reuse a shared mask buffer to mark inactive candidates.
     mask = state.mask_buf
-    mask.fill(True)
-    if state.active_set:
-        mask[np.array(state.active_set, dtype=int)] = False
+    # active_mask tracks active features; invert it to get candidate positions.
+    np.logical_not(state.active_mask, out=mask)
     candidates = np.where(mask)[0]
     if not candidates.size:
         return None
@@ -56,7 +55,7 @@ def _build_forward_cache(
             active_rk=0,
         )
 
-    idx_S = np.array(state.active_set, dtype=int)
+    idx_S = state.active_idx
     g = state.data.gram[np.ix_(idx_S, candidates)]
     proj_col = state.K @ g
     resid_var = state.gram_diag[candidates] - np.sum(g * proj_col, axis=0)
@@ -116,7 +115,10 @@ def _apply_forward_from_cache(
     state.beta_S = beta_new.view()
     state.K = K_new.view()
     state.active_set.append(feat_idx)
-    idx_array = np.array(state.active_set, dtype=int)
+    state.active_idx_buf[state.active_len] = feat_idx
+    state.active_len += 1
+    state.active_mask[feat_idx] = True
+    idx_array = state.active_idx
     state.beta[idx_array] = state.beta_S
     state.rss = float(rss_new)
     return feat_idx
@@ -173,6 +175,9 @@ class SelectionState:
     beta_buf: np.ndarray = field(init=False)
     outer_buf: np.ndarray = field(init=False)
     mask_buf: np.ndarray = field(init=False)
+    active_mask: np.ndarray = field(init=False)
+    active_idx_buf: np.ndarray = field(init=False)
+    active_len: int = field(init=False, default=0)
 
     def __post_init__(self):
         self.p = self.data.gram.shape[0]
@@ -182,10 +187,29 @@ class SelectionState:
         self.beta_buf = np.empty(self.p)
         self.outer_buf = np.empty((self.p, self.p))
         self.mask_buf = np.empty(self.p, dtype=bool)
+        self.active_mask = np.zeros(self.p, dtype=bool)
+        self.active_idx_buf = np.empty(self.p, dtype=int)
+        self.active_len = 0
         self.init_empty()
+
+    @property
+    def active_idx(self) -> np.ndarray:
+        return self.active_idx_buf[: self.active_len]
+
+    def _refresh_active_cache(self) -> None:
+        """Synchronize active index/mask caches from active_set."""
+        self.active_len = len(self.active_set)
+        if self.active_len:
+            self.active_idx_buf[: self.active_len] = np.array(self.active_set, dtype=int)
+            # Reset and fill only once per sync to keep mask consistent.
+            self.active_mask.fill(False)
+            self.active_mask[self.active_idx] = True
+        else:
+            self.active_mask.fill(False)
 
     def init_empty(self):
         self.active_set = []
+        self._refresh_active_cache()
         self.beta[:] = 0.0
         self.beta_S = np.zeros(0)
         self.K = None
@@ -194,7 +218,8 @@ class SelectionState:
 
     def init_full(self):
         self.active_set = list(range(self.p))
-        idx_S = np.array(self.active_set, dtype=int)
+        self._refresh_active_cache()
+        idx_S = self.active_idx
         G_S = self.data.gram[np.ix_(idx_S, idx_S)]
         try:
             L = np.linalg.cholesky(G_S)
@@ -238,6 +263,9 @@ class SelectionState:
         clone.outer_buf = self.outer_buf.copy()
         clone.K_buf = self.K_buf.copy()
         clone.mask_buf = self.mask_buf.copy()
+        clone.active_mask = self.active_mask.copy()
+        clone.active_idx_buf = self.active_idx_buf.copy()
+        clone.active_len = self.active_len
         if self.beta_S.size:
             k_beta = self.beta_S.shape[0]
             clone.beta_S = clone.beta_buf[:k_beta]
@@ -283,6 +311,7 @@ class SelectionState:
         if new_active_set:
             self.beta[new_active_set] = beta_S_new
         self.active_set = new_active_set
+        self._refresh_active_cache()
         self.beta_S = beta_S_new
         self.K = K_new if self.active_set else None
         self.rss = float(rss_new)
