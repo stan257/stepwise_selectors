@@ -1,5 +1,10 @@
-"""Selection routines orchestrating forward, backward, and mixed strategies."""
+"""Deprecated reference implementations for selection routines.
 
+Use `selection.routines` (fast defaults) or `selection.fast_routines` directly.
+This module will be removed in a future release.
+"""
+
+import warnings
 import inspect
 import numpy as np
 
@@ -16,6 +21,13 @@ from .beam_utils import (
 from .cv_utils import cv_backward_scores, cv_forward_scores
 from .definitions import GramData, CrossValGramData
 from .state import SelectionState, CrossValSelectionState
+
+warnings.warn(
+    "selection.legacy_routines is deprecated and will be removed in a future release. "
+    "Use selection.routines or selection.fast_routines instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 
 class BaseSingleSelectionRoutine:

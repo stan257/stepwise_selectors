@@ -19,8 +19,8 @@ Lightweight linear-model selection routines built on precomputed Gram statistics
 - Beam + cross-val: `BeamCrossValForwardSelection`, `BeamCrossValBackwardSelection`, `BeamCrossValMixedSelection`
 - Grouped routines: `GroupForwardSelection`, `GroupBackwardSelection`
 - Criteria: `AICCriterion`, `BestRSSCriterion`
-- Reference (slow) implementations live in `selection.legacy_routines` and
-  `selection.legacy_grouped_routines`.
+- Deprecated reference (slow) implementations live in `selection.legacy_routines`
+  and `selection.legacy_grouped_routines` and will be removed in a future release.
 
 ## Quick start
 1) Install deps (Python 3.12+; minimal requirements: `numpy`, `pytest`). In conda:
@@ -58,6 +58,6 @@ print(gstate.active_groups, gstate.beta, gstate.rss)
 
 ## Notes
 - The code operates on Gram statistics (`X.T @ X`, `X.T @ y`, `y.T @ y`) and does not depend on raw design matrices.
-- `selection.routines` and `selection.grouped_routines` now default to the fast implementations; the reference versions are under `selection.legacy_*`.
+- `selection.routines` and `selection.grouped_routines` default to fast implementations; deprecated references are under `selection.legacy_*`.
 - For cross-validation, provide per-fold `GramData` via `CrossValGramData`.
 - Beam search and mixed routines rely on the same criterion interface (default AIC; can swap in `BestRSSCriterion`).

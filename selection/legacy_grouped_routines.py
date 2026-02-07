@@ -1,11 +1,14 @@
 """
-Reference implementations for grouped greedy selection.
+Deprecated reference implementations for grouped greedy selection.
 
 These routines intentionally recompute block solves for transparency.
-Fast grouped selection lives in `selection.grouped_routines`.
+Use `selection.grouped_routines` (fast defaults) instead.
+This module will be removed in a future release.
 """
 
 from __future__ import annotations
+
+import warnings
 
 import inspect
 from typing import Iterable, Sequence
@@ -15,6 +18,13 @@ import numpy as np
 from .constants import ABS_TOL
 from .criteria import AICCriterion, SelectionCriterion
 from .definitions import GramData
+
+warnings.warn(
+    "selection.legacy_grouped_routines is deprecated and will be removed in a future "
+    "release. Use selection.grouped_routines instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 
 def _flatten_group_indices(groups: Iterable[int], group_map: Sequence[Sequence[int]]):
