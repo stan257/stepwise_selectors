@@ -7,9 +7,18 @@ Lightweight linear-model selection routines built on precomputed Gram statistics
 - Optional grouped forward/backward selection.
 
 ## Layout
-- `useful/selection/`: core code (criteria, state updates, beam utils, grouped variants).
-- `useful/tests/`: pytest suite covering selectors, state management, and grouped routines.
+- `selection/`: core code (criteria, state updates, beam utils, grouped variants).
+- `tests/`: pytest suite covering selectors, state management, and grouped routines.
 - `summary.md`: annotated walkthrough of the selection codebase.
+
+## API overview
+- Data containers: `GramData`, `CrossValGramData`
+- Greedy routines: `ForwardSelection`, `BackwardSelection`, `MixedSelection`
+- Beam routines: `BeamForwardSelection`, `BeamBackwardSelection`, `BeamMixedSelection`
+- Cross-val routines: `CrossValForwardSelection`, `CrossValBackwardSelection`, `CrossValMixedSelection`
+- Beam + cross-val: `BeamCrossValForwardSelection`, `BeamCrossValBackwardSelection`, `BeamCrossValMixedSelection`
+- Grouped routines: `GroupForwardSelection`, `GroupBackwardSelection`
+- Criteria: `AICCriterion`, `BestRSSCriterion`
 
 ## Quick start
 1) Install deps (Python 3.12+; minimal requirements: `numpy`, `pytest`). In conda:
@@ -17,11 +26,15 @@ Lightweight linear-model selection routines built on precomputed Gram statistics
 conda create -n jax-arm python=3.12 numpy pytest
 conda activate jax-arm
 ```
-2) Run tests:
+2) Install the package (editable):
 ```bash
-pytest useful/tests
+python -m pip install -e .
 ```
-3) Use selection routines:
+3) Run tests:
+```bash
+pytest tests
+```
+4) Use selection routines:
 ```python
 from selection.definitions import GramData
 from selection.routines import ForwardSelection
