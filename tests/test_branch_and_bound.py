@@ -30,7 +30,9 @@ def _exhaustive_best(data: GramData, k_max: int, criterion) -> tuple[tuple[int, 
         for subset in itertools.combinations(range(p), k):
             _, rss = _explicit_beta_rss(data, subset)
             score = float(np.asarray(criterion.evaluate(rss, k)))
-            if criterion.is_improvement(score, incumbent=best_score):
+            if not np.isfinite(best_score) or criterion.is_improvement(
+                score, incumbent=best_score
+            ):
                 best_score = score
                 best_subset = subset
     return best_subset, best_score
@@ -43,7 +45,9 @@ def _exhaustive_best_exact(data: GramData, k: int, criterion) -> tuple[tuple[int
     for subset in itertools.combinations(range(p), k):
         _, rss = _explicit_beta_rss(data, subset)
         score = float(np.asarray(criterion.evaluate(rss, k)))
-        if criterion.is_improvement(score, incumbent=best_score):
+        if not np.isfinite(best_score) or criterion.is_improvement(
+            score, incumbent=best_score
+        ):
             best_score = score
             best_subset = subset
     return best_subset, best_score
@@ -60,7 +64,9 @@ def test_branch_and_bound_matches_exhaustive_best_rss():
     criterion = BestRSSCriterion()
     subset, score = _exhaustive_best(data, k_max=3, criterion=criterion)
 
-    state = BranchAndBoundSelection(criterion_cls=BestRSSCriterion).fit(
+    state = BranchAndBoundSelection(
+        criterion_cls=BestRSSCriterion, bound_strategy="none"
+    ).fit(
         data=data, max_subset_size=3
     )
     chosen = tuple(sorted(state.active_set))
@@ -79,7 +85,9 @@ def test_branch_and_bound_exact_k_matches_exhaustive():
     criterion = BestRSSCriterion()
     subset, score = _exhaustive_best_exact(data, k=k, criterion=criterion)
 
-    state = BranchAndBoundSelection(criterion_cls=BestRSSCriterion).fit(
+    state = BranchAndBoundSelection(
+        criterion_cls=BestRSSCriterion, bound_strategy="none"
+    ).fit(
         data=data, max_subset_size=k, exact_k=True
     )
     chosen = tuple(sorted(state.active_set))
@@ -98,7 +106,9 @@ def test_branch_and_bound_matches_exhaustive_aic():
     criterion = AICCriterion(n_samples=n)
     subset, score = _exhaustive_best(data, k_max=4, criterion=criterion)
 
-    state = BranchAndBoundSelection(criterion_cls=AICCriterion).fit(
+    state = BranchAndBoundSelection(
+        criterion_cls=AICCriterion, bound_strategy="none"
+    ).fit(
         data=data, max_subset_size=4
     )
     chosen = tuple(sorted(state.active_set))

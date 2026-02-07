@@ -25,17 +25,20 @@ class BranchAndBoundSelection:
 
     This is intended for small subset sizes (k) or small p. It explores
     subsets in lexicographic order and prunes using optimistic bounds from
-    forward-step improvements.
+    forward-step improvements. Use bound_strategy="none" for fully exhaustive
+    (exact) search without pruning.
     """
 
     def __init__(
         self,
         *,
         tol: float = ABS_TOL,
+        bound_strategy: str = "none",
         criterion_cls=None,
         criterion_kwargs=None,
     ):
         self.tol = float(tol)
+        self.bound_strategy = bound_strategy
         self.criterion_cls = criterion_cls or AICCriterion
         self.criterion_kwargs = dict(criterion_kwargs or {})
 
@@ -55,6 +58,10 @@ class BranchAndBoundSelection:
     ) -> SelectionState:
         if max_subset_size < 0:
             raise ValueError("max_subset_size must be non-negative.")
+        if self.bound_strategy not in ("none", "forward_sum", "full"):
+            raise ValueError(
+                "bound_strategy must be one of: 'none', 'forward_sum', 'full'."
+            )
 
         criterion = self._init_criterion(data)
         stats = BranchAndBoundStats()
@@ -69,6 +76,25 @@ class BranchAndBoundSelection:
             rss_new: np.ndarray,
         ) -> float | None:
             """Compute optimistic best achievable score from this node."""
+            if self.bound_strategy == "none":
+                return None
+
+            if self.bound_strategy == "full":
+                idx = list(state.active_set) + [int(c) for c in candidates]
+                if not idx:
+                    return None
+                idx_arr = np.array(idx, dtype=int)
+                try:
+                    G_ss = data.gram[np.ix_(idx_arr, idx_arr)]
+                    cov_s = data.cov[idx_arr]
+                    beta = np.linalg.solve(G_ss, cov_s)
+                    rss = float(data.y_norm - cov_s @ beta)
+                except np.linalg.LinAlgError:
+                    return None
+                rss = max(rss, rss_floor)
+                score = float(np.asarray(criterion.evaluate(rss, len(idx))))
+                return score
+
             remain = max_subset_size - state.k
             if remain <= 0:
                 return None
@@ -121,7 +147,9 @@ class BranchAndBoundSelection:
                 score = float(
                     np.asarray(criterion.evaluate(max(state.rss, rss_floor), k))
                 )
-                if criterion.is_improvement(score, incumbent=best_score):
+                if not np.isfinite(best_score) or criterion.is_improvement(
+                    score, incumbent=best_score
+                ):
                     best_score = score
                     best_set = list(state.active_set)
 
@@ -139,8 +167,10 @@ class BranchAndBoundSelection:
             rss_new = rss_new[mask]
 
             bound = optimistic_bound(state, candidates, rss_new)
-            if bound is not None and not criterion.is_improvement(
-                bound, incumbent=best_score
+            if (
+                bound is not None
+                and np.isfinite(best_score)
+                and not criterion.is_improvement(bound, incumbent=best_score)
             ):
                 stats.pruned += 1
                 return
