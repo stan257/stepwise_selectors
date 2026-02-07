@@ -1,7 +1,4 @@
-"""Fast selection routines (default API).
-
-Reference implementations are available in `selection.legacy_routines`.
-"""
+"""Fast selection routines (default API)."""
 
 from .fast_routines import (
     FastBackwardSelection as BackwardSelection,

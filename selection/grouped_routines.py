@@ -1,8 +1,4 @@
-"""
-Fast grouped selection routines (default API).
-
-Reference implementations live in `selection.legacy_grouped_routines`.
-"""
+"""Fast grouped selection routines (default API)."""
 
 from __future__ import annotations
 
