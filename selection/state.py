@@ -3,6 +3,9 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from .constants import ABS_TOL
+
+# Tuneable block size for forward candidate scoring to reduce peak memory.
+FORWARD_BLOCK_SIZE = 4096
 from .definitions import CrossValGramData, GramData
 
 
@@ -56,16 +59,31 @@ def _build_forward_cache(
         )
 
     idx_S = state.active_idx
-    g = state.data.gram[np.ix_(idx_S, candidates)]
-    proj_col = state.K @ g
-    resid_var = state.gram_diag[candidates] - np.sum(g * proj_col, axis=0)
+    k = idx_S.size
+    num_candidates = candidates.size
+    proj_col = np.empty((k, num_candidates), dtype=float)
+    resid_var = np.empty(num_candidates, dtype=float)
+    resid_corr = np.empty(num_candidates, dtype=float)
+
+    # Block evaluation avoids materializing the full G_Sc matrix at once.
+    for start in range(0, num_candidates, FORWARD_BLOCK_SIZE):
+        end = min(start + FORWARD_BLOCK_SIZE, num_candidates)
+        cand_block = candidates[start:end]
+        g_block = state.data.gram[np.ix_(idx_S, cand_block)]
+        proj_block = state.K @ g_block
+        proj_col[:, start:end] = proj_block
+        resid_var[start:end] = state.gram_diag[cand_block] - np.sum(
+            g_block * proj_block, axis=0
+        )
+        resid_corr[start:end] = state.data.cov[cand_block] - state.beta_S @ g_block
+        # Delay RSS computation until after filtering to avoid invalid divides.
     valid = resid_var > tol  # multicollinearity check: avoid near-singular updates
     if not np.any(valid):
         return None
     candidates = candidates[valid]
     resid_var = resid_var[valid]
     proj_col = proj_col[:, valid]
-    resid_corr = state.data.cov[candidates] - state.beta_S @ g[:, valid]
+    resid_corr = resid_corr[valid]
     rss_new = state.rss - (resid_corr**2) / resid_var
     valid_rss = rss_new > -tol  # valid rss check: forbid negative/invalid RSS
     if not np.any(valid_rss):
