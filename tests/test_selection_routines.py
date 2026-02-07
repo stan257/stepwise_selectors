@@ -480,10 +480,12 @@ def test_crossval_mixed_keeps_fold_state_in_sync():
     max_forward_steps = 3  # noqa: F841
     max_total_steps = 5
 
-    from selection.legacy_routines import CrossValMixedSelection as LegacyCrossValMixedSelection
+    from selection.constants import ABS_TOL
+    from selection.cv_utils import cv_backward_scores, cv_forward_scores
+    from selection.state import CrossValSelectionState
 
-    selector = LegacyCrossValMixedSelection()
-    cv_state = selector._init_run(None, cv_data, mode="empty")[0]
+    cv_state = CrossValSelectionState(cv_data)
+    cv_state.init_empty()
 
     # Helper to recompute rss_cv fresh from per-fold states.
     def recompute_from_folds(state):
@@ -497,10 +499,17 @@ def test_crossval_mixed_keeps_fold_state_in_sync():
             break
         if forward_steps >= max_forward_steps:
             break
-        if not selector._forward_step(
-            cv_state, selector._init_criterion(cv_state, cv_data)
-        ):
+        forward_data = cv_forward_scores(cv_state, ABS_TOL)
+        if forward_data is None:
             break
+        best_idx = int(np.argmin(forward_data.aggregated_rss))
+        chosen = forward_data.candidates[best_idx]
+        for fold_idx, fold_state in enumerate(cv_state.train_states):
+            cache = forward_data.fold_caches[fold_idx]
+            idx_local = forward_data.candidate_maps[fold_idx][chosen]
+            fold_state.apply_forward_step(cache, idx_local)
+        cv_state._sync_active_set()
+        cv_state.recompute_oos_rss()
         forward_steps += 1
         ops += 1
 
@@ -517,16 +526,21 @@ def test_crossval_mixed_keeps_fold_state_in_sync():
         # Try one backward step if budget allows.
         if max_total_steps is not None and ops >= max_total_steps:
             break
-        if selector._backward_step(
-            cv_state, selector._init_criterion(cv_state, cv_data)
-        ):
-            ops += 1
-            fold_sets = [tuple(s.active_set) for s in cv_state.train_states]
-            assert all(fs == fold_sets[0] for fs in fold_sets)
-            assert list(fold_sets[0]) == cv_state.active_set
-            assert pytest.approx(
-                cv_state.rss_cv, rel=1e-9, abs=1e-9
-            ) == recompute_from_folds(cv_state)
+        backward_data = cv_backward_scores(cv_state, ABS_TOL)
+        if backward_data is None:
+            break
+        best_local = int(np.argmin(backward_data.aggregated_rss))
+        try:
+            cv_state.apply_backward_step(best_local, ABS_TOL)
+        except np.linalg.LinAlgError:
+            break
+        ops += 1
+        fold_sets = [tuple(s.active_set) for s in cv_state.train_states]
+        assert all(fs == fold_sets[0] for fs in fold_sets)
+        assert list(fold_sets[0]) == cv_state.active_set
+        assert pytest.approx(
+            cv_state.rss_cv, rel=1e-9, abs=1e-9
+        ) == recompute_from_folds(cv_state)
 
 
 # ---------------------------------------------------------------------------

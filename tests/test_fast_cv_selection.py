@@ -8,7 +8,7 @@ from selection.fast_routines import (
     FastCrossValForwardSelection,
     FastCrossValMixedSelection,
 )
-from selection.legacy_routines import (
+from selection.routines import (
     CrossValBackwardSelection,
     CrossValForwardSelection,
     CrossValMixedSelection,

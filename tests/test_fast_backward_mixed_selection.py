@@ -4,7 +4,7 @@ import pytest
 from selection.criteria import BestRSSCriterion
 from selection.definitions import GramData
 from selection.fast_routines import FastBackwardSelection, FastMixedSelection
-from selection.legacy_routines import BackwardSelection, MixedSelection
+from selection.routines import BackwardSelection, MixedSelection
 
 
 def test_fast_backward_matches_standard_best_rss():

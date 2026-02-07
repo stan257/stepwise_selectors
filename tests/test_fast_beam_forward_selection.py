@@ -4,7 +4,7 @@ import pytest
 from selection.criteria import BestRSSCriterion
 from selection.definitions import GramData
 from selection.fast_routines import FastBeamForwardSelection
-from selection.legacy_routines import BeamForwardSelection
+from selection.routines import BeamForwardSelection
 
 
 def test_fast_beam_forward_matches_standard_best_rss():

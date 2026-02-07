@@ -4,7 +4,7 @@ import pytest
 from selection.criteria import BestRSSCriterion
 from selection.definitions import GramData
 from selection.fast_routines import FastBeamBackwardSelection, FastBeamMixedSelection
-from selection.legacy_routines import BeamBackwardSelection, BeamMixedSelection
+from selection.routines import BeamBackwardSelection, BeamMixedSelection
 
 
 def _make_problem(seed=777, n=200, p=18):

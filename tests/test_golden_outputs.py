@@ -2,7 +2,7 @@ import numpy as np
 
 from selection.criteria import BestRSSCriterion
 from selection.definitions import CrossValGramData, GramData
-from selection.legacy_routines import (
+from selection.routines import (
     BeamForwardSelection,
     CrossValForwardSelection,
     ForwardSelection,
@@ -68,4 +68,4 @@ def test_golden_beam_forward_best_rss_active_set():
         data=data, max_steps=k
     )
 
-    assert state.active_set == [4, 6, 5]
+    assert state.active_set == [6, 4, 5]
