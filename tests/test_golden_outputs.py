@@ -2,7 +2,12 @@ import numpy as np
 
 from selection.criteria import BestRSSCriterion
 from selection.definitions import CrossValGramData, GramData
-from selection.routines import BeamForwardSelection, CrossValForwardSelection, ForwardSelection, MixedSelection
+from selection.legacy_routines import (
+    BeamForwardSelection,
+    CrossValForwardSelection,
+    ForwardSelection,
+    MixedSelection,
+)
 
 
 def test_golden_forward_best_rss_active_set():

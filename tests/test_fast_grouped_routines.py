@@ -3,9 +3,8 @@ import pytest
 
 from selection.criteria import AICCriterion, BestRSSCriterion
 from selection.definitions import GramData
-from selection.grouped_routines import (
-    FastGroupBackwardSelection,
-    FastGroupForwardSelection,
+from selection.grouped_routines import FastGroupBackwardSelection, FastGroupForwardSelection
+from selection.legacy_grouped_routines import (
     GroupBackwardSelection,
     GroupForwardSelection,
 )

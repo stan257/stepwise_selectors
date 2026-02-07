@@ -480,7 +480,9 @@ def test_crossval_mixed_keeps_fold_state_in_sync():
     max_forward_steps = 3  # noqa: F841
     max_total_steps = 5
 
-    selector = CrossValMixedSelection()
+    from selection.legacy_routines import CrossValMixedSelection as LegacyCrossValMixedSelection
+
+    selector = LegacyCrossValMixedSelection()
     cv_state = selector._init_run(None, cv_data, mode="empty")[0]
 
     # Helper to recompute rss_cv fresh from per-fold states.

@@ -1019,6 +1019,8 @@ class FastCrossValBackwardSelection(FastForwardSelection):
             best_idx, best_score = criterion.best_candidate(
                 aggregated, fast_states[0].k - 1
             )
+            if not criterion.is_improvement(best_score):
+                break
             try:
                 for state_k in fast_states:
                     state_k.apply_backward(best_idx)

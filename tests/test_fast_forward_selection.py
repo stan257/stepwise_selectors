@@ -4,7 +4,7 @@ import pytest
 from selection.criteria import BestRSSCriterion
 from selection.definitions import GramData
 from selection.fast_routines import FastForwardSelection
-from selection.routines import ForwardSelection
+from selection.legacy_routines import ForwardSelection
 
 
 def test_fast_forward_matches_standard_best_rss():
