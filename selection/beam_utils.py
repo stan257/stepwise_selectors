@@ -10,6 +10,7 @@ from .cv_utils import (
     cv_forward_scores,
 )
 from .state import CrossValSelectionState
+from .topk import topk_indices
 
 
 def run_beam_search(
@@ -90,10 +91,10 @@ def cv_beam_forward_children(
     crit_scores = np.asarray(
         beam.criterion.evaluate(aggregated, len(cv_state.active_set) + 1)
     )
-    order = np.argsort(crit_scores)
+    order = topk_indices(crit_scores, beam_width, minimize=beam.criterion.minimize)
 
     children: list[Beam] = []
-    for idx in order[:beam_width]:
+    for idx in order:
         candidate_score = float(crit_scores[idx])
         if not beam.criterion.is_improvement(candidate_score, beam.score):
             continue
@@ -125,10 +126,10 @@ def cv_beam_backward_children(
     crit_scores = np.asarray(
         beam.criterion.evaluate(aggregated_rss, len(cv_state.active_set) - 1)
     )
-    order = np.argsort(crit_scores)
+    order = topk_indices(crit_scores, beam_width, minimize=beam.criterion.minimize)
 
     children: list[Beam] = []
-    for idx in order[:beam_width]:
+    for idx in order:
         candidate_score = float(crit_scores[idx])
         if not allow_worse and not beam.criterion.is_improvement(
             candidate_score, beam.score

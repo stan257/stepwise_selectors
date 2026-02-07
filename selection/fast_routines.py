@@ -12,6 +12,7 @@ from .constants import ABS_TOL
 from .criteria import AICCriterion, SelectionCriterion
 from .definitions import CrossValGramData, GramData
 from .state import CrossValSelectionState, SelectionState
+from .topk import topk_indices
 
 
 @dataclass
@@ -485,9 +486,9 @@ def _fast_beam_forward_children(beam: FastBeam, beam_width: int) -> list[FastBea
         return []
     cand_idx, rss_new = scored
     crit_scores = np.asarray(beam.criterion.evaluate(rss_new, beam.state.k + 1))
-    order = np.argsort(crit_scores)
+    order = topk_indices(crit_scores, beam_width, minimize=beam.criterion.minimize)
     children: list[FastBeam] = []
-    for idx in order[:beam_width]:
+    for idx in order:
         candidate_score = float(crit_scores[idx])
         if not beam.criterion.is_improvement(candidate_score, beam.score):
             continue
@@ -509,9 +510,9 @@ def _fast_beam_backward_children(
     crit_scores = np.asarray(
         beam.criterion.evaluate(rss_values, max(beam.state.k - 1, 0))
     )
-    order = np.argsort(crit_scores)
+    order = topk_indices(crit_scores, beam_width, minimize=beam.criterion.minimize)
     children: list[FastBeam] = []
-    for idx in order[:beam_width]:
+    for idx in order:
         candidate_score = float(crit_scores[idx])
         if not allow_worse and not beam.criterion.is_improvement(
             candidate_score, beam.score
@@ -748,9 +749,9 @@ def _fast_cv_beam_forward_children(
     crit_scores = np.asarray(
         beam.criterion.evaluate(aggregated, len(beam.states[0].active_set) + 1)
     )
-    order = np.argsort(crit_scores)
+    order = topk_indices(crit_scores, beam_width, minimize=beam.criterion.minimize)
     children: list[FastCVBeam] = []
-    for idx in order[:beam_width]:
+    for idx in order:
         candidate_score = float(crit_scores[idx])
         if not beam.criterion.is_improvement(candidate_score, beam.score):
             continue
@@ -780,9 +781,9 @@ def _fast_cv_beam_backward_children(
     crit_scores = np.asarray(
         beam.criterion.evaluate(aggregated, max(len(beam.states[0].active_set) - 1, 0))
     )
-    order = np.argsort(crit_scores)
+    order = topk_indices(crit_scores, beam_width, minimize=beam.criterion.minimize)
     children: list[FastCVBeam] = []
-    for idx in order[:beam_width]:
+    for idx in order:
         candidate_score = float(crit_scores[idx])
         if not allow_worse and not beam.criterion.is_improvement(
             candidate_score, beam.score

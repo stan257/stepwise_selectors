@@ -6,6 +6,7 @@ import numpy as np
 from .constants import ABS_TOL
 from .criteria import SelectionCriterion
 from .state import SelectionState
+from .topk import topk_indices
 
 
 @dataclass
@@ -57,9 +58,9 @@ def beam_forward_children(
         return []
     rss_scores = np.asarray(cache.rss_new)
     crit_scores = np.asarray(beam.criterion.evaluate(rss_scores, cache.active_rk + 1))
-    order = np.argsort(crit_scores)
+    order = topk_indices(crit_scores, beam_width, minimize=beam.criterion.minimize)
     children: list[Beam] = []
-    for idx in order[:beam_width]:
+    for idx in order:
         candidate_score = float(crit_scores[idx])
         if not beam.criterion.is_improvement(candidate_score, beam.score):
             continue
@@ -80,9 +81,9 @@ def beam_backward_children(
     rss_scores = np.asarray(rss_values)
     k = max(len(beam.state.active_set) - 1, 0)
     crit_scores = np.asarray(beam.criterion.evaluate(rss_scores, k))
-    order = np.argsort(crit_scores)
+    order = topk_indices(crit_scores, beam_width, minimize=beam.criterion.minimize)
     children: list[Beam] = []
-    for idx in order[:beam_width]:
+    for idx in order:
         candidate_score = float(crit_scores[idx])
         if not allow_worse and not beam.criterion.is_improvement(
             candidate_score, beam.score
