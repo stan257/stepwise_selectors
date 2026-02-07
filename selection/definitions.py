@@ -56,6 +56,8 @@ class CrossValGramData:
     gram_folds: list[np.ndarray] = field(init=False)
     cov_folds: list[np.ndarray] = field(init=False)
     y_norm_folds: list[float] = field(init=False)
+    cov_folds_arr: np.ndarray = field(init=False)
+    y_norm_folds_arr: np.ndarray = field(init=False)
 
     def check_data_validity(self) -> int:
         if not self.folds:
@@ -106,6 +108,9 @@ class CrossValGramData:
         self.gram_folds = [fd.gram for fd in self.folds]
         self.cov_folds = [fd.cov for fd in self.folds]
         self.y_norm_folds = [fd.y_norm for fd in self.folds]
+        # Stack per-fold covariances for faster vectorized CV computations.
+        self.cov_folds_arr = np.stack(self.cov_folds, axis=0)
+        self.y_norm_folds_arr = np.array(self.y_norm_folds, dtype=float)
 
     def val_data_for_fold(self, k: int) -> GramData:
         if not (0 <= k < self.n_folds):

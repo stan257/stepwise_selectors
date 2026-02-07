@@ -388,22 +388,16 @@ class CrossValSelectionState:
             return self.rss_cv
 
         idx_S = np.array(S, dtype=int)
-        oos = np.empty(self.n_folds, dtype=float)
-
-        for k in range(self.n_folds):
-            state_k = self.train_states[k]
-            beta_S_k = state_k.beta_S
-            G_val_k = self.data.gram_folds[k]
-            c_val_k = self.data.cov_folds[k]
-            y_norm_val_k = self.data.y_norm_folds[k]
-            G_val_SS = G_val_k[np.ix_(idx_S, idx_S)]
-            c_val_S = c_val_k[idx_S]
-            rss_k = (
-                y_norm_val_k
-                - 2.0 * float(beta_S_k @ c_val_S)
-                + float(beta_S_k @ (G_val_SS @ beta_S_k))
-            )
-            oos[k] = rss_k
+        # Stack fold-specific values to compute RSS across folds in one pass.
+        beta_mat = np.stack([state.beta_S for state in self.train_states], axis=0)
+        c_val = self.data.cov_folds_arr[:, idx_S]
+        y_norm_val = self.data.y_norm_folds_arr
+        G_val_SS = np.stack(
+            [G[np.ix_(idx_S, idx_S)] for G in self.data.gram_folds], axis=0
+        )
+        term2 = 2.0 * np.einsum("fk,fk->f", beta_mat, c_val)
+        term3 = np.einsum("fk,fkl,fl->f", beta_mat, G_val_SS, beta_mat)
+        oos = y_norm_val - term2 + term3
 
         self.oos_rss_folds = oos
         self.rss_cv = float(oos.sum())
