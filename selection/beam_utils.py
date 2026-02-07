@@ -85,8 +85,8 @@ def cv_beam_forward_children(
     if forward_data is None:
         return []
     fold_caches = forward_data.fold_caches
-    candidate_maps = forward_data.candidate_maps
     candidates = forward_data.candidates
+    candidate_indices = forward_data.candidate_indices
     aggregated = forward_data.aggregated_rss
     crit_scores = np.asarray(
         beam.criterion.evaluate(aggregated, len(cv_state.active_set) + 1)
@@ -103,7 +103,7 @@ def cv_beam_forward_children(
         child_state: CrossValSelectionState = cv_state.clone()
         for fold_idx, fold_state in enumerate(child_state.train_states):
             cache = fold_caches[fold_idx]
-            idx_local = candidate_maps[fold_idx][candidate]
+            idx_local = int(candidate_indices[fold_idx][idx])
             fold_state.apply_forward_step(cache, idx_local)
         child_state._sync_active_set()
         child_state.recompute_oos_rss()

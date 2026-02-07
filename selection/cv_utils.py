@@ -10,8 +10,8 @@ class CVForwardScores:
     """Per-fold caches and aggregated RSS for a CV forward step."""
 
     fold_caches: list[ForwardDeltaCache]
-    candidate_maps: list[dict[int, int]]
-    candidates: list[int]
+    candidate_indices: list[np.ndarray]
+    candidates: np.ndarray
     aggregated_rss: np.ndarray
 
 
@@ -27,37 +27,44 @@ def cv_forward_scores(
     cv_state: CrossValSelectionState, tol: float
 ) -> CVForwardScores | None:
     fold_caches: list[ForwardDeltaCache] = []
-    candidate_maps: list[dict[int, int]] = []
+    p = cv_state.p
+    common_mask = np.ones(p, dtype=bool)
+    temp_mask = np.zeros(p, dtype=bool)
     for train_state in cv_state.train_states:
         cache = train_state.compute_forward_deltas(tol)
         if cache is None or not cache.candidates.size:
             return None
         fold_caches.append(cache)
-        candidate_maps.append({int(c): idx for idx, c in enumerate(cache.candidates)})
+        temp_mask.fill(False)
+        temp_mask[cache.candidates] = True
+        common_mask &= temp_mask
+        if not np.any(common_mask):
+            return None
 
-    common = set(candidate_maps[0].keys())
-    for mapping in candidate_maps[1:]:
-        common &= set(mapping.keys())
-    if not common:
+    candidates = np.flatnonzero(common_mask)
+    if not candidates.size:
         return None
-    candidates = sorted(common)
-    num_candidates = len(candidates)
+
+    num_candidates = candidates.size
     rss_matrix = np.full((cv_state.n_folds, num_candidates), np.inf, dtype=float)
+    candidate_indices: list[np.ndarray] = []
     for fold_idx, cache in enumerate(fold_caches):
-        mapping = candidate_maps[fold_idx]
-        for col, candidate in enumerate(candidates):
-            idx_local = mapping.get(candidate)
-            if idx_local is None:
-                raise RuntimeError("Candidate mapping missing during CV forward scoring.")
+        # Map common candidates to local cache indices (cache.candidates is sorted).
+        idx_local = np.searchsorted(cache.candidates, candidates)
+        if __debug__:
+            if not np.array_equal(cache.candidates[idx_local], candidates):
+                raise RuntimeError("Candidate mapping mismatch during CV forward scoring.")
+        candidate_indices.append(idx_local)
+        for col, cache_idx in enumerate(idx_local):
             rss_matrix[fold_idx, col] = cv_state.validation_rss_for_candidate(
-                fold_idx, cache, idx_local
+                fold_idx, cache, int(cache_idx)
             )
 
     # Use summed CV RSS to keep the scale consistent with rss_cv (sum over folds).
     aggregated = np.sum(rss_matrix, axis=0)
     return CVForwardScores(
         fold_caches=fold_caches,
-        candidate_maps=candidate_maps,
+        candidate_indices=candidate_indices,
         candidates=candidates,
         aggregated_rss=aggregated,
     )

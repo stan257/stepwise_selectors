@@ -503,10 +503,9 @@ def test_crossval_mixed_keeps_fold_state_in_sync():
         if forward_data is None:
             break
         best_idx = int(np.argmin(forward_data.aggregated_rss))
-        chosen = forward_data.candidates[best_idx]
         for fold_idx, fold_state in enumerate(cv_state.train_states):
             cache = forward_data.fold_caches[fold_idx]
-            idx_local = forward_data.candidate_maps[fold_idx][chosen]
+            idx_local = int(forward_data.candidate_indices[fold_idx][best_idx])
             fold_state.apply_forward_step(cache, idx_local)
         cv_state._sync_active_set()
         cv_state.recompute_oos_rss()
@@ -541,6 +540,62 @@ def test_crossval_mixed_keeps_fold_state_in_sync():
         assert pytest.approx(
             cv_state.rss_cv, rel=1e-9, abs=1e-9
         ) == recompute_from_folds(cv_state)
+
+
+def test_cv_forward_scores_matches_reference_intersection():
+    """Ensure vectorized candidate intersection matches the prior mapping logic."""
+    from selection.constants import ABS_TOL
+    from selection.cv_utils import cv_forward_scores
+    from selection.state import CrossValSelectionState
+
+    cv_data, _ = make_cv_support_problem(p=12, support=4, folds=3, n=200, seed=123)
+    cv_state = CrossValSelectionState(cv_data)
+    cv_state.init_empty()
+
+    def reference_forward_scores(state, tol):
+        fold_caches = []
+        candidate_maps = []
+        for train_state in state.train_states:
+            cache = train_state.compute_forward_deltas(tol)
+            if cache is None or not cache.candidates.size:
+                return None
+            fold_caches.append(cache)
+            candidate_maps.append(
+                {int(c): idx for idx, c in enumerate(cache.candidates)}
+            )
+
+        common = set(candidate_maps[0].keys())
+        for mapping in candidate_maps[1:]:
+            common &= set(mapping.keys())
+        if not common:
+            return None
+        candidates = sorted(common)
+        rss_matrix = np.full(
+            (state.n_folds, len(candidates)), np.inf, dtype=float
+        )
+        for fold_idx, cache in enumerate(fold_caches):
+            mapping = candidate_maps[fold_idx]
+            for col, candidate in enumerate(candidates):
+                idx_local = mapping[candidate]
+                rss_matrix[fold_idx, col] = state.validation_rss_for_candidate(
+                    fold_idx, cache, idx_local
+                )
+
+        aggregated = np.sum(rss_matrix, axis=0)
+        return candidates, aggregated, candidate_maps
+
+    ref = reference_forward_scores(cv_state, ABS_TOL)
+    fast = cv_forward_scores(cv_state, ABS_TOL)
+    assert ref is not None and fast is not None
+    ref_candidates, ref_agg, ref_maps = ref
+
+    np.testing.assert_array_equal(fast.candidates, np.array(ref_candidates))
+    np.testing.assert_allclose(fast.aggregated_rss, ref_agg, rtol=1e-12, atol=1e-12)
+    for fold_idx, mapping in enumerate(ref_maps):
+        ref_idx = np.array(
+            [mapping[int(c)] for c in ref_candidates], dtype=int
+        )
+        np.testing.assert_array_equal(fast.candidate_indices[fold_idx], ref_idx)
 
 
 # ---------------------------------------------------------------------------

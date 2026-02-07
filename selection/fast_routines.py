@@ -307,6 +307,8 @@ class FastForwardSelection:
         init_params = inspect.signature(self.criterion_cls.__init__).parameters
         if "n_samples" in init_params and "n_samples" not in params:
             params["n_samples"] = data.n_samples
+        if "p" in init_params and "p" not in params:
+            params["p"] = data.gram.shape[0]
         criterion = self.criterion_cls(**params)
         initial = float(np.asarray(criterion.evaluate(data.y_norm, 0)))
         criterion.update_current(initial)

@@ -1,7 +1,14 @@
 import numpy as np
 import pytest
 
-from selection.criteria import BestRSSCriterion
+from selection.criteria import (
+    AICcCriterion,
+    BICCriterion,
+    BestRSSCriterion,
+    EBICCriterion,
+    GCVCriterion,
+    HQICCriterion,
+)
 from selection.definitions import CrossValGramData, GramData
 from selection.grouped_routines import GroupForwardSelection
 from selection.routines import (
@@ -107,6 +114,41 @@ def test_grouped_forward_matches_forward_with_singleton_groups():
     assert set(grouped_state.active_groups) == set(forward_state.active_set)
     np.testing.assert_allclose(grouped_state.beta, forward_state.beta, atol=1e-8, rtol=1e-8)
     assert pytest.approx(grouped_state.rss, rel=1e-8, abs=1e-8) == forward_state.rss
+
+
+def test_information_criteria_choose_expected_size_on_diagonal():
+    p = 8
+    cov = np.array([2.5, 2.0, 1.6, 1.3, 1.0, 0.8, 0.6, 0.4])
+    gram = np.eye(p)
+    y_norm = float(np.sum(cov**2) + 3.0)
+    n_samples = 40
+    data = GramData(gram, cov, y_norm, n_samples)
+
+    rss_path = np.array([y_norm - np.sum(cov[:k] ** 2) for k in range(p + 1)])
+
+    cases = [
+        ("BIC", BICCriterion(n_samples=n_samples), BICCriterion, {}),
+        ("AICc", AICcCriterion(n_samples=n_samples), AICcCriterion, {}),
+        ("HQIC", HQICCriterion(n_samples=n_samples), HQICCriterion, {}),
+        (
+            "EBIC",
+            EBICCriterion(n_samples=n_samples, p=p, gamma=0.5),
+            EBICCriterion,
+            {"gamma": 0.5},
+        ),
+        ("GCV", GCVCriterion(n_samples=n_samples), GCVCriterion, {}),
+    ]
+
+    for _, crit, crit_cls, kwargs in cases:
+        values = np.array([crit.evaluate(rss_path[k], k) for k in range(p + 1)])
+        expected_k = int(np.argmin(values))
+
+        state = ForwardSelection(
+            criterion_cls=crit_cls, criterion_kwargs=kwargs
+        ).fit(data=data, max_steps=p)
+
+        assert len(state.active_set) == expected_k
+        assert state.active_set == list(range(expected_k))
 
 
 # ---------------------------------------------------------------------------

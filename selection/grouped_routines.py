@@ -66,6 +66,8 @@ class BaseGroupedSelection:
         init_params = inspect.signature(self.criterion_cls.__init__).parameters
         if "n_samples" in init_params and "n_samples" not in params:
             params["n_samples"] = data.n_samples
+        if "p" in init_params and "p" not in params:
+            params["p"] = data.gram.shape[0]
         return self.criterion_cls(**params)
 
 

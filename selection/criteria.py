@@ -1,3 +1,5 @@
+import math
+
 import numpy as np
 
 from .constants import ABS_TOL
@@ -72,6 +74,106 @@ class AICCriterion(SelectionCriterion):
         best_rss = float(rss_arr[idx])
         best_value = float(self.evaluate(best_rss, k))
         return idx, best_value
+
+
+class BICCriterion(SelectionCriterion):
+    """Bayesian information criterion."""
+
+    def __init__(self, *, n_samples: int, **kwargs):
+        super().__init__(minimize=True, **kwargs)
+        self.n_samples = int(n_samples)
+
+    def evaluate(self, rss, k: int):
+        rss_arr = np.asarray(rss, dtype=float)
+        if np.any(rss_arr <= 0):
+            raise ValueError("RSS must be positive to compute BIC.")
+        n = self.n_samples
+        return n * np.log(rss_arr / n) + k * np.log(n)
+
+
+class AICcCriterion(SelectionCriterion):
+    """Small-sample corrected Akaike information criterion."""
+
+    def __init__(self, *, n_samples: int, **kwargs):
+        super().__init__(minimize=True, **kwargs)
+        self.n_samples = int(n_samples)
+
+    def evaluate(self, rss, k: int):
+        rss_arr = np.asarray(rss, dtype=float)
+        if np.any(rss_arr <= 0):
+            raise ValueError("RSS must be positive to compute AICc.")
+        n = self.n_samples
+        aic = n * np.log(rss_arr / n) + 2 * k
+        denom = n - k - 1
+        if denom <= 0:
+            return np.full_like(rss_arr, np.inf, dtype=float)
+        correction = (2 * k * (k + 1)) / denom
+        return aic + correction
+
+
+class HQICCriterion(SelectionCriterion):
+    """Hannan-Quinn information criterion."""
+
+    def __init__(self, *, n_samples: int, **kwargs):
+        super().__init__(minimize=True, **kwargs)
+        self.n_samples = int(n_samples)
+
+    def evaluate(self, rss, k: int):
+        rss_arr = np.asarray(rss, dtype=float)
+        if np.any(rss_arr <= 0):
+            raise ValueError("RSS must be positive to compute HQIC.")
+        n = self.n_samples
+        penalty = 2.0 * k * np.log(np.log(n))
+        return n * np.log(rss_arr / n) + penalty
+
+
+class EBICCriterion(SelectionCriterion):
+    """Extended BIC with a combinatorial penalty term."""
+
+    def __init__(self, *, n_samples: int, p: int, gamma: float = 0.5, **kwargs):
+        super().__init__(minimize=True, **kwargs)
+        self.n_samples = int(n_samples)
+        self.p = int(p)
+        self.gamma = float(gamma)
+        if not 0.0 <= self.gamma <= 1.0:
+            raise ValueError("gamma must be between 0 and 1 for EBIC.")
+        if self.p <= 0:
+            raise ValueError("p must be positive for EBIC.")
+
+    def evaluate(self, rss, k: int):
+        rss_arr = np.asarray(rss, dtype=float)
+        if np.any(rss_arr <= 0):
+            raise ValueError("RSS must be positive to compute EBIC.")
+        if k < 0 or k > self.p:
+            raise ValueError("k must be between 0 and p for EBIC.")
+        n = self.n_samples
+        base = n * np.log(rss_arr / n) + k * np.log(n)
+        if k == 0:
+            return base
+        log_choose = (
+            math.lgamma(self.p + 1)
+            - math.lgamma(k + 1)
+            - math.lgamma(self.p - k + 1)
+        )
+        return base + 2.0 * self.gamma * log_choose
+
+
+class GCVCriterion(SelectionCriterion):
+    """Generalized cross-validation score."""
+
+    def __init__(self, *, n_samples: int, **kwargs):
+        super().__init__(minimize=True, **kwargs)
+        self.n_samples = int(n_samples)
+
+    def evaluate(self, rss, k: int):
+        rss_arr = np.asarray(rss, dtype=float)
+        if np.any(rss_arr < 0):
+            raise ValueError("RSS must be non-negative to compute GCV.")
+        denom = self.n_samples - k
+        if denom <= 0:
+            return np.full_like(rss_arr, np.inf, dtype=float)
+        scale = (denom / self.n_samples) ** 2
+        return (rss_arr / self.n_samples) / scale
 
 
 class BestRSSCriterion(SelectionCriterion):
