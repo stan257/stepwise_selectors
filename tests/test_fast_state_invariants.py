@@ -1,0 +1,56 @@
+import numpy as np
+
+from selection.definitions import GramData
+from selection.fast_routines import FastForwardState
+
+
+def test_fast_state_invariants_after_random_steps():
+    rng = np.random.default_rng(2024)
+    n, p = 140, 40
+    X = rng.standard_normal((n, p))
+    beta = rng.standard_normal(p)
+    y = X @ beta + 0.1 * rng.standard_normal(n)
+    data = GramData(X.T @ X, X.T @ y, y @ y, n)
+
+    state = FastForwardState.create(data, tol=1e-12)
+
+    for _ in range(30):
+        scored = state.candidate_scores()
+        can_forward = scored is not None and scored[0].size
+        # Prefer forward moves but allow backward steps to exercise downdates.
+        do_forward = can_forward and (state.k == 0 or rng.random() < 0.6)
+
+        if do_forward:
+            candidates, _ = scored
+            feat_idx = int(rng.choice(candidates))
+            state.apply_forward(feat_idx)
+        elif state.k:
+            drop_idx = int(rng.integers(0, state.k))
+            state.apply_backward(drop_idx)
+
+        # Reconstruct beta and RSS from the active Gram block and compare.
+        idx = np.array(state.active_set, dtype=int)
+        if idx.size:
+            G_ss = data.gram[np.ix_(idx, idx)]
+            cov_s = data.cov[idx]
+            beta_s = np.linalg.solve(G_ss, cov_s)
+            rss = float(data.y_norm - cov_s @ beta_s)
+            np.testing.assert_allclose(
+                state.beta_S[: state.k], beta_s, atol=1e-8, rtol=1e-8
+            )
+            np.testing.assert_allclose(state.rss, rss, atol=1e-8, rtol=1e-8)
+
+            inv_ss = np.linalg.inv(G_ss)
+            np.testing.assert_allclose(
+                state.K[: state.k, : state.k], inv_ss, atol=1e-6, rtol=1e-6
+            )
+        else:
+            np.testing.assert_allclose(state.rss, data.y_norm, atol=1e-10, rtol=0.0)
+
+        # Validate residual correlations/variances derived from the QR basis.
+        r_expected = data.cov - state.Z[: state.k, :].T @ state.qy[: state.k]
+        v_expected = np.diag(data.gram) - np.sum(
+            state.Z[: state.k, :] ** 2, axis=0
+        )
+        np.testing.assert_allclose(state.r, r_expected, atol=1e-8, rtol=1e-8)
+        np.testing.assert_allclose(state.v, v_expected, atol=1e-8, rtol=1e-8)
