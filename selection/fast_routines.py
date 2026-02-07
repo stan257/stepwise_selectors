@@ -10,8 +10,8 @@ from dataclasses import dataclass
 
 from .constants import ABS_TOL
 from .criteria import AICCriterion, SelectionCriterion
-from .definitions import GramData
-from .state import SelectionState
+from .definitions import CrossValGramData, GramData
+from .state import CrossValSelectionState, SelectionState
 
 
 @dataclass
@@ -479,6 +479,62 @@ def _fast_beam_prune(beams: list[FastBeam], beam_limit: int) -> list[FastBeam]:
     return result
 
 
+def _fast_beam_forward_children(beam: FastBeam, beam_width: int) -> list[FastBeam]:
+    scored = beam.state.candidate_scores()
+    if scored is None:
+        return []
+    cand_idx, rss_new = scored
+    crit_scores = np.asarray(beam.criterion.evaluate(rss_new, beam.state.k + 1))
+    order = np.argsort(crit_scores)
+    children: list[FastBeam] = []
+    for idx in order[:beam_width]:
+        candidate_score = float(crit_scores[idx])
+        if not beam.criterion.is_improvement(candidate_score, beam.score):
+            continue
+        feat_idx = int(cand_idx[idx])
+        child_state = beam.state.clone()
+        child_state.apply_forward(feat_idx)
+        child_criterion = beam.criterion.clone()
+        child_criterion.update_current(candidate_score)
+        children.append(FastBeam(child_state, child_criterion, candidate_score))
+    return children
+
+
+def _fast_beam_backward_children(
+    beam: FastBeam, beam_width: int, *, allow_worse: bool = False
+) -> list[FastBeam]:
+    rss_values = beam.state.backward_scores()
+    if rss_values is None or not len(rss_values):
+        return []
+    crit_scores = np.asarray(
+        beam.criterion.evaluate(rss_values, max(beam.state.k - 1, 0))
+    )
+    order = np.argsort(crit_scores)
+    children: list[FastBeam] = []
+    for idx in order[:beam_width]:
+        candidate_score = float(crit_scores[idx])
+        if not allow_worse and not beam.criterion.is_improvement(
+            candidate_score, beam.score
+        ):
+            continue
+        try:
+            child_state = beam.state.clone()
+            child_state.apply_backward(idx)
+        except Exception:
+            continue
+        child_criterion = beam.criterion.clone()
+        child_criterion.update_current(candidate_score)
+        children.append(FastBeam(child_state, child_criterion, candidate_score))
+    return children
+
+
+def _fast_beam_best_backward_child(beam: FastBeam) -> FastBeam | None:
+    for child in _fast_beam_backward_children(beam, 1, allow_worse=False):
+        if beam.criterion.is_improvement(child.score, beam.score):
+            return child
+    return None
+
+
 class FastBeamForwardSelection(FastForwardSelection):
     """Beam-search forward selection using fast Gram-only updates."""
 
@@ -504,26 +560,7 @@ class FastBeamForwardSelection(FastForwardSelection):
         while beams and (max_steps is None or steps < max_steps):
             candidates: list[FastBeam] = []
             for beam in beams:
-                scored = beam.state.candidate_scores()
-                if scored is None:
-                    continue
-                cand_idx, rss_new = scored
-                crit_scores = np.asarray(
-                    beam.criterion.evaluate(rss_new, beam.state.k + 1)
-                )
-                order = np.argsort(crit_scores)
-                for idx in order[: self.beam_width]:
-                    candidate_score = float(crit_scores[idx])
-                    if not beam.criterion.is_improvement(candidate_score, beam.score):
-                        continue
-                    feat_idx = int(cand_idx[idx])
-                    child_state = beam.state.clone()
-                    child_state.apply_forward(feat_idx)
-                    child_criterion = beam.criterion.clone()
-                    child_criterion.update_current(candidate_score)
-                    candidates.append(
-                        FastBeam(child_state, child_criterion, candidate_score)
-                    )
+                candidates.extend(_fast_beam_forward_children(beam, self.beam_width))
 
             if not candidates:
                 break
@@ -534,3 +571,713 @@ class FastBeamForwardSelection(FastForwardSelection):
         result = state if state is not None else SelectionState(data)
         result.init_from_active_set(best.state.active_set)
         return result
+
+
+class FastBeamBackwardSelection(FastForwardSelection):
+    """Beam-search backward selection using fast Gram-only updates."""
+
+    def __init__(self, *, beam_width: int = 1, allow_worse: bool = False, **kwargs):
+        super().__init__(**kwargs)
+        self.beam_width = max(1, int(beam_width))
+        self.allow_worse = allow_worse
+
+    def fit(
+        self,
+        state: SelectionState | None = None,
+        *,
+        data: GramData,
+        max_steps: int | None = None,
+    ) -> SelectionState:
+        if state is not None and state.active_set:
+            raise ValueError("FastBeamBackwardSelection does not support warm starts.")
+
+        criterion = self._init_criterion(data)
+        full_active = list(range(data.gram.shape[0]))
+        initial_state = FastForwardState.from_active_set(data, full_active, self.tol)
+        initial_score = float(
+            np.asarray(criterion.evaluate(initial_state.rss, initial_state.k))
+        )
+        criterion.update_current(initial_score)
+        beams = [FastBeam(initial_state, criterion, criterion.current_value)]
+
+        steps = 0
+        while beams and (max_steps is None or steps < max_steps):
+            candidates: list[FastBeam] = []
+            for beam in beams:
+                candidates.extend(
+                    _fast_beam_backward_children(
+                        beam, self.beam_width, allow_worse=self.allow_worse
+                    )
+                )
+            if not candidates:
+                break
+            beams = _fast_beam_prune(candidates, self.beam_width)
+            steps += 1
+
+        best = min(beams, key=lambda b: b.score)
+        result = state if state is not None else SelectionState(data)
+        result.init_from_active_set(best.state.active_set)
+        return result
+
+
+class FastBeamMixedSelection(FastForwardSelection):
+    """Beam-search mixed selection using fast Gram-only updates."""
+
+    def __init__(self, *, beam_width: int = 1, **kwargs):
+        super().__init__(**kwargs)
+        self.beam_width = max(1, int(beam_width))
+
+    def fit(
+        self,
+        state: SelectionState | None = None,
+        *,
+        data: GramData,
+        max_forward_steps: int | None = None,
+        max_total_steps: int | None = None,
+    ) -> SelectionState:
+        if state is not None and state.active_set:
+            raise ValueError("FastBeamMixedSelection does not support warm starts.")
+
+        criterion = self._init_criterion(data)
+        initial = FastBeam(FastForwardState.create(data, self.tol), criterion, criterion.current_value)
+        beams = [initial]
+        best = initial
+
+        forward_steps = 0
+        total_ops = 0
+        while True:
+            if max_total_steps is not None and total_ops >= max_total_steps:
+                break
+            candidates: list[FastBeam] = []
+            for beam in beams:
+                candidates.extend(_fast_beam_forward_children(beam, self.beam_width))
+            if not candidates:
+                break
+            beams = _fast_beam_prune(candidates, self.beam_width)
+            best = min(beams, key=lambda b: b.score)
+            forward_steps += 1
+            total_ops += len(beams)
+            if max_forward_steps is not None and forward_steps >= max_forward_steps:
+                break
+
+            new_beams: list[FastBeam] = []
+            for beam in beams:
+                while True:
+                    if max_total_steps is not None and total_ops >= max_total_steps:
+                        break
+                    improved = _fast_beam_best_backward_child(beam)
+                    if improved is None:
+                        break
+                    beam = improved
+                    total_ops += 1
+                best = min([best, beam], key=lambda b: b.score)
+                new_beams.append(beam)
+            beams = new_beams
+
+        result = state if state is not None else SelectionState(data)
+        result.init_from_active_set(best.state.active_set)
+        return result
+
+
+def _fast_cv_rss(fast_states: list[FastForwardState], data: CrossValGramData) -> float:
+    """Compute summed validation RSS for the shared active set across folds."""
+    if not fast_states or not fast_states[0].active_set:
+        return float(np.sum(data.y_norm_folds))
+    idx = np.array(fast_states[0].active_set, dtype=int)
+    rss_sum = 0.0
+    for fold_idx, fast_state in enumerate(fast_states):
+        beta_S = fast_state.beta_S[: fast_state.k]
+        G_val = data.gram_folds[fold_idx]
+        c_val = data.cov_folds[fold_idx]
+        y_norm_val = data.y_norm_folds[fold_idx]
+        G_val_SS = G_val[np.ix_(idx, idx)]
+        c_val_S = c_val[idx]
+        rss_k = (
+            y_norm_val
+            - 2.0 * float(beta_S @ c_val_S)
+            + float(beta_S @ (G_val_SS @ beta_S))
+        )
+        rss_sum += rss_k
+    return float(rss_sum)
+
+
+@dataclass
+class FastCVBeam:
+    states: list[FastForwardState]
+    criterion: SelectionCriterion
+    score: float
+    _signature: int = 0
+
+    def __post_init__(self) -> None:
+        sig = 0
+        for idx in self.states[0].active_set:
+            sig |= 1 << int(idx)
+        self._signature = sig
+
+    @property
+    def signature(self) -> int:
+        return self._signature
+
+
+def _fast_cv_beam_prune(
+    beams: list[FastCVBeam], beam_limit: int
+) -> list[FastCVBeam]:
+    seen = set()
+    result: list[FastCVBeam] = []
+    for beam in sorted(beams, key=lambda b: b.score):
+        sig = beam.signature
+        if sig in seen:
+            continue
+        seen.add(sig)
+        result.append(beam)
+        if len(result) >= beam_limit:
+            break
+    return result
+
+
+def _fast_cv_beam_forward_children(
+    beam: FastCVBeam,
+    beam_width: int,
+    data: CrossValGramData,
+    tol: float,
+) -> list[FastCVBeam]:
+    scored = _fast_cv_forward_scores(beam.states, data, tol)
+    if scored is None:
+        return []
+    candidates, aggregated = scored
+    crit_scores = np.asarray(
+        beam.criterion.evaluate(aggregated, len(beam.states[0].active_set) + 1)
+    )
+    order = np.argsort(crit_scores)
+    children: list[FastCVBeam] = []
+    for idx in order[:beam_width]:
+        candidate_score = float(crit_scores[idx])
+        if not beam.criterion.is_improvement(candidate_score, beam.score):
+            continue
+        feat_idx = int(candidates[idx])
+        child_states = [state.clone() for state in beam.states]
+        for state_k in child_states:
+            state_k.apply_forward(feat_idx)
+        # Rebuild per-fold states to keep QR/K updates numerically stable.
+        child_states = _rebuild_fast_states(data, child_states[0].active_set, tol)
+        child_criterion = beam.criterion.clone()
+        child_criterion.update_current(candidate_score)
+        children.append(FastCVBeam(child_states, child_criterion, candidate_score))
+    return children
+
+
+def _fast_cv_beam_backward_children(
+    beam: FastCVBeam,
+    beam_width: int,
+    data: CrossValGramData,
+    tol: float,
+    *,
+    allow_worse: bool = False,
+) -> list[FastCVBeam]:
+    aggregated = _fast_cv_backward_scores(beam.states, data, tol)
+    if aggregated is None or not len(aggregated):
+        return []
+    crit_scores = np.asarray(
+        beam.criterion.evaluate(aggregated, max(len(beam.states[0].active_set) - 1, 0))
+    )
+    order = np.argsort(crit_scores)
+    children: list[FastCVBeam] = []
+    for idx in order[:beam_width]:
+        candidate_score = float(crit_scores[idx])
+        if not allow_worse and not beam.criterion.is_improvement(
+            candidate_score, beam.score
+        ):
+            continue
+        try:
+            child_states = [state.clone() for state in beam.states]
+            for state_k in child_states:
+                state_k.apply_backward(idx)
+            # Rebuild per-fold states to keep QR/K updates numerically stable.
+            child_states = _rebuild_fast_states(data, child_states[0].active_set, tol)
+        except ValueError:
+            continue
+        child_criterion = beam.criterion.clone()
+        child_criterion.update_current(candidate_score)
+        children.append(FastCVBeam(child_states, child_criterion, candidate_score))
+    return children
+
+
+def _fast_cv_beam_best_backward_child(
+    beam: FastCVBeam, data: CrossValGramData, tol: float
+) -> FastCVBeam | None:
+    for child in _fast_cv_beam_backward_children(
+        beam, 1, data, tol, allow_worse=False
+    ):
+        if beam.criterion.is_improvement(child.score, beam.score):
+            return child
+    return None
+
+
+def _rebuild_fast_states(
+    data: CrossValGramData, active_set: list[int], tol: float
+) -> list[FastForwardState]:
+    """Rebuild fast states from scratch to limit numerical drift."""
+    return [
+        FastForwardState.from_active_set(data.train_data_for_fold(k), active_set, tol)
+        for k in range(data.n_folds)
+    ]
+
+
+def _build_cv_state_from_active_set(
+    data: CrossValGramData, active_set: list[int]
+) -> CrossValSelectionState:
+    """Materialize a CrossValSelectionState from an active set."""
+    cv_state = CrossValSelectionState(data)
+    for fold_idx, fold_state in enumerate(cv_state.train_states):
+        fold_state.init_from_active_set(active_set)
+    cv_state._sync_active_set()
+    cv_state.recompute_oos_rss()
+    return cv_state
+
+
+def _fast_cv_forward_scores(
+    fast_states: list[FastForwardState], data: CrossValGramData, tol: float
+) -> tuple[list[int], np.ndarray] | None:
+    """Return common candidates and aggregated (summed) validation RSS."""
+    candidate_lists = []
+    for state in fast_states:
+        scored = state.candidate_scores()
+        if scored is None:
+            return None
+        candidates, _ = scored
+        candidate_lists.append(set(int(c) for c in candidates))
+
+    common = set.intersection(*candidate_lists)
+    if not common:
+        return None
+    candidates = sorted(common)
+    num_candidates = len(candidates)
+    rss_matrix = np.empty((len(fast_states), num_candidates), dtype=float)
+
+    for fold_idx, state in enumerate(fast_states):
+        idx_S = np.array(state.active_set, dtype=int)
+        k = state.k
+        resid_corr = state.r[candidates]
+        resid_var = state.v[candidates]
+        beta_j = resid_corr / resid_var
+
+        G_val = data.gram_folds[fold_idx]
+        c_val = data.cov_folds[fold_idx]
+        y_norm_val = data.y_norm_folds[fold_idx]
+        c_val_j = c_val[candidates]
+        g_val_jj = G_val[candidates, candidates]
+
+        if k == 0:
+            rss = y_norm_val - 2.0 * beta_j * c_val_j + (beta_j**2) * g_val_jj
+            rss_matrix[fold_idx] = rss
+            continue
+
+        G_val_SS = G_val[np.ix_(idx_S, idx_S)]
+        c_val_S = c_val[idx_S]
+        g_val_Sc = G_val[np.ix_(idx_S, candidates)]
+
+        g_train_Sc = state.data.gram[np.ix_(idx_S, candidates)]
+        proj = state.K[:k, :k] @ g_train_Sc
+        beta_S_new = state.beta_S[:k, None] - proj * beta_j[None, :]
+
+        term1 = -2.0 * (beta_S_new * c_val_S[:, None]).sum(axis=0)
+        term2 = -2.0 * beta_j * c_val_j
+        term3 = (beta_S_new * (G_val_SS @ beta_S_new)).sum(axis=0)
+        term4 = 2.0 * beta_j * (g_val_Sc * beta_S_new).sum(axis=0)
+        term5 = (beta_j**2) * g_val_jj
+        rss_matrix[fold_idx] = y_norm_val + term1 + term2 + term3 + term4 + term5
+
+    # Sum across folds to match rss_cv scale.
+    aggregated = np.sum(rss_matrix, axis=0)
+    return candidates, aggregated
+
+
+def _fast_cv_backward_scores(
+    fast_states: list[FastForwardState], data: CrossValGramData, tol: float
+) -> np.ndarray | None:
+    if not fast_states or not fast_states[0].active_set:
+        return None
+    idx_full = np.array(fast_states[0].active_set, dtype=int)
+    k = len(idx_full)
+    rss_matrix = np.empty((len(fast_states), k), dtype=float)
+
+    for fold_idx, state in enumerate(fast_states):
+        Kk = state.K[:k, :k]
+        beta_k = state.beta_S[:k]
+        G_val = data.gram_folds[fold_idx]
+        c_val = data.cov_folds[fold_idx]
+        y_norm_val = data.y_norm_folds[fold_idx]
+
+        for local_idx in range(k):
+            k_22 = Kk[local_idx, local_idx]
+            if abs(k_22) <= tol:
+                rss_matrix[fold_idx, local_idx] = np.inf
+                continue
+            idx_keep = np.delete(np.arange(k), local_idx)
+            beta_removed = beta_k[local_idx]
+            k_12 = Kk[idx_keep, local_idx]
+            beta_keep = beta_k[idx_keep]
+            beta_new = (
+                beta_keep - (beta_removed / k_22) * k_12
+                if beta_keep.size
+                else np.zeros(0)
+            )
+            if not beta_new.size:
+                rss_matrix[fold_idx, local_idx] = y_norm_val
+                continue
+            idx = idx_full[idx_keep]
+            G_val_SS = G_val[np.ix_(idx, idx)]
+            c_val_S = c_val[idx]
+            rss = (
+                y_norm_val
+                - 2.0 * float(beta_new @ c_val_S)
+                + float(beta_new @ (G_val_SS @ beta_new))
+            )
+            rss_matrix[fold_idx, local_idx] = rss
+
+    # Sum across folds to match rss_cv scale.
+    return np.sum(rss_matrix, axis=0)
+
+
+class FastCrossValForwardSelection(FastForwardSelection):
+    """Cross-validated forward selection using fast training updates."""
+
+    def fit(
+        self,
+        state: SelectionState | None = None,
+        *,
+        data: CrossValGramData,
+        max_steps: int | None = None,
+    ) -> SelectionState:
+        if state is not None and state.active_set:
+            raise ValueError("FastCrossValForwardSelection does not support warm starts.")
+
+        criterion = self._init_criterion(data.make_full_data())
+        fast_states = [
+            FastForwardState.create(data.train_data_for_fold(k), self.tol)
+            for k in range(data.n_folds)
+        ]
+        criterion.update_current(
+            float(np.asarray(criterion.evaluate(_fast_cv_rss(fast_states, data), 0)))
+        )
+
+        steps = 0
+        while max_steps is None or steps < max_steps:
+            scored = _fast_cv_forward_scores(fast_states, data, self.tol)
+            if scored is None:
+                break
+            candidates, aggregated = scored
+            best_idx, best_score = criterion.best_candidate(
+                aggregated, len(fast_states[0].active_set) + 1
+            )
+            if not criterion.is_improvement(best_score):
+                break
+            feat_idx = candidates[best_idx]
+            for state_k in fast_states:
+                state_k.apply_forward(feat_idx)
+            fast_states = _rebuild_fast_states(
+                data, fast_states[0].active_set, self.tol
+            )
+            criterion.update_current(best_score)
+            steps += 1
+
+        return _build_cv_state_from_active_set(data, fast_states[0].active_set)
+
+
+class FastCrossValBackwardSelection(FastForwardSelection):
+    """Cross-validated backward selection using fast training updates."""
+
+    def fit(
+        self,
+        state: SelectionState | None = None,
+        *,
+        data: CrossValGramData,
+        max_steps: int | None = None,
+    ) -> SelectionState:
+        if state is not None and state.active_set:
+            raise ValueError("FastCrossValBackwardSelection does not support warm starts.")
+
+        criterion = self._init_criterion(data.make_full_data())
+        full_active = list(range(data.gram_total.shape[0]))
+        fast_states = [
+            FastForwardState.from_active_set(data.train_data_for_fold(k), full_active, self.tol)
+            for k in range(data.n_folds)
+        ]
+        criterion.update_current(
+            float(
+                np.asarray(
+                    criterion.evaluate(_fast_cv_rss(fast_states, data), len(full_active))
+                )
+            )
+        )
+
+        steps = 0
+        while fast_states[0].k and (max_steps is None or steps < max_steps):
+            aggregated = _fast_cv_backward_scores(fast_states, data, self.tol)
+            if aggregated is None:
+                break
+            best_idx, best_score = criterion.best_candidate(
+                aggregated, fast_states[0].k - 1
+            )
+            try:
+                for state_k in fast_states:
+                    state_k.apply_backward(best_idx)
+                fast_states = _rebuild_fast_states(
+                    data, fast_states[0].active_set, self.tol
+                )
+            except ValueError:
+                break
+            criterion.update_current(best_score)
+            steps += 1
+
+        return _build_cv_state_from_active_set(data, fast_states[0].active_set)
+
+
+class FastCrossValMixedSelection(FastForwardSelection):
+    """Cross-validated mixed selection using fast training updates."""
+
+    def fit(
+        self,
+        state: SelectionState | None = None,
+        *,
+        data: CrossValGramData,
+        max_forward_steps: int | None = None,
+        max_total_steps: int | None = None,
+    ) -> SelectionState:
+        if state is not None and state.active_set:
+            raise ValueError("FastCrossValMixedSelection does not support warm starts.")
+
+        criterion = self._init_criterion(data.make_full_data())
+        fast_states = [
+            FastForwardState.create(data.train_data_for_fold(k), self.tol)
+            for k in range(data.n_folds)
+        ]
+        criterion.update_current(
+            float(np.asarray(criterion.evaluate(_fast_cv_rss(fast_states, data), 0)))
+        )
+
+        forward_steps = 0
+        total_steps = 0
+        while True:
+            if max_total_steps is not None and total_steps >= max_total_steps:
+                break
+            scored = _fast_cv_forward_scores(fast_states, data, self.tol)
+            if scored is None:
+                break
+            candidates, aggregated = scored
+            best_idx, best_score = criterion.best_candidate(
+                aggregated, len(fast_states[0].active_set) + 1
+            )
+            if not criterion.is_improvement(best_score):
+                break
+            feat_idx = candidates[best_idx]
+            for state_k in fast_states:
+                state_k.apply_forward(feat_idx)
+            fast_states = _rebuild_fast_states(
+                data, fast_states[0].active_set, self.tol
+            )
+            criterion.update_current(best_score)
+            forward_steps += 1
+            total_steps += 1
+
+            if max_forward_steps is not None and forward_steps >= max_forward_steps:
+                break
+
+            while True:
+                if max_total_steps is not None and total_steps >= max_total_steps:
+                    break
+                aggregated = _fast_cv_backward_scores(fast_states, data, self.tol)
+                if aggregated is None:
+                    break
+                best_idx, best_score = criterion.best_candidate(
+                    aggregated, fast_states[0].k - 1
+                )
+                if not criterion.is_improvement(best_score):
+                    break
+                try:
+                    for state_k in fast_states:
+                        state_k.apply_backward(best_idx)
+                    fast_states = _rebuild_fast_states(
+                        data, fast_states[0].active_set, self.tol
+                    )
+                except ValueError:
+                    break
+                criterion.update_current(best_score)
+                total_steps += 1
+
+        return _build_cv_state_from_active_set(data, fast_states[0].active_set)
+
+
+class FastBeamCrossValForwardSelection(FastForwardSelection):
+    """Beam-search forward selection with fast CV scoring."""
+
+    def __init__(self, *, beam_width: int = 1, **kwargs):
+        super().__init__(**kwargs)
+        self.beam_width = max(1, int(beam_width))
+
+    def fit(
+        self,
+        state: SelectionState | None = None,
+        *,
+        data: CrossValGramData,
+        max_steps: int | None = None,
+    ) -> SelectionState:
+        if state is not None and state.active_set:
+            raise ValueError(
+                "FastBeamCrossValForwardSelection does not support warm starts."
+            )
+
+        criterion = self._init_criterion(data.make_full_data())
+        fast_states = [
+            FastForwardState.create(data.train_data_for_fold(k), self.tol)
+            for k in range(data.n_folds)
+        ]
+        initial_score = float(
+            np.asarray(criterion.evaluate(_fast_cv_rss(fast_states, data), 0))
+        )
+        criterion.update_current(initial_score)
+        beams = [FastCVBeam(fast_states, criterion, criterion.current_value)]
+
+        steps = 0
+        while beams and (max_steps is None or steps < max_steps):
+            candidates: list[FastCVBeam] = []
+            for beam in beams:
+                candidates.extend(
+                    _fast_cv_beam_forward_children(
+                        beam, self.beam_width, data, self.tol
+                    )
+                )
+            if not candidates:
+                break
+            beams = _fast_cv_beam_prune(candidates, self.beam_width)
+            steps += 1
+
+        best = min(beams, key=lambda b: b.score)
+        return _build_cv_state_from_active_set(data, best.states[0].active_set)
+
+
+class FastBeamCrossValBackwardSelection(FastForwardSelection):
+    """Beam-search backward selection with fast CV scoring."""
+
+    def __init__(self, *, beam_width: int = 1, **kwargs):
+        super().__init__(**kwargs)
+        self.beam_width = max(1, int(beam_width))
+
+    def fit(
+        self,
+        state: SelectionState | None = None,
+        *,
+        data: CrossValGramData,
+        max_steps: int | None = None,
+    ) -> SelectionState:
+        if state is not None and state.active_set:
+            raise ValueError(
+                "FastBeamCrossValBackwardSelection does not support warm starts."
+            )
+
+        criterion = self._init_criterion(data.make_full_data())
+        full_active = list(range(data.gram_total.shape[0]))
+        fast_states = [
+            FastForwardState.from_active_set(
+                data.train_data_for_fold(k), full_active, self.tol
+            )
+            for k in range(data.n_folds)
+        ]
+        initial_score = float(
+            np.asarray(criterion.evaluate(_fast_cv_rss(fast_states, data), len(full_active)))
+        )
+        criterion.update_current(initial_score)
+        beams = [FastCVBeam(fast_states, criterion, criterion.current_value)]
+        allow_worse = max_steps is not None
+
+        steps = 0
+        while beams and (max_steps is None or steps < max_steps):
+            candidates: list[FastCVBeam] = []
+            for beam in beams:
+                candidates.extend(
+                    _fast_cv_beam_backward_children(
+                        beam,
+                        self.beam_width,
+                        data,
+                        self.tol,
+                        allow_worse=allow_worse,
+                    )
+                )
+            if not candidates:
+                break
+            beams = _fast_cv_beam_prune(candidates, self.beam_width)
+            steps += 1
+
+        best = min(beams, key=lambda b: b.score)
+        return _build_cv_state_from_active_set(data, best.states[0].active_set)
+
+
+class FastBeamCrossValMixedSelection(FastForwardSelection):
+    """Beam-search mixed selection with fast CV scoring."""
+
+    def __init__(self, *, beam_width: int = 1, **kwargs):
+        super().__init__(**kwargs)
+        self.beam_width = max(1, int(beam_width))
+
+    def fit(
+        self,
+        state: SelectionState | None = None,
+        *,
+        data: CrossValGramData,
+        max_forward_steps: int | None = None,
+        max_total_steps: int | None = None,
+    ) -> SelectionState:
+        if state is not None and state.active_set:
+            raise ValueError(
+                "FastBeamCrossValMixedSelection does not support warm starts."
+            )
+
+        criterion = self._init_criterion(data.make_full_data())
+        fast_states = [
+            FastForwardState.create(data.train_data_for_fold(k), self.tol)
+            for k in range(data.n_folds)
+        ]
+        initial_score = float(
+            np.asarray(criterion.evaluate(_fast_cv_rss(fast_states, data), 0))
+        )
+        criterion.update_current(initial_score)
+        initial = FastCVBeam(fast_states, criterion, criterion.current_value)
+        beams = [initial]
+        best = initial
+
+        forward_steps = 0
+        total_ops = 0
+        while True:
+            if max_total_steps is not None and total_ops >= max_total_steps:
+                break
+            candidates: list[FastCVBeam] = []
+            for beam in beams:
+                candidates.extend(
+                    _fast_cv_beam_forward_children(
+                        beam, self.beam_width, data, self.tol
+                    )
+                )
+            if not candidates:
+                break
+            beams = _fast_cv_beam_prune(candidates, self.beam_width)
+            best = min(beams, key=lambda b: b.score)
+            forward_steps += 1
+            total_ops += len(beams)
+            if max_forward_steps is not None and forward_steps >= max_forward_steps:
+                break
+
+            new_beams: list[FastCVBeam] = []
+            for beam in beams:
+                while True:
+                    if max_total_steps is not None and total_ops >= max_total_steps:
+                        break
+                    improved = _fast_cv_beam_best_backward_child(beam, data, self.tol)
+                    if improved is None:
+                        break
+                    beam = improved
+                    total_ops += 1
+                best = min([best, beam], key=lambda b: b.score)
+                new_beams.append(beam)
+            beams = new_beams
+
+        return _build_cv_state_from_active_set(data, best.states[0].active_set)

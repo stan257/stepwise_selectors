@@ -53,7 +53,8 @@ def cv_forward_scores(
                 fold_idx, cache, idx_local
             )
 
-    aggregated = np.mean(rss_matrix, axis=0)
+    # Use summed CV RSS to keep the scale consistent with rss_cv (sum over folds).
+    aggregated = np.sum(rss_matrix, axis=0)
     return CVForwardScores(
         fold_caches=fold_caches,
         candidate_maps=candidate_maps,
@@ -77,5 +78,6 @@ def cv_backward_scores(
                 )
             )
 
-    aggregated = np.mean(rss_matrix, axis=0)
+    # Use summed CV RSS to keep the scale consistent with rss_cv (sum over folds).
+    aggregated = np.sum(rss_matrix, axis=0)
     return CVBackwardScores(rss_matrix=rss_matrix, aggregated_rss=aggregated)

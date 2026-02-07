@@ -357,6 +357,9 @@ class BaseCrossValSelection:
         best_local_idx, best_score = criterion.best_candidate(
             aggregated_rss, len(cv_state.active_set) - 1
         )
+        # Stop if the best drop does not improve the criterion.
+        if not criterion.is_improvement(best_score):
+            return False
         try:
             cv_state.apply_backward_step(best_local_idx, self.tol)
             criterion.update_current(best_score)
