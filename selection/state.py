@@ -119,7 +119,9 @@ def _apply_forward_from_cache(
         np.copyto(K_new[:-1, :-1], state.K)
         outer = state.outer_buf[: cache.active_rk, : cache.active_rk]
         np.multiply.outer(proj_vec, proj_vec, out=outer)
-        K_new[:-1, :-1] += outer / resid_var
+        # Scale in-place to avoid a temporary during the rank-one update.
+        outer *= 1.0 / resid_var
+        K_new[:-1, :-1] += outer
         K_new[:-1, -1] = -proj_vec / resid_var
         K_new[-1, :-1] = -proj_vec / resid_var
         K_new[-1, -1] = 1.0 / resid_var
