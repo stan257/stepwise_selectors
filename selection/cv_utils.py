@@ -26,6 +26,11 @@ class CVBackwardScores:
 def cv_forward_scores(
     cv_state: CrossValSelectionState, tol: float
 ) -> CVForwardScores | None:
+    """Score forward candidates using validation RSS aggregated across folds.
+
+    Intersects candidate sets across folds via boolean masks and records the
+    per-fold cache indices needed to apply a chosen candidate consistently.
+    """
     fold_caches: list[ForwardDeltaCache] = []
     p = cv_state.p
     common_mask = np.ones(p, dtype=bool)

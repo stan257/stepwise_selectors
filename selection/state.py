@@ -24,6 +24,11 @@ class ForwardDeltaCache:
 def _build_forward_cache(
     state: "SelectionState", tol: float
 ) -> ForwardDeltaCache | None:
+    """Compute forward-candidate deltas using block Gram projections.
+
+    The cache stores residual variances/correlations needed for a rank-one
+    update, avoiding recomputation when applying a chosen candidate.
+    """
     # Reuse a shared mask buffer to mark inactive candidates.
     mask = state.mask_buf
     # active_mask tracks active features; invert it to get candidate positions.
@@ -101,6 +106,7 @@ def _build_forward_cache(
 def _apply_forward_from_cache(
     state: "SelectionState", cache: ForwardDeltaCache, cache_idx: int
 ) -> int:
+    """Apply a cached forward candidate via a rank-one inverse Gram update."""
     resid_var = cache.resid_var[cache_idx]
     resid_corr = cache.resid_corr[cache_idx]
     rss_new = cache.rss_new[cache_idx]
@@ -147,6 +153,7 @@ def _apply_forward_from_cache(
 def _backward_components(
     state: "SelectionState", active_pos: int, tol: float
 ) -> tuple[int, list[int], np.ndarray, np.ndarray, float] | None:
+    """Compute the Schur-complement downdate for removing one active feature."""
     k = len(state.active_set)
     if not 0 <= active_pos < k:
         return None
@@ -413,6 +420,7 @@ class CrossValSelectionState:
         self.recompute_oos_rss()
 
     def recompute_oos_rss(self) -> float:
+        """Recompute out-of-sample RSS across folds using Gram-only formulas."""
         S = self.active_set
         if not S:
             self.oos_rss_folds = np.array(self.data.y_norm_folds, dtype=float)
@@ -454,6 +462,7 @@ class CrossValSelectionState:
         cache: ForwardDeltaCache,
         cache_idx: int,
     ) -> float:
+        """Compute validation RSS for adding a candidate in one fold."""
         state_k = self.train_states[fold_idx]
         feat_idx = int(cache.candidates[cache_idx])
         beta_j = cache.resid_corr[cache_idx] / cache.resid_var[cache_idx]

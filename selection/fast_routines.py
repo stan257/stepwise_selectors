@@ -142,6 +142,7 @@ class FastForwardState:
         return candidates[valid_rss], rss_new[valid_rss]
 
     def apply_forward(self, feat_idx: int) -> float:
+        """Apply a forward step while updating QR/Gram state in O(p)."""
         if self.active_mask[feat_idx]:
             raise ValueError("Feature is already active.")
         resid_var = self.v[feat_idx]
@@ -216,6 +217,7 @@ class FastForwardState:
         return rss_new
 
     def apply_backward(self, idx: int) -> None:
+        """Remove one active feature via inverse-Gram and QR downdates."""
         if not (0 <= idx < self.k):
             raise IndexError("Backward index out of range.")
         removed = self.active_set.pop(idx)
@@ -841,7 +843,11 @@ def _build_cv_state_from_active_set(
 def _fast_cv_forward_scores(
     fast_states: list[FastForwardState], data: CrossValGramData, tol: float
 ) -> tuple[list[int], np.ndarray] | None:
-    """Return common candidates and aggregated (summed) validation RSS."""
+    """Return common candidates and aggregated (summed) validation RSS.
+
+    Uses Gram-only formulas to score candidates per fold without materializing
+    design matrices, then sums fold RSS to match rss_cv scale.
+    """
     candidate_lists = []
     for state in fast_states:
         scored = state.candidate_scores()
@@ -898,6 +904,7 @@ def _fast_cv_forward_scores(
 def _fast_cv_backward_scores(
     fast_states: list[FastForwardState], data: CrossValGramData, tol: float
 ) -> np.ndarray | None:
+    """Compute aggregated CV backward scores using Gram-only downdates."""
     if not fast_states or not fast_states[0].active_set:
         return None
     idx_full = np.array(fast_states[0].active_set, dtype=int)
