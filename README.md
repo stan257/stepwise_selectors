@@ -18,7 +18,6 @@ Lightweight linear-model selection routines built on precomputed Gram statistics
 - Cross-val routines: `CrossValForwardSelection`, `CrossValBackwardSelection`, `CrossValMixedSelection`
 - Beam + cross-val: `BeamCrossValForwardSelection`, `BeamCrossValBackwardSelection`, `BeamCrossValMixedSelection`
 - Grouped routines: `GroupForwardSelection`, `GroupBackwardSelection`
-- Exact best-subset: `BranchAndBoundSelection` (for small `p` / `k`)
 - Criteria: `AICCriterion`, `BestRSSCriterion`
 
 ## Quick start
@@ -55,13 +54,6 @@ gstate = GroupForwardSelection(groups).fit(data=data)
 print(gstate.active_groups, gstate.beta, gstate.rss)
 ```
 
-### Exact best subset (small k)
-```python
-from selection.branch_and_bound import BranchAndBoundSelection
-
-state = BranchAndBoundSelection().fit(data=data, max_subset_size=3)
-print(state.active_set, state.beta, state.rss)
-```
 
 ## Notes
 - The code operates on Gram statistics (`X.T @ X`, `X.T @ y`, `y.T @ y`) and does not depend on raw design matrices.
