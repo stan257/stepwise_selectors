@@ -1,6 +1,7 @@
 """Public API exports for the selection toolkit."""
 
 from .criteria import AICCriterion, BestRSSCriterion, SelectionCriterion
+from .branch_and_bound import BranchAndBoundSelection
 from .definitions import CrossValGramData, GramData
 from .fast_routines import (
     FastBackwardSelection,
@@ -41,6 +42,7 @@ __all__ = [
     "AICCriterion",
     "BestRSSCriterion",
     "SelectionCriterion",
+    "BranchAndBoundSelection",
     "CrossValGramData",
     "GramData",
     "GroupBackwardSelection",
