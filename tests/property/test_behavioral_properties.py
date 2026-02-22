@@ -25,54 +25,7 @@ from selection.grouped_routines import (
 )
 from selection.routines import ForwardSelection
 from selection.state import SelectionState
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _make_regression(seed: int, n: int, p: int) -> GramData:
-    rng = np.random.default_rng(seed)
-    X = rng.standard_normal((n, p))
-    beta = rng.standard_normal(p)
-    y = X @ beta + 0.1 * rng.standard_normal(n)
-    return GramData(X.T @ X, X.T @ y, y @ y, n)
-
-
-def _explicit_beta_rss(data: GramData, active_set):
-    p = data.gram.shape[0]
-    beta = np.zeros(p, dtype=float)
-    if not active_set:
-        return beta, float(data.y_norm)
-    idx = np.array(active_set, dtype=int)
-    G_ss = data.gram[np.ix_(idx, idx)]
-    cov_s = data.cov[idx]
-    beta_s = np.linalg.solve(G_ss, cov_s)
-    beta[idx] = beta_s
-    rss = float(data.y_norm - cov_s @ beta_s)
-    return beta, rss
-
-
-def _explicit_cv_rss(cv_data: CrossValGramData, active_set) -> float:
-    if not active_set:
-        return float(np.sum(cv_data.y_norm_folds))
-    idx = np.array(active_set, dtype=int)
-    total = 0.0
-    for k in range(cv_data.n_folds):
-        train = cv_data.train_data_for_fold(k)
-        G_train = train.gram[np.ix_(idx, idx)]
-        cov_train = train.cov[idx]
-        beta = np.linalg.solve(G_train, cov_train)
-        G_val = cv_data.gram_folds[k]
-        c_val = cv_data.cov_folds[k]
-        y_norm_val = cv_data.y_norm_folds[k]
-        G_val_ss = G_val[np.ix_(idx, idx)]
-        rss = y_norm_val - 2.0 * float(beta @ c_val[idx]) + float(
-            beta @ (G_val_ss @ beta)
-        )
-        total += rss
-    return float(total)
+from tests.helpers import explicit_beta_rss, explicit_cv_rss, make_regression_gram
 
 
 # ---------------------------------------------------------------------------
@@ -85,7 +38,7 @@ def test_fast_and_reference_select_same_features_stepwise(seed: int):
     """Both implementations must choose the same feature at every forward step
     and produce identical backward scores from the full model."""
     n, p = 80, 10
-    data = _make_regression(seed, n, p)
+    data = make_regression_gram(seed, n=n, p=p)
 
     fast = FastForwardState.create(data, tol=1e-10)
     ref = SelectionState(data)
@@ -139,7 +92,7 @@ def test_backward_rss_monotone_and_matches_ols(seed: int):
     """Backward selection with BestRSS must produce monotonically increasing
     RSS, and each intermediate model must match direct OLS on its support."""
     n, p = 80, 8
-    data = _make_regression(seed, n, p)
+    data = make_regression_gram(seed, n=n, p=p)
 
     rss_path: list[float] = []
     for max_steps in range(p + 1):
@@ -148,7 +101,7 @@ def test_backward_rss_monotone_and_matches_ols(seed: int):
         ).fit(data=data, max_steps=max_steps)
 
         # Verify beta/RSS match direct OLS on the active support.
-        beta_ols, rss_ols = _explicit_beta_rss(data, state.active_set)
+        beta_ols, rss_ols = explicit_beta_rss(data, state.active_set)
         np.testing.assert_allclose(state.beta, beta_ols, atol=1e-8, rtol=1e-8)
         assert pytest.approx(state.rss, rel=1e-8, abs=1e-8) == rss_ols
 
@@ -195,7 +148,7 @@ def test_cv_forward_finds_optimal_subset_on_diagonal():
         best_cv_rss = float("inf")
         best_subset = None
         for subset in itertools.combinations(range(p), k):
-            cv_rss = _explicit_cv_rss(cv_data, list(subset))
+            cv_rss = explicit_cv_rss(cv_data, list(subset))
             if cv_rss < best_cv_rss:
                 best_cv_rss = cv_rss
                 best_subset = set(subset)
@@ -205,7 +158,7 @@ def test_cv_forward_finds_optimal_subset_on_diagonal():
             data=cv_data, max_steps=k
         )
 
-        selected_cv_rss = _explicit_cv_rss(cv_data, state.active_set)
+        selected_cv_rss = explicit_cv_rss(cv_data, state.active_set)
         assert selected_cv_rss <= best_cv_rss + 1e-6, (
             f"k={k}: selected CV RSS {selected_cv_rss:.8f} > "
             f"optimal {best_cv_rss:.8f}"
@@ -265,7 +218,7 @@ def test_grouped_active_set_is_always_union_of_complete_groups(seed: int):
     of complete groups — never a partial group."""
     n, p = 100, 12
     groups = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9, 10, 11]]
-    data = _make_regression(seed, n, p)
+    data = make_regression_gram(seed, n=n, p=p)
 
     # Forward: start empty, add groups one by one.
     for max_steps in range(1, len(groups) + 1):

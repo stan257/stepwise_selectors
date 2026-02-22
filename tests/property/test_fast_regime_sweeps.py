@@ -4,6 +4,7 @@ import pytest
 from selection.criteria import BestRSSCriterion
 from selection.definitions import GramData
 from selection.fast_routines import FastForwardSelection
+from tests.helpers import explicit_beta_rss
 
 
 def _make_data_scenario(kind: str, seed: int) -> GramData:
@@ -28,20 +29,6 @@ def _make_data_scenario(kind: str, seed: int) -> GramData:
     return GramData(X.T @ X, X.T @ y, y @ y, n)
 
 
-def _explicit_beta_rss(data: GramData, active_set):
-    p = data.gram.shape[0]
-    beta = np.zeros(p, dtype=float)
-    if not active_set:
-        return beta, float(data.y_norm)
-    idx = np.array(active_set, dtype=int)
-    G_ss = data.gram[np.ix_(idx, idx)]
-    cov_s = data.cov[idx]
-    beta_s = np.linalg.solve(G_ss, cov_s)
-    beta[idx] = beta_s
-    rss = float(data.y_norm - cov_s @ beta_s)
-    return beta, rss
-
-
 @pytest.mark.parametrize("kind", ["p_gt_n", "n_gt_p", "ill_conditioned"])
 def test_fast_forward_matches_explicit_across_regimes(kind: str):
     data = _make_data_scenario(kind, seed=2025)
@@ -50,6 +37,6 @@ def test_fast_forward_matches_explicit_across_regimes(kind: str):
     state = FastForwardSelection(criterion_cls=BestRSSCriterion).fit(
         data=data, max_steps=max_steps
     )
-    beta, rss = _explicit_beta_rss(data, state.active_set)
+    beta, rss = explicit_beta_rss(data, state.active_set)
     np.testing.assert_allclose(state.beta, beta, atol=1e-8, rtol=1e-8)
     assert pytest.approx(state.rss, rel=1e-8, abs=1e-8) == rss

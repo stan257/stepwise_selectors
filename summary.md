@@ -169,13 +169,13 @@ Major coverage themes:
 - Golden-output and regression stability checks.
 
 Notable files:
-- `tests/test_state_management.py`
-- `tests/test_selection_routines.py`
-- `tests/test_fast_cv_explicit_oos.py`
-- `tests/test_fast_cv_beam_selection.py`
-- `tests/test_fast_equivalence_sweeps.py`
-- `tests/test_fast_oracle_exhaustive.py`
-- `tests/test_golden_outputs.py`
+- `tests/unit/test_state.py`
+- `tests/integration/test_selection_routines.py`
+- `tests/regression/test_fast_cv_explicit_oos.py`
+- `tests/unit/test_fast_cv_beam_selection.py`
+- `tests/property/test_fast_equivalence_sweeps.py`
+- `tests/regression/test_fast_oracle_exhaustive.py`
+- `tests/regression/test_golden_outputs.py`
 
 ---
 

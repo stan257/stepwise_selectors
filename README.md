@@ -8,7 +8,12 @@ Lightweight linear-model selection routines built on precomputed Gram statistics
 
 ## Layout
 - `selection/`: core code (criteria, state objects, fast selection routines, grouped variants).
-- `tests/`: pytest suite covering selectors, state management, and grouped routines.
+- `tests/`: pytest suite organized by category:
+  - `tests/unit/`
+  - `tests/integration/`
+  - `tests/property/`
+  - `tests/regression/`
+  - shared helpers in `tests/helpers/`
 - `summary.md`: annotated walkthrough of the selection codebase.
 
 ## API overview
@@ -33,6 +38,13 @@ python -m pip install -e .
 3) Run tests:
 ```bash
 pytest tests
+```
+Filter by category marker:
+```bash
+pytest -m unit
+pytest -m integration
+pytest -m property
+pytest -m regression
 ```
 4) Use selection routines:
 ```python

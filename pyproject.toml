@@ -15,3 +15,13 @@ dev = ["pytest"]
 
 [tool.setuptools.packages.find]
 include = ["selection"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "unit: fast deterministic checks for isolated components",
+    "integration: cross-module and workflow tests",
+    "property: randomized/property-based behavioral checks",
+    "regression: golden/oracle and previously failing-case coverage",
+    "smoke: lightweight end-to-end sanity checks",
+]
