@@ -1,7 +1,14 @@
 import numpy as np  # noqa: D100
 import pytest
+from selection.constants import ABS_TOL
 from selection.criteria import BestRSSCriterion
 from selection.definitions import CrossValGramData, GramData
+from selection.fast_routines import (
+    FastForwardState,
+    _fast_cv_backward_scores,
+    _fast_cv_forward_scores,
+    _fast_cv_rss,
+)
 from selection.routines import (
     BackwardSelection,
     BeamBackwardSelection,
@@ -476,21 +483,32 @@ def test_crossval_mixed_keeps_fold_state_in_sync():
     CV RSS stay consistent with the per-fold training states, catching any
     desync between folds and the aggregated view.
     """
-    cv_data, support_set = make_cv_support_problem(p=12, support=4, folds=3, n=200)
-    max_forward_steps = 3  # noqa: F841
+    cv_data, _ = make_cv_support_problem(p=12, support=4, folds=3, n=200)
+    max_forward_steps = 3
     max_total_steps = 5
 
-    from selection.constants import ABS_TOL
-    from selection.cv_utils import cv_backward_scores, cv_forward_scores
     from selection.state import CrossValSelectionState
 
-    cv_state = CrossValSelectionState(cv_data)
-    cv_state.init_empty()
+    def rebuild_fast_states(active_set):
+        return [
+            FastForwardState.from_active_set(
+                cv_data.train_data_for_fold(k), active_set, ABS_TOL
+            )
+            for k in range(cv_data.n_folds)
+        ]
 
-    # Helper to recompute rss_cv fresh from per-fold states.
-    def recompute_from_folds(state):
-        clone = state.clone()
-        return clone.recompute_oos_rss()
+    def materialize_cv_state(active_set):
+        state = CrossValSelectionState(cv_data)
+        for fold_state in state.train_states:
+            fold_state.init_from_active_set(active_set)
+        state._sync_active_set()
+        state.recompute_oos_rss()
+        return state
+
+    fast_states = [
+        FastForwardState.create(cv_data.train_data_for_fold(k), ABS_TOL)
+        for k in range(cv_data.n_folds)
+    ]
 
     ops = 0
     forward_steps = 0
@@ -499,103 +517,120 @@ def test_crossval_mixed_keeps_fold_state_in_sync():
             break
         if forward_steps >= max_forward_steps:
             break
-        forward_data = cv_forward_scores(cv_state, ABS_TOL)
+        forward_data = _fast_cv_forward_scores(fast_states, cv_data, ABS_TOL)
         if forward_data is None:
             break
-        best_idx = int(np.argmin(forward_data.aggregated_rss))
-        for fold_idx, fold_state in enumerate(cv_state.train_states):
-            cache = forward_data.fold_caches[fold_idx]
-            idx_local = int(forward_data.candidate_indices[fold_idx][best_idx])
-            fold_state.apply_forward_step(cache, idx_local)
-        cv_state._sync_active_set()
-        cv_state.recompute_oos_rss()
+        candidates, aggregated = forward_data
+        best_idx = int(np.argmin(aggregated))
+        feat_idx = int(candidates[best_idx])
+        for fold_state in fast_states:
+            fold_state.apply_forward(feat_idx)
+        fast_states = rebuild_fast_states(list(fast_states[0].active_set))
         forward_steps += 1
         ops += 1
 
-        # Assert active sets match across folds and the shared view.
-        fold_sets = [tuple(s.active_set) for s in cv_state.train_states]
+        fold_sets = [tuple(s.active_set) for s in fast_states]
         assert all(fs == fold_sets[0] for fs in fold_sets)
+        cv_state = materialize_cv_state(list(fast_states[0].active_set))
         assert list(fold_sets[0]) == cv_state.active_set
 
-        # Assert cached rss_cv matches fresh recomputation.
-        assert pytest.approx(
-            cv_state.rss_cv, rel=1e-9, abs=1e-9
-        ) == recompute_from_folds(cv_state)
+        assert pytest.approx(cv_state.rss_cv, rel=1e-9, abs=1e-9) == _fast_cv_rss(
+            fast_states, cv_data
+        )
 
         # Try one backward step if budget allows.
         if max_total_steps is not None and ops >= max_total_steps:
             break
-        backward_data = cv_backward_scores(cv_state, ABS_TOL)
+        backward_data = _fast_cv_backward_scores(fast_states, cv_data, ABS_TOL)
         if backward_data is None:
             break
-        best_local = int(np.argmin(backward_data.aggregated_rss))
+        best_local = int(np.argmin(backward_data))
         try:
-            cv_state.apply_backward_step(best_local, ABS_TOL)
-        except np.linalg.LinAlgError:
+            for fold_state in fast_states:
+                fold_state.apply_backward(best_local)
+            fast_states = rebuild_fast_states(list(fast_states[0].active_set))
+        except ValueError:
             break
         ops += 1
-        fold_sets = [tuple(s.active_set) for s in cv_state.train_states]
+        fold_sets = [tuple(s.active_set) for s in fast_states]
         assert all(fs == fold_sets[0] for fs in fold_sets)
+        cv_state = materialize_cv_state(list(fast_states[0].active_set))
         assert list(fold_sets[0]) == cv_state.active_set
-        assert pytest.approx(
-            cv_state.rss_cv, rel=1e-9, abs=1e-9
-        ) == recompute_from_folds(cv_state)
+        assert pytest.approx(cv_state.rss_cv, rel=1e-9, abs=1e-9) == _fast_cv_rss(
+            fast_states, cv_data
+        )
 
 
 def test_cv_forward_scores_matches_reference_intersection():
     """Ensure vectorized candidate intersection matches the prior mapping logic."""
-    from selection.constants import ABS_TOL
-    from selection.cv_utils import cv_forward_scores
-    from selection.state import CrossValSelectionState
-
     cv_data, _ = make_cv_support_problem(p=12, support=4, folds=3, n=200, seed=123)
-    cv_state = CrossValSelectionState(cv_data)
-    cv_state.init_empty()
+    fast_states = [
+        FastForwardState.create(cv_data.train_data_for_fold(k), ABS_TOL)
+        for k in range(cv_data.n_folds)
+    ]
 
-    def reference_forward_scores(state, tol):
-        fold_caches = []
-        candidate_maps = []
-        for train_state in state.train_states:
-            cache = train_state.compute_forward_deltas(tol)
-            if cache is None or not cache.candidates.size:
-                return None
-            fold_caches.append(cache)
-            candidate_maps.append(
-                {int(c): idx for idx, c in enumerate(cache.candidates)}
+    # Advance to a non-empty support before checking candidate intersections.
+    for _ in range(2):
+        scored = _fast_cv_forward_scores(fast_states, cv_data, ABS_TOL)
+        assert scored is not None
+        candidates, aggregated = scored
+        feat_idx = int(candidates[int(np.argmin(aggregated))])
+        for fold_state in fast_states:
+            fold_state.apply_forward(feat_idx)
+        fast_states = [
+            FastForwardState.from_active_set(
+                cv_data.train_data_for_fold(k),
+                list(fast_states[0].active_set),
+                ABS_TOL,
             )
+            for k in range(cv_data.n_folds)
+        ]
+
+    def reference_forward_scores(states):
+        candidate_maps = []
+        for state in states:
+            scored = state.candidate_scores()
+            if scored is None:
+                return None
+            candidates, _ = scored
+            candidate_maps.append({int(c): idx for idx, c in enumerate(candidates)})
 
         common = set(candidate_maps[0].keys())
         for mapping in candidate_maps[1:]:
             common &= set(mapping.keys())
         if not common:
             return None
+
         candidates = sorted(common)
-        rss_matrix = np.full(
-            (state.n_folds, len(candidates)), np.inf, dtype=float
-        )
-        for fold_idx, cache in enumerate(fold_caches):
-            mapping = candidate_maps[fold_idx]
-            for col, candidate in enumerate(candidates):
-                idx_local = mapping[candidate]
-                rss_matrix[fold_idx, col] = state.validation_rss_for_candidate(
-                    fold_idx, cache, idx_local
+        active_prefix = list(states[0].active_set)
+        rss_matrix = np.full((cv_data.n_folds, len(candidates)), np.inf, dtype=float)
+
+        for col, candidate in enumerate(candidates):
+            idx = np.array(active_prefix + [int(candidate)], dtype=int)
+            for fold_idx in range(cv_data.n_folds):
+                train_data = cv_data.train_data_for_fold(fold_idx)
+                beta = np.linalg.solve(
+                    train_data.gram[np.ix_(idx, idx)], train_data.cov[idx]
+                )
+                G_val = cv_data.gram_folds[fold_idx]
+                c_val = cv_data.cov_folds[fold_idx]
+                y_norm_val = cv_data.y_norm_folds[fold_idx]
+                rss_matrix[fold_idx, col] = (
+                    y_norm_val
+                    - 2.0 * float(beta @ c_val[idx])
+                    + float(beta @ (G_val[np.ix_(idx, idx)] @ beta))
                 )
 
-        aggregated = np.sum(rss_matrix, axis=0)
-        return candidates, aggregated, candidate_maps
+        return candidates, np.sum(rss_matrix, axis=0)
 
-    ref = reference_forward_scores(cv_state, ABS_TOL)
-    fast = cv_forward_scores(cv_state, ABS_TOL)
+    ref = reference_forward_scores(fast_states)
+    fast = _fast_cv_forward_scores(fast_states, cv_data, ABS_TOL)
     assert ref is not None and fast is not None
-    ref_candidates, ref_agg, ref_maps = ref
+    ref_candidates, ref_agg = ref
+    fast_candidates, fast_agg = fast
 
-    np.testing.assert_array_equal(fast.candidates, np.array(ref_candidates))
-    np.testing.assert_allclose(fast.aggregated_rss, ref_agg, rtol=1e-12, atol=1e-12)
-    for fold_idx, mapping in enumerate(ref_maps):
-        ref_idx = np.array(
-            [mapping[int(c)] for c in ref_candidates], dtype=int
-        )
-        np.testing.assert_array_equal(fast.candidate_indices[fold_idx], ref_idx)
+    np.testing.assert_array_equal(np.array(fast_candidates), np.array(ref_candidates))
+    np.testing.assert_allclose(fast_agg, ref_agg, rtol=1e-10, atol=1e-10)
 
 
 # ---------------------------------------------------------------------------

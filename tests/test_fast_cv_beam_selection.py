@@ -1,15 +1,14 @@
 import numpy as np
 import pytest
 
-from selection.beam_search import Beam
-from selection.beam_utils import cv_beam_backward_children
 from selection.criteria import BestRSSCriterion
-from selection.cv_utils import CVBackwardScores
 from selection.definitions import CrossValGramData, GramData
 from selection.fast_routines import (
     FastBeamCrossValBackwardSelection,
     FastBeamCrossValForwardSelection,
     FastBeamCrossValMixedSelection,
+    FastCVBeam,
+    _fast_cv_beam_backward_children,
 )
 from selection.routines import (
     BeamCrossValBackwardSelection,
@@ -71,26 +70,26 @@ def test_fast_cv_beam_mixed_matches_standard():
 
 
 def test_cv_beam_backward_children_propagates_unexpected_errors(monkeypatch):
-    class _DummyState:
+    class _DummyFastState:
         active_set = [0]
 
         def clone(self):
             return self
 
-        def apply_backward_step(self, idx, tol):
+        def apply_backward(self, idx):
             raise RuntimeError("unexpected failure")
 
     criterion = BestRSSCriterion()
     criterion.update_current(10.0)
-    beam = Beam(_DummyState(), criterion, 10.0)
+    beam = FastCVBeam([_DummyFastState()], criterion, 10.0)
+    cv_data = make_cv_problem(folds=2, n=20, p=4, support=1, seed=777)
 
-    def _fake_backward_scores(cv_state, tol):
-        return CVBackwardScores(
-            rss_matrix=np.array([[1.0]]),
-            aggregated_rss=np.array([1.0]),
-        )
-
-    monkeypatch.setattr("selection.beam_utils.cv_backward_scores", _fake_backward_scores)
+    monkeypatch.setattr(
+        "selection.fast_routines._fast_cv_backward_scores",
+        lambda states, data, tol: np.array([1.0]),
+    )
 
     with pytest.raises(RuntimeError, match="unexpected failure"):
-        cv_beam_backward_children(beam, beam_width=1, tol=1e-10, allow_worse=True)
+        _fast_cv_beam_backward_children(
+            beam, beam_width=1, data=cv_data, tol=1e-10, allow_worse=True
+        )
