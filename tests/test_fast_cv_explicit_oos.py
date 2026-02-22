@@ -105,6 +105,24 @@ def test_fast_cv_backward_scores_match_explicit():
     np.testing.assert_allclose(scores, explicit, atol=1e-8, rtol=1e-8)
 
 
+def test_fast_cv_backward_scores_reject_nonpositive_pivots():
+    cv_data, _, _ = _make_explicit_cv(seed=556, folds=3, n=50, p=8)
+    active = [0, 1]
+    fast_states = [
+        FastForwardState.from_active_set(
+            cv_data.train_data_for_fold(k), active, tol=1e-12
+        )
+        for k in range(cv_data.n_folds)
+    ]
+    for state in fast_states:
+        state.K[0, 0] = -abs(state.K[0, 0])
+
+    scores = _fast_cv_backward_scores(fast_states, cv_data, tol=1e-12)
+
+    assert scores is not None
+    assert np.isinf(scores[0])
+
+
 def test_fast_cv_mixed_rss_matches_explicit():
     cv_data, X_folds, y_folds = _make_explicit_cv(seed=777, folds=3, n=60, p=9)
     state = FastCrossValMixedSelection(criterion_cls=BestRSSCriterion).fit(

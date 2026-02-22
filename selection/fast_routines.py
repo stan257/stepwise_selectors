@@ -20,7 +20,14 @@ from .criteria import (
     SelectionCriterion,
 )
 
-_IC_CRITERIA = (AICCriterion, BICCriterion, AICcCriterion, HQICCriterion, EBICCriterion, GCVCriterion)
+_DISALLOWED_CV_CRITERIA = (
+    AICCriterion,
+    BICCriterion,
+    AICcCriterion,
+    HQICCriterion,
+    EBICCriterion,
+    GCVCriterion,
+)
 from .definitions import CrossValGramData, GramData
 from .state import CrossValSelectionState, SelectionState
 from .topk import topk_indices
@@ -235,7 +242,7 @@ class FastForwardState:
         Kk = self.K[: self.k, : self.k]
         beta_k = self.beta_S[: self.k]
         k_22 = Kk[idx, idx]
-        if abs(k_22) <= self.tol:
+        if k_22 <= self.tol:
             raise ValueError("Backward update failed due to near-singular pivot.")
         idx_keep = np.delete(np.arange(self.k), idx)
         K_11 = Kk[np.ix_(idx_keep, idx_keep)]
@@ -313,10 +320,10 @@ class FastForwardSelection:
     ):
         self.tol = tol
         cls = criterion_cls or self._default_criterion
-        if self._reject_ic and issubclass(cls, _IC_CRITERIA):
+        if self._reject_ic and issubclass(cls, _DISALLOWED_CV_CRITERIA):
             raise ValueError(
                 f"{type(self).__name__} uses cross-validation for regularisation; "
-                f"information criteria ({cls.__name__}) should not be combined with CV. "
+                f"{cls.__name__} is not supported for CV selection routines. "
                 f"Use BestRSSCriterion (the default) instead."
             )
         self.criterion_cls = cls
@@ -947,7 +954,7 @@ def _fast_cv_backward_scores(
 
         for local_idx in range(k):
             k_22 = Kk[local_idx, local_idx]
-            if abs(k_22) <= tol:
+            if k_22 <= tol:
                 rss_matrix[fold_idx, local_idx] = np.inf
                 continue
             idx_keep = np.delete(np.arange(k), local_idx)

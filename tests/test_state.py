@@ -3,8 +3,8 @@ import numpy as np
 import pytest
 from scipy import linalg as la
 
-from selection.definitions import GramData
-from selection.state import SelectionState
+from selection.definitions import CrossValGramData, GramData
+from selection.state import CrossValSelectionState, SelectionState
 
 
 def make_random_state(n=30, p=5, seed=0):
@@ -112,3 +112,34 @@ def test_backward_scores_match_individual_updates():
         clone = copy.deepcopy(state)
         clone.apply_backward_step(i)
         assert pytest.approx(scores[i]) == clone.rss
+
+
+def test_backward_rejects_nonpositive_pivot():
+    state = make_random_state(p=3)
+    state.init_from_active_set([0])
+    state.K[0, 0] = -abs(state.K[0, 0])
+
+    scores = state.compute_backward_scores()
+    assert scores is not None
+    assert np.isinf(scores[0])
+
+    with pytest.raises(np.linalg.LinAlgError):
+        state.apply_backward_step(0)
+
+
+def test_cv_validation_backward_rejects_nonpositive_pivot():
+    rng = np.random.default_rng(987)
+    fold_data = []
+    for _ in range(2):
+        X = rng.standard_normal((30, 3))
+        y = rng.standard_normal(30)
+        fold_data.append(GramData(X.T @ X, X.T @ y, y @ y, n_samples=30))
+
+    cv_state = CrossValSelectionState(CrossValGramData(fold_data))
+    for train_state in cv_state.train_states:
+        train_state.init_from_active_set([0])
+        train_state.K[0, 0] = -abs(train_state.K[0, 0])
+    cv_state._sync_active_set()
+
+    rss = cv_state.validation_rss_for_backward_candidate(0, 0, tol=1e-12)
+    assert np.isinf(rss)

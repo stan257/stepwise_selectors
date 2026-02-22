@@ -165,7 +165,7 @@ def _backward_components(
     k_12 = K_inv[idx_to_keep, active_pos]
     k_22 = K_inv[active_pos, active_pos]
 
-    if abs(k_22) <= tol:
+    if k_22 <= tol:
         return None
 
     K_new = K_11 - np.outer(k_12, k_12) / k_22

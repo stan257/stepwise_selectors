@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from selection.criteria import BestRSSCriterion
+from selection.criteria import AICCriterion, BestRSSCriterion, GCVCriterion
 from selection.definitions import CrossValGramData, GramData
 from selection.fast_routines import (
     FastCrossValBackwardSelection,
@@ -9,6 +9,9 @@ from selection.fast_routines import (
     FastCrossValMixedSelection,
 )
 from selection.routines import (
+    BeamCrossValBackwardSelection,
+    BeamCrossValForwardSelection,
+    BeamCrossValMixedSelection,
     CrossValBackwardSelection,
     CrossValForwardSelection,
     CrossValMixedSelection,
@@ -62,3 +65,39 @@ def test_fast_cv_mixed_matches_standard():
     )
     assert fast.active_set == ref.active_set
     assert pytest.approx(fast.rss_cv, rel=1e-8, abs=1e-8) == ref.rss_cv
+
+
+@pytest.mark.parametrize(
+    "selector_cls",
+    [
+        CrossValForwardSelection,
+        CrossValBackwardSelection,
+        CrossValMixedSelection,
+        BeamCrossValForwardSelection,
+        BeamCrossValBackwardSelection,
+        BeamCrossValMixedSelection,
+    ],
+)
+def test_cv_selectors_default_to_best_rss(selector_cls):
+    selector = selector_cls()
+    assert selector.criterion_cls is BestRSSCriterion
+
+
+@pytest.mark.parametrize(
+    "selector_cls",
+    [
+        CrossValForwardSelection,
+        CrossValBackwardSelection,
+        CrossValMixedSelection,
+        BeamCrossValForwardSelection,
+        BeamCrossValBackwardSelection,
+        BeamCrossValMixedSelection,
+    ],
+)
+@pytest.mark.parametrize("criterion_cls", [AICCriterion, GCVCriterion])
+def test_cv_selectors_reject_disallowed_criteria(selector_cls, criterion_cls):
+    with pytest.raises(
+        ValueError,
+        match=rf"{criterion_cls.__name__} is not supported for CV selection routines",
+    ):
+        selector_cls(criterion_cls=criterion_cls)
