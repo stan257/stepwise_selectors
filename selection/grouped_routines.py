@@ -56,6 +56,12 @@ class BaseGroupedSelection:
         criterion_kwargs=None,
     ):
         self.groups = [tuple(g) for g in groups]
+        seen = set()
+        for g in self.groups:
+            overlap = seen & set(g)
+            if overlap:
+                raise ValueError(f"Groups must be disjoint; features {overlap} appear in multiple groups.")
+            seen.update(g)
         self.num_groups = len(self.groups)
         self.tol = tol
         self.criterion_cls = criterion_cls or AICCriterion

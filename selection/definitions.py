@@ -27,6 +27,10 @@ class GramData:
             raise TypeError("n_samples must be an integer.")
         if self.gram.ndim != 2 or self.gram.shape[0] != self.gram.shape[1]:
             raise ValueError("Gram matrix must be square.")
+        if not np.allclose(self.gram, self.gram.T, atol=1e-10):
+            raise ValueError("Gram matrix must be symmetric.")
+        if np.any(np.diag(self.gram) < 0):
+            raise ValueError("Gram diagonal entries must be non-negative.")
         if self.cov.ndim != 1 or self.cov.shape[0] != self.gram.shape[0]:
             raise ValueError("cov vector must match Gram dimensions.")
         if self.y_norm < 0:
@@ -62,12 +66,8 @@ class CrossValGramData:
     y_norm_folds_arr: np.ndarray = field(init=False)
 
     def check_data_validity(self) -> int:
-        if not self.folds:
-            raise ValueError("CrossValidationGramData requires at least one fold.")
         if len(self.folds) < 2:
-            raise ValueError(
-                "CrossValidationGramData requires at least two folds for cross-validation."
-            )
+            raise ValueError("CrossValidationGramData requires at least two folds.")
         first = self.folds[0]
         if not isinstance(first, GramData):
             raise TypeError("All folds must be GramData instances.")
@@ -88,8 +88,8 @@ class CrossValGramData:
         return p
 
     def __post_init__(self):
-        if not self.folds:
-            raise ValueError("CrossValidationGramData requires at least one fold.")
+        if len(self.folds) < 2:
+            raise ValueError("CrossValidationGramData requires at least two folds.")
 
         self.n_folds = len(self.folds)
         self.p = self.check_data_validity()

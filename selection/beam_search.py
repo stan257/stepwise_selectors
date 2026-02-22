@@ -93,7 +93,7 @@ def beam_backward_children(
         try:
             child_state = beam.state.clone()
             child_state.apply_backward_step(idx, tol)
-        except Exception:
+        except (ValueError, np.linalg.LinAlgError):
             continue
         child_criterion = beam.criterion.clone()
         child_criterion.update_current(candidate_score)

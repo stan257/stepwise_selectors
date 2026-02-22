@@ -37,7 +37,7 @@ def test_crossvalgramdata_requires_at_least_two_folds():
     y = rng.standard_normal(20)
     fold = GramData(X.T @ X, X.T @ y, y @ y, n_samples=20)
     with pytest.raises(
-        ValueError, match="requires at least two folds for cross-validation"
+        ValueError, match="requires at least two folds"
     ):
         CrossValGramData([fold])
 

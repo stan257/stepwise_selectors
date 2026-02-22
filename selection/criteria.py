@@ -200,7 +200,7 @@ class BestRSSCriterion(SelectionCriterion):
 
     def evaluate(self, rss, k: int):
         rss_arr = np.asarray(rss, dtype=float)
-        if __debug__ and np.any(rss_arr < 0):
+        if np.any(rss_arr < 0):
             raise ValueError("RSS must be non-negative.")
         return rss_arr
 
