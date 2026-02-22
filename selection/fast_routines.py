@@ -9,7 +9,18 @@ import numpy as np
 from dataclasses import dataclass
 
 from .constants import ABS_TOL
-from .criteria import AICCriterion, SelectionCriterion
+from .criteria import (
+    AICCriterion,
+    AICcCriterion,
+    BestRSSCriterion,
+    BICCriterion,
+    EBICCriterion,
+    GCVCriterion,
+    HQICCriterion,
+    SelectionCriterion,
+)
+
+_IC_CRITERIA = (AICCriterion, BICCriterion, AICcCriterion, HQICCriterion, EBICCriterion, GCVCriterion)
 from .definitions import CrossValGramData, GramData
 from .state import CrossValSelectionState, SelectionState
 from .topk import topk_indices
@@ -290,6 +301,9 @@ class FastForwardSelection:
     O(k^2·p) cost of recomputing projections from scratch at each step.
     """
 
+    _default_criterion = AICCriterion
+    _reject_ic: bool = False
+
     def __init__(
         self,
         *,
@@ -298,7 +312,14 @@ class FastForwardSelection:
         criterion_kwargs=None,
     ):
         self.tol = tol
-        self.criterion_cls = criterion_cls or AICCriterion
+        cls = criterion_cls or self._default_criterion
+        if self._reject_ic and issubclass(cls, _IC_CRITERIA):
+            raise ValueError(
+                f"{type(self).__name__} uses cross-validation for regularisation; "
+                f"information criteria ({cls.__name__}) should not be combined with CV. "
+                f"Use BestRSSCriterion (the default) instead."
+            )
+        self.criterion_cls = cls
         self.criterion_kwargs = dict(criterion_kwargs or {})
 
     def _init_criterion(self, data: GramData) -> SelectionCriterion:
@@ -958,6 +979,9 @@ def _fast_cv_backward_scores(
 class FastCrossValForwardSelection(FastForwardSelection):
     """Cross-validated forward selection using fast training updates."""
 
+    _default_criterion = BestRSSCriterion
+    _reject_ic = True
+
     def fit(
         self,
         state: SelectionState | None = None,
@@ -1002,6 +1026,9 @@ class FastCrossValForwardSelection(FastForwardSelection):
 
 class FastCrossValBackwardSelection(FastForwardSelection):
     """Cross-validated backward selection using fast training updates."""
+
+    _default_criterion = BestRSSCriterion
+    _reject_ic = True
 
     def fit(
         self,
@@ -1053,6 +1080,9 @@ class FastCrossValBackwardSelection(FastForwardSelection):
 
 class FastCrossValMixedSelection(FastForwardSelection):
     """Cross-validated mixed selection using fast training updates."""
+
+    _default_criterion = BestRSSCriterion
+    _reject_ic = True
 
     def fit(
         self,
@@ -1129,6 +1159,9 @@ class FastCrossValMixedSelection(FastForwardSelection):
 class FastBeamCrossValForwardSelection(FastForwardSelection):
     """Beam-search forward selection with fast CV scoring."""
 
+    _default_criterion = BestRSSCriterion
+    _reject_ic = True
+
     def __init__(self, *, beam_width: int = 1, **kwargs):
         super().__init__(**kwargs)
         self.beam_width = max(1, int(beam_width))
@@ -1177,6 +1210,9 @@ class FastBeamCrossValForwardSelection(FastForwardSelection):
 
 class FastBeamCrossValBackwardSelection(FastForwardSelection):
     """Beam-search backward selection with fast CV scoring."""
+
+    _default_criterion = BestRSSCriterion
+    _reject_ic = True
 
     def __init__(self, *, beam_width: int = 1, **kwargs):
         super().__init__(**kwargs)
@@ -1234,6 +1270,9 @@ class FastBeamCrossValBackwardSelection(FastForwardSelection):
 
 class FastBeamCrossValMixedSelection(FastForwardSelection):
     """Beam-search mixed selection with fast CV scoring."""
+
+    _default_criterion = BestRSSCriterion
+    _reject_ic = True
 
     def __init__(self, *, beam_width: int = 1, **kwargs):
         super().__init__(**kwargs)
