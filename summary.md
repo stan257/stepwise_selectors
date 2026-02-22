@@ -156,57 +156,20 @@ This document explains every module in the `selection` package and the associate
   - Holds per-fold validation RSS matrix (fold × active index) and aggregated RSS across folds.
 
 - `cv_forward_scores(cv_state, tol) -> CVForwardScores | None`
-  - Builds forward caches on each fold’s training state, intersects candidate sets across folds, computes validation RSS for each common candidate on each fold, aggregates by mean. Returns None if no viable candidates.
+  - Builds forward caches on each fold’s training state, intersects candidate sets across folds, computes validation RSS for each common candidate on each fold, aggregates by sum. Returns None if no viable candidates.
 
 - `cv_backward_scores(cv_state, tol) -> CVBackwardScores | None`
-  - Computes validation RSS on each fold for dropping each active variable (via `validation_rss_for_backward_candidate`), aggregates by mean. Returns None if no active variables.
+  - Computes validation RSS on each fold for dropping each active variable (via `validation_rss_for_backward_candidate`), aggregates by sum. Returns None if no active variables.
 
 ---
 
-## `selection/routines.py` – selection algorithms (greedy and beam; single-data and CV)
-- `class BaseSingleSelectionRoutine`
-  - Stores shared config for greedy single-dataset routines (`tol`, `criterion_cls`, `criterion_kwargs`).
-  - `_init_run(state, data, mode)`: Clones or creates `SelectionState`, initializes empty/full, instantiates criterion (injects `n_samples` if required), seeds `current_value`.
-  - `_select_forward_candidate(state, criterion)`: Computes forward deltas, gets best candidate score, ensures improvement.
-  - `_forward_step(state, criterion)`: Applies chosen forward move and updates criterion.
-  - `_select_backward_candidate(state, criterion, allow_worse=False)`: Computes backward RSS, chooses best removal; optionally permits non-improving moves.
-  - `_backward_step(state, criterion, allow_worse=False)`: Applies chosen removal with error handling; updates criterion.
-
-- Greedy single-dataset routines:
-  - `ForwardSelection.fit(data, state=None, max_steps=None)`: Starts empty, repeatedly `_forward_step` until no improvement or step budget.
-  - `BackwardSelection.fit(...)`: Starts full, repeatedly `_backward_step`.
-  - `MixedSelection.fit(..., max_forward_steps=None, max_total_steps=None)`: Alternates forward additions with as many improving backward removals as possible under budgets.
-  - **Asymptotic runtime (Gram given)**: Let `k_t` be the active-set size at step `t`. A forward step costs `O(k_t^2 (p - k_t))` for projections plus `O(k_t^2)` for the rank-one update; total over `s` steps is `O(∑_{t=1..s} k_t^2 (p - k_t))`, bounded by `O(s · k_max^2 · p)` with `k_max = max k_t`. A backward step at size `k_t` is `O(k_t^2)`; total `O(∑ k_t^2)` (bounded by `O(s · k_max^2)`). Memory: `O(p^2)` for the Gram plus `O(k_max^2)` for state.
-
-- `class BaseBeamSelectionRoutine` (inherits BaseSingleSelectionRoutine)
-  - Adds `beam_width` config for beam variants.
-
-- Beam single-dataset routines:
-  - `BeamForwardSelection.fit(...)`: Uses `run_beam_search` with `beam_forward_children`.
-  - `BeamBackwardSelection.fit(...)`: Uses `run_beam_search` with `beam_backward_children`; allows non-improving removals when step-limited.
-  - `BeamMixedSelection.fit(...)`: Uses `run_beam_mixed` with forward/ backward expanders.
-
-- `class BaseCrossValSelection`
-  - Shared config for greedy CV routines (`tol`, `criterion_cls`, `criterion_kwargs`).
-  - `_init_run(state, data, mode)`: Clones/creates `CrossValSelectionState`, initializes empty/full, builds criterion with `n_samples_total` if needed.
-  - `_init_criterion(cv_state, data)`: Seeds criterion `current_value` with `rss_cv` + current model size.
-  - `_forward_step(cv_state, criterion)`: Uses `cv_forward_scores` to aggregate validation RSS for common candidates; applies best addition across folds; updates OOS RSS and criterion.
-  - `_backward_step(cv_state, criterion)`: Uses `cv_backward_scores` to aggregate CV RSS for dropping each active variable; applies best removal; updates criterion.
-
-- Greedy CV routines:
-  - `CrossValForwardSelection.fit(...)`: Empty start; repeated forward steps.
-  - `CrossValBackwardSelection.fit(...)`: Full start; repeated backward steps.
-  - `CrossValMixedSelection.fit(...)`: Empty start; forward steps with as many backward improvements as budgets allow.
-  - **Asymptotic runtime (Gram per fold given)**: Multiply the single-dataset sums by `n_folds` (each step touches every fold’s state/validation Gram). Memory: `O(n_folds * p^2)` for fold Grams plus per-fold `O(k_max^2)` state.
-
-- `class BaseBeamCrossValSelection` (inherits BaseCrossValSelection)
-  - Adds `beam_width` config for CV beam routines.
-
-- Beam CV routines:
-  - `BeamCrossValForwardSelection.fit(...)`: Beam search over CV forward candidates via `cv_beam_forward_children`.
-  - `BeamCrossValBackwardSelection.fit(...)`: Beam search over CV backward moves via `cv_beam_backward_children`; can allow non-improving removals when step-limited.
-  - `BeamCrossValMixedSelection.fit(...)`: Beam-based forward expansions with greedy backward improvements per beam (`cv_beam_best_backward_child`), respecting operation budgets.
-  - **Asymptotic runtime**: Single-dataset beam costs are scaled by `beam_width` per expansion; CV variants add the `n_folds` multiplier. Memory scales with beam width (`O(beam_width * k_max^2)` for inverse blocks) plus shared `O(p^2)` (or `n_folds * p^2` for CV) for Grams.
+## `selection/routines.py` – public API aliases
+- `selection/routines.py` is a thin API layer that re-exports the fast implementations from `selection/fast_routines.py` under the default names:
+  - `ForwardSelection`, `BackwardSelection`, `MixedSelection`
+  - `BeamForwardSelection`, `BeamBackwardSelection`, `BeamMixedSelection`
+  - `CrossValForwardSelection`, `CrossValBackwardSelection`, `CrossValMixedSelection`
+  - `BeamCrossValForwardSelection`, `BeamCrossValBackwardSelection`, `BeamCrossValMixedSelection`
+- The algorithmic behavior and complexity are therefore defined by `selection/fast_routines.py`.
 
 ---
 

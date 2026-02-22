@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 from selection.criteria import AICCriterion, BestRSSCriterion
 from selection.definitions import GramData
 from selection.grouped_routines import GroupBackwardSelection, GroupForwardSelection
@@ -48,3 +49,13 @@ def test_group_backward_drops_weak_group():
     np.testing.assert_allclose(state.beta[:2], data.cov[:2])
     np.testing.assert_allclose(state.beta[2:], 0.0)
     assert state.rss < data.y_norm
+
+
+def test_group_selection_rejects_overlapping_groups():
+    with pytest.raises(ValueError, match="disjoint"):
+        GroupForwardSelection([[0, 1], [1, 2]])
+
+
+def test_group_selection_rejects_duplicate_feature_within_group():
+    with pytest.raises(ValueError, match="unique features"):
+        GroupForwardSelection([[0, 0], [1, 2]])

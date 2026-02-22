@@ -59,4 +59,5 @@ print(gstate.active_groups, gstate.beta, gstate.rss)
 - The code operates on Gram statistics (`X.T @ X`, `X.T @ y`, `y.T @ y`) and does not depend on raw design matrices.
 - `selection.routines` and `selection.grouped_routines` default to fast implementations.
 - For cross-validation, provide per-fold `GramData` via `CrossValGramData`.
-- Beam search and mixed routines rely on the same criterion interface (default AIC; can swap in `BestRSSCriterion`).
+- Single-dataset selectors default to `AICCriterion`; CV selectors default to `BestRSSCriterion`.
+- CV selectors reject IC/GCV-style criteria to avoid double regularization on top of held-out RSS.

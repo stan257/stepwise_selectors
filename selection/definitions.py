@@ -27,7 +27,7 @@ class GramData:
             raise TypeError("n_samples must be an integer.")
         if self.gram.ndim != 2 or self.gram.shape[0] != self.gram.shape[1]:
             raise ValueError("Gram matrix must be square.")
-        if not np.allclose(self.gram, self.gram.T, atol=1e-10):
+        if not np.allclose(self.gram, self.gram.T, atol=1e-10, rtol=0.0):
             raise ValueError("Gram matrix must be symmetric.")
         if np.any(np.diag(self.gram) < 0):
             raise ValueError("Gram diagonal entries must be non-negative.")

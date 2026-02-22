@@ -73,6 +73,12 @@ def test_best_candidate_matches_argmin_for_rss():
     assert pytest.approx(score) == 0.1
 
 
+def test_best_rss_criterion_rejects_negative_rss():
+    crit = BestRSSCriterion()
+    with pytest.raises(ValueError, match="non-negative"):
+        crit.evaluate(np.array([0.1, -0.1]), k=1)
+
+
 @pytest.mark.parametrize(
     ("criterion_cls", "kwargs"),
     [

@@ -58,10 +58,22 @@ class BaseGroupedSelection:
         self.groups = [tuple(g) for g in groups]
         seen = set()
         for g in self.groups:
-            overlap = seen & set(g)
+            current = set()
+            duplicates = set()
+            for feat in g:
+                if feat in current:
+                    duplicates.add(feat)
+                current.add(feat)
+            if duplicates:
+                raise ValueError(
+                    f"Each group must contain unique features; group {g} repeats {sorted(duplicates)}."
+                )
+            overlap = seen & current
             if overlap:
-                raise ValueError(f"Groups must be disjoint; features {overlap} appear in multiple groups.")
-            seen.update(g)
+                raise ValueError(
+                    f"Groups must be disjoint; features {overlap} appear in multiple groups."
+                )
+            seen.update(current)
         self.num_groups = len(self.groups)
         self.tol = tol
         self.criterion_cls = criterion_cls or AICCriterion
