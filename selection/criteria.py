@@ -117,6 +117,10 @@ class HQICCriterion(SelectionCriterion):
     def __init__(self, *, n_samples: int, **kwargs):
         super().__init__(minimize=True, **kwargs)
         self.n_samples = int(n_samples)
+        if self.n_samples < 3:
+            raise ValueError(
+                "HQIC requires n_samples >= 3 (log(log(n)) must be positive)."
+            )
 
     def evaluate(self, rss, k: int):
         rss_arr = np.asarray(rss, dtype=float)

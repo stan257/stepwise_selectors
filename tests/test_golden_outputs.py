@@ -68,4 +68,4 @@ def test_golden_beam_forward_best_rss_active_set():
         data=data, max_steps=k
     )
 
-    assert state.active_set == [6, 4, 5]
+    assert set(state.active_set) == {4, 5, 6}

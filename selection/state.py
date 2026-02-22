@@ -351,7 +351,7 @@ class SelectionState:
         diag_K = np.diag(self.K)
         rss_new = np.full(k, np.inf, dtype=float)
         tol_value = ABS_TOL if tol is None else float(tol)
-        safe = np.abs(diag_K) > tol_value
+        safe = diag_K > tol_value
         if np.any(safe):
             rss_new[safe] = self.rss + self.beta_S[safe] ** 2 / diag_K[safe]
         return rss_new
@@ -369,8 +369,15 @@ class SelectionState:
             self.beta[new_active_set] = beta_S_new
         self.active_set = new_active_set
         self._refresh_active_cache()
-        self.beta_S = beta_S_new
-        self.K = K_new if self.active_set else None
+        k = len(new_active_set)
+        if k > 0:
+            self.beta_buf[:k] = beta_S_new
+            self.beta_S = self.beta_buf[:k]
+            self.K_buf[:k, :k] = K_new
+            self.K = self.K_buf[:k, :k]
+        else:
+            self.beta_S = np.zeros(0)
+            self.K = None
         self.rss = float(rss_new)
         return removed_var
 

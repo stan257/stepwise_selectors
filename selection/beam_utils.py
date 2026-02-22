@@ -3,6 +3,7 @@ from collections.abc import Callable
 import numpy as np
 
 from .beam_search import Beam, BeamManager
+from .state import SelectionState
 from .cv_utils import (
     CVBackwardScores,
     CVForwardScores,
@@ -20,9 +21,10 @@ def run_beam_search(
     max_steps: int | None,
     expand_fn: Callable[[Beam], list[Beam]],
     track_best=True,
-) -> Beam:
+) -> SelectionState:
     manager = BeamManager([initial_beam], beam_width)
     best_beam = manager.beams[0]
+    sel = min if initial_beam.criterion.minimize else max
     steps = 0
     while True:
         if max_steps is not None and steps >= max_steps:
@@ -31,7 +33,7 @@ def run_beam_search(
         if not expanded:
             break
         if track_best:
-            best_beam = min(manager.beams, key=lambda b: b.score)
+            best_beam = sel(manager.beams, key=lambda b: b.score)
         steps += 1
     return best_beam.state
 
@@ -44,9 +46,10 @@ def run_beam_mixed(
     max_total_steps: int | None,
     forward_expand: Callable[[Beam], list[Beam]],
     backward_improve: Callable[[Beam], Beam | None],
-) -> Beam:
+) -> SelectionState:
     manager = BeamManager([initial_beam], beam_width)
     best_beam = manager.beams[0]
+    sel = min if initial_beam.criterion.minimize else max
     forward_steps = 0
     total_operations = 0
     while True:
@@ -55,7 +58,7 @@ def run_beam_mixed(
         expanded = manager.expand(forward_expand)
         if not expanded:
             break
-        best_beam = min(manager.beams, key=lambda b: b.score)
+        best_beam = sel(manager.beams, key=lambda b: b.score)
         forward_steps += 1
         total_operations += len(manager)
         if max_forward_steps is not None and forward_steps >= max_forward_steps:
@@ -71,7 +74,7 @@ def run_beam_mixed(
                     break
                 beam = improved_child
                 total_operations += 1
-            best_beam = min([best_beam, beam], key=lambda b: b.score)
+            best_beam = sel([best_beam, beam], key=lambda b: b.score)
             new_beams.append(beam)
         manager.beams = new_beams
     return best_beam.state

@@ -44,7 +44,8 @@ class BeamManager:
         return bool(self.beams)
 
     def best_state(self) -> SelectionState:
-        return min(self.beams, key=lambda b: b.score).state
+        sel = min if self.beams[0].criterion.minimize else max
+        return sel(self.beams, key=lambda b: b.score).state
 
     def __len__(self):
         return len(self.beams)
@@ -109,9 +110,12 @@ def beam_best_backward_child(beam: Beam, tol: float = ABS_TOL) -> Beam | None:
 
 
 def beam_prune(candidates: list[Beam], beam_limit: int) -> list[Beam]:
+    if not candidates:
+        return []
+    minimize = candidates[0].criterion.minimize
     seen = set()
     result: list[Beam] = []
-    for beam in sorted(candidates, key=lambda b: b.score):
+    for beam in sorted(candidates, key=lambda b: b.score, reverse=not minimize):
         sig = beam.signature
         if sig in seen:
             continue

@@ -146,11 +146,7 @@ class CrossValGramData:
         Convenience method to get a GramData view of the full dataset,
         using the aggregated sums.
         """
-        n_samples_total = None
-        if np.any(self.fold_sizes):
-            n_samples_total = np.sum(self.fold_sizes)
-
-        if n_samples_total is None:
+        if self.n_samples_total is None:
             raise ValueError(
                 "Fold GramData objects must include n_samples to recover full data."
             )
@@ -158,5 +154,5 @@ class CrossValGramData:
             gram=self.gram_total,
             cov=self.cov_total,
             y_norm=self.y_norm_total,
-            n_samples=n_samples_total,
+            n_samples=int(self.n_samples_total),
         )

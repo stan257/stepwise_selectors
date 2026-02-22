@@ -78,7 +78,7 @@ class FastGroupForwardSelection(BaseGroupedSelection):
         criterion = self._init_criterion(data)
         active: list[int] = []
         fast_state = FastForwardState.create(data, self.tol)
-        initial = float(np.asarray(criterion.evaluate(fast_state.rss, 0)))
+        initial = float(np.asarray(criterion.evaluate(fast_state.rss, fast_state.k)))
         criterion.update_current(initial)
 
         steps = 0
@@ -96,7 +96,7 @@ class FastGroupForwardSelection(BaseGroupedSelection):
                 except ValueError:
                     continue
                 score_cand = float(
-                    np.asarray(criterion.evaluate(candidate_state.rss, len(active) + 1))
+                    np.asarray(criterion.evaluate(candidate_state.rss, candidate_state.k))
                 )
                 if not criterion.is_improvement(score_cand):
                     continue
@@ -131,7 +131,7 @@ class FastGroupBackwardSelection(BaseGroupedSelection):
         full_idx = _flatten_group_indices(active, self.groups)
         fast_state = FastForwardState.from_active_set(data, full_idx, self.tol)
         initial = float(
-            np.asarray(criterion.evaluate(fast_state.rss, len(active)))
+            np.asarray(criterion.evaluate(fast_state.rss, fast_state.k))
         )
         criterion.update_current(initial)
 
@@ -148,7 +148,7 @@ class FastGroupBackwardSelection(BaseGroupedSelection):
                 except ValueError:
                     continue
                 score_cand = float(
-                    np.asarray(criterion.evaluate(candidate_state.rss, len(active) - 1))
+                    np.asarray(criterion.evaluate(candidate_state.rss, candidate_state.k))
                 )
                 if not criterion.is_improvement(score_cand):
                     continue

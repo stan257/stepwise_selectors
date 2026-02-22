@@ -136,10 +136,7 @@ class FastForwardState:
         v_valid = self.v[candidates]
         rss_new = self.rss - (r_valid**2) / v_valid
         rss_new = np.clip(rss_new, self.tol, None)
-        valid_rss = rss_new > -self.tol
-        if not np.any(valid_rss):
-            return None
-        return candidates[valid_rss], rss_new[valid_rss]
+        return candidates, rss_new
 
     def apply_forward(self, feat_idx: int) -> float:
         """Apply a forward step while updating QR/Gram state in O(p)."""
@@ -211,7 +208,7 @@ class FastForwardState:
             return None
         diag_K = np.diag(self.K[: self.k, : self.k])
         rss_new = np.full(self.k, np.inf, dtype=float)
-        safe = np.abs(diag_K) > self.tol
+        safe = diag_K > self.tol
         if np.any(safe):
             rss_new[safe] = self.rss + (self.beta_S[: self.k][safe] ** 2) / diag_K[safe]
         return rss_new
@@ -471,9 +468,12 @@ class FastBeam:
 
 
 def _fast_beam_prune(beams: list[FastBeam], beam_limit: int) -> list[FastBeam]:
+    if not beams:
+        return []
+    minimize = beams[0].criterion.minimize
     seen = set()
     result: list[FastBeam] = []
-    for beam in sorted(beams, key=lambda b: b.score):
+    for beam in sorted(beams, key=lambda b: b.score, reverse=not minimize):
         sig = beam.signature
         if sig in seen:
             continue
@@ -572,7 +572,8 @@ class FastBeamForwardSelection(FastForwardSelection):
             beams = _fast_beam_prune(candidates, self.beam_width)
             steps += 1
 
-        best = min(beams, key=lambda b: b.score)
+        sel = min if criterion.minimize else max
+        best = sel(beams, key=lambda b: b.score)
         result = state if state is not None else SelectionState(data)
         result.init_from_active_set(best.state.active_set)
         return result
@@ -619,7 +620,8 @@ class FastBeamBackwardSelection(FastForwardSelection):
             beams = _fast_beam_prune(candidates, self.beam_width)
             steps += 1
 
-        best = min(beams, key=lambda b: b.score)
+        sel = min if criterion.minimize else max
+        best = sel(beams, key=lambda b: b.score)
         result = state if state is not None else SelectionState(data)
         result.init_from_active_set(best.state.active_set)
         return result
@@ -647,6 +649,7 @@ class FastBeamMixedSelection(FastForwardSelection):
         initial = FastBeam(FastForwardState.create(data, self.tol), criterion, criterion.current_value)
         beams = [initial]
         best = initial
+        sel = min if criterion.minimize else max
 
         forward_steps = 0
         total_ops = 0
@@ -659,7 +662,7 @@ class FastBeamMixedSelection(FastForwardSelection):
             if not candidates:
                 break
             beams = _fast_beam_prune(candidates, self.beam_width)
-            best = min(beams, key=lambda b: b.score)
+            best = sel(beams, key=lambda b: b.score)
             forward_steps += 1
             total_ops += len(beams)
             if max_forward_steps is not None and forward_steps >= max_forward_steps:
@@ -675,7 +678,7 @@ class FastBeamMixedSelection(FastForwardSelection):
                         break
                     beam = improved
                     total_ops += 1
-                best = min([best, beam], key=lambda b: b.score)
+                best = sel([best, beam], key=lambda b: b.score)
                 new_beams.append(beam)
             beams = new_beams
 
@@ -727,9 +730,12 @@ class FastCVBeam:
 def _fast_cv_beam_prune(
     beams: list[FastCVBeam], beam_limit: int
 ) -> list[FastCVBeam]:
+    if not beams:
+        return []
+    minimize = beams[0].criterion.minimize
     seen = set()
     result: list[FastCVBeam] = []
-    for beam in sorted(beams, key=lambda b: b.score):
+    for beam in sorted(beams, key=lambda b: b.score, reverse=not minimize):
         sig = beam.signature
         if sig in seen:
             continue
@@ -1164,7 +1170,8 @@ class FastBeamCrossValForwardSelection(FastForwardSelection):
             beams = _fast_cv_beam_prune(candidates, self.beam_width)
             steps += 1
 
-        best = min(beams, key=lambda b: b.score)
+        sel = min if criterion.minimize else max
+        best = sel(beams, key=lambda b: b.score)
         return _build_cv_state_from_active_set(data, best.states[0].active_set)
 
 
@@ -1220,7 +1227,8 @@ class FastBeamCrossValBackwardSelection(FastForwardSelection):
             beams = _fast_cv_beam_prune(candidates, self.beam_width)
             steps += 1
 
-        best = min(beams, key=lambda b: b.score)
+        sel = min if criterion.minimize else max
+        best = sel(beams, key=lambda b: b.score)
         return _build_cv_state_from_active_set(data, best.states[0].active_set)
 
 
@@ -1256,6 +1264,7 @@ class FastBeamCrossValMixedSelection(FastForwardSelection):
         initial = FastCVBeam(fast_states, criterion, criterion.current_value)
         beams = [initial]
         best = initial
+        sel = min if criterion.minimize else max
 
         forward_steps = 0
         total_ops = 0
@@ -1272,7 +1281,7 @@ class FastBeamCrossValMixedSelection(FastForwardSelection):
             if not candidates:
                 break
             beams = _fast_cv_beam_prune(candidates, self.beam_width)
-            best = min(beams, key=lambda b: b.score)
+            best = sel(beams, key=lambda b: b.score)
             forward_steps += 1
             total_ops += len(beams)
             if max_forward_steps is not None and forward_steps >= max_forward_steps:
@@ -1288,7 +1297,7 @@ class FastBeamCrossValMixedSelection(FastForwardSelection):
                         break
                     beam = improved
                     total_ops += 1
-                best = min([best, beam], key=lambda b: b.score)
+                best = sel([best, beam], key=lambda b: b.score)
                 new_beams.append(beam)
             beams = new_beams
 
