@@ -401,6 +401,28 @@ class CrossValSelectionState:
         self.oos_rss_folds = np.array(self.data.y_norm_folds, dtype=float)
         self.rss_cv = float(self.oos_rss_folds.sum())
 
+    def _refit_full_data_beta(self) -> None:
+        """Refit coefficients on full data for the current active set.
+
+        This exposes a single post-selection coefficient vector that is
+        directly interpretable for downstream analysis. CV model selection
+        still uses held-out RSS (`rss_cv`) from fold-wise training models.
+        """
+        self.beta[:] = 0.0
+        if not self.active_set:
+            return
+        idx_S = np.array(self.active_set, dtype=int)
+        gram_ss = self.data.gram_total[np.ix_(idx_S, idx_S)]
+        cov_s = self.data.cov_total[idx_S]
+        try:
+            L = np.linalg.cholesky(gram_ss)
+            beta_s = np.linalg.solve(L.T, np.linalg.solve(L, cov_s))
+        except np.linalg.LinAlgError as err:
+            raise np.linalg.LinAlgError(
+                "Selected support is singular on full data; cannot compute post-selection coefficients."
+            ) from err
+        self.beta[idx_S] = beta_s
+
     def _init_train_states_empty(self) -> None:
         self.train_states = []
         for k in range(self.n_folds):
@@ -432,6 +454,7 @@ class CrossValSelectionState:
         if not S:
             self.oos_rss_folds = np.array(self.data.y_norm_folds, dtype=float)
             self.rss_cv = float(self.oos_rss_folds.sum())
+            self.beta[:] = 0.0
             return self.rss_cv
 
         idx_S = np.array(S, dtype=int)
@@ -448,6 +471,7 @@ class CrossValSelectionState:
 
         self.oos_rss_folds = oos
         self.rss_cv = float(oos.sum())
+        self._refit_full_data_beta()
         return self.rss_cv
 
     def _sync_active_set(self) -> None:

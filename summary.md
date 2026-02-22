@@ -58,8 +58,10 @@ This document summarizes the current `selection` package after migration to a fa
 
 - `CrossValSelectionState`
   - Wraps one training `SelectionState` per fold and tracks aggregate OOS RSS (`rss_cv`).
+  - Exposes `beta` as a post-selection full-data refit on the selected support.
   - Key methods:
     - `_sync_active_set()`
+    - `_refit_full_data_beta()`
     - `recompute_oos_rss()`
     - `apply_backward_step()`
     - `validation_rss_for_candidate()`
@@ -118,6 +120,7 @@ This module is now the single source of algorithmic behavior for all public sele
 
 Important behavior:
 - CV candidate scoring uses summed fold validation RSS (same scale as `rss_cv`).
+- `FastBeamCrossValBackwardSelection` is improvement-only by default; `allow_worse=True` enables forced removals.
 - Beam pruning deduplicates by active-set bitmask signatures.
 - Rebuilds from active set are used after accepted moves to limit numerical drift.
 - Warm starts are intentionally disallowed for fast beam/CV selectors where state reconstruction assumptions are strict.
@@ -180,6 +183,6 @@ Notable files:
 1. Build `GramData` / `CrossValGramData`.
 2. Run a selector from `selection.routines` (alias) or `selection.fast_routines` (explicit).
 3. Internal optimization runs on fast Gram-only states.
-4. Final result is materialized as `SelectionState` or `CrossValSelectionState` with `active_set`, `beta`, and RSS metrics.
+4. Final result is materialized as `SelectionState` or `CrossValSelectionState` with `active_set` and RSS metrics; CV `beta` is a full-data post-selection refit.
 
 This is the current architecture baseline: no separate legacy `beam_search.py`, `beam_utils.py`, or `cv_utils.py` modules remain.

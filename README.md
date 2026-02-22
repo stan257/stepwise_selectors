@@ -7,7 +7,7 @@ Lightweight linear-model selection routines built on precomputed Gram statistics
 - Optional grouped forward/backward selection.
 
 ## Layout
-- `selection/`: core code (criteria, state updates, beam utils, grouped variants).
+- `selection/`: core code (criteria, state objects, fast selection routines, grouped variants).
 - `tests/`: pytest suite covering selectors, state management, and grouped routines.
 - `summary.md`: annotated walkthrough of the selection codebase.
 
@@ -59,5 +59,7 @@ print(gstate.active_groups, gstate.beta, gstate.rss)
 - The code operates on Gram statistics (`X.T @ X`, `X.T @ y`, `y.T @ y`) and does not depend on raw design matrices.
 - `selection.routines` and `selection.grouped_routines` default to fast implementations.
 - For cross-validation, provide per-fold `GramData` via `CrossValGramData`.
+- CV output states expose `beta` as a post-selection refit on full-data Gram statistics at the selected support.
 - Single-dataset selectors default to `AICCriterion`; CV selectors default to `BestRSSCriterion`.
 - CV selectors reject IC/GCV-style criteria to avoid double regularization on top of held-out RSS.
+- Backward beam selectors are improvement-only by default; set `allow_worse=True` to force removals under a step budget.

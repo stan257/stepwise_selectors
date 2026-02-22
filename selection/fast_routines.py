@@ -1221,9 +1221,12 @@ class FastBeamCrossValBackwardSelection(FastForwardSelection):
     _default_criterion = BestRSSCriterion
     _reject_ic = True
 
-    def __init__(self, *, beam_width: int = 1, **kwargs):
+    def __init__(
+        self, *, beam_width: int = 1, allow_worse: bool = False, **kwargs
+    ):
         super().__init__(**kwargs)
         self.beam_width = max(1, int(beam_width))
+        self.allow_worse = bool(allow_worse)
 
     def fit(
         self,
@@ -1250,7 +1253,6 @@ class FastBeamCrossValBackwardSelection(FastForwardSelection):
         )
         criterion.update_current(initial_score)
         beams = [FastCVBeam(fast_states, criterion, criterion.current_value)]
-        allow_worse = max_steps is not None
 
         steps = 0
         while beams and (max_steps is None or steps < max_steps):
@@ -1262,7 +1264,7 @@ class FastBeamCrossValBackwardSelection(FastForwardSelection):
                         self.beam_width,
                         data,
                         self.tol,
-                        allow_worse=allow_worse,
+                        allow_worse=self.allow_worse,
                     )
                 )
             if not candidates:

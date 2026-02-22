@@ -283,7 +283,7 @@ def test_beam_crossval_forward_selection_recovers_true_support():
 
 def test_beam_crossval_backward_selection_recovers_true_support():
     cv_data, support_set = make_cv_support_problem()
-    selector = BeamCrossValBackwardSelection(beam_width=2)
+    selector = BeamCrossValBackwardSelection(beam_width=2, allow_worse=True)
     state = selector.fit(data=cv_data, max_steps=50 - len(support_set))
 
     assert set(state.active_set) == set(support_set)

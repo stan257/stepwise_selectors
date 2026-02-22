@@ -43,6 +43,17 @@ def _explicit_cv_rss(cv_data: CrossValGramData, active_set: list[int]) -> float:
     return float(total)
 
 
+def _make_full_model_optimal_cv(*, folds: int = 3, n: int = 50, p: int = 6):
+    """Build diagonal CV data where dropping any feature strictly worsens RSS."""
+    fold_data = []
+    gram = float(n) * np.eye(p)
+    cov = float(n) * np.ones(p, dtype=float)
+    y_norm = float(n) * (p + 1.0)
+    for _ in range(folds):
+        fold_data.append(GramData(gram.copy(), cov.copy(), y_norm, n))
+    return CrossValGramData(fold_data)
+
+
 def test_fast_cv_beam_forward_matches_explicit_rss():
     cv_data = make_cv_problem()
     state = FastBeamCrossValForwardSelection(
@@ -94,3 +105,18 @@ def test_cv_beam_backward_children_propagates_unexpected_errors(monkeypatch):
         _fast_cv_beam_backward_children(
             beam, beam_width=1, data=cv_data, tol=1e-10, allow_worse=True
         )
+
+
+def test_fast_cv_beam_backward_is_improvement_only_by_default():
+    cv_data = _make_full_model_optimal_cv(folds=3, n=40, p=6)
+
+    strict = FastBeamCrossValBackwardSelection(
+        beam_width=2, criterion_cls=BestRSSCriterion
+    ).fit(data=cv_data, max_steps=1)
+    relaxed = FastBeamCrossValBackwardSelection(
+        beam_width=2, criterion_cls=BestRSSCriterion, allow_worse=True
+    ).fit(data=cv_data, max_steps=1)
+
+    assert len(strict.active_set) == cv_data.p
+    assert len(relaxed.active_set) == cv_data.p - 1
+    assert strict.rss_cv <= relaxed.rss_cv + 1e-12

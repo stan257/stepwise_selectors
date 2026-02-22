@@ -49,6 +49,15 @@ def _explicit_cv_rss(cv_data: CrossValGramData, active_set: list[int]) -> float:
     return float(total)
 
 
+def _explicit_beta_from_active(data: GramData, active_set: list[int]) -> np.ndarray:
+    beta = np.zeros(data.gram.shape[0], dtype=float)
+    if not active_set:
+        return beta
+    idx = np.array(active_set, dtype=int)
+    beta[idx] = np.linalg.solve(data.gram[np.ix_(idx, idx)], data.cov[idx])
+    return beta
+
+
 def test_crossvalgramdata_requires_at_least_two_folds():
     rng = np.random.default_rng(42)
     X = rng.standard_normal((20, 4))
@@ -85,6 +94,21 @@ def test_fast_cv_mixed_matches_explicit_rss():
     )
     expected_rss = _explicit_cv_rss(cv_data, state.active_set)
     assert pytest.approx(state.rss_cv, rel=1e-8, abs=1e-8) == expected_rss
+
+
+def test_fast_cv_state_exposes_full_data_postselection_beta():
+    cv_data = make_cv_problem(seed=2026, folds=4, n=100, p=10, support=4)
+    state = FastCrossValForwardSelection(criterion_cls=BestRSSCriterion).fit(
+        data=cv_data, max_steps=4
+    )
+    full_data = cv_data.make_full_data()
+    expected_beta = _explicit_beta_from_active(full_data, state.active_set)
+    np.testing.assert_allclose(state.beta, expected_beta, atol=1e-8, rtol=1e-8)
+
+    empty = FastCrossValForwardSelection(criterion_cls=BestRSSCriterion).fit(
+        data=cv_data, max_steps=0
+    )
+    np.testing.assert_allclose(empty.beta, np.zeros_like(empty.beta), atol=0.0, rtol=0.0)
 
 
 @pytest.mark.parametrize(
