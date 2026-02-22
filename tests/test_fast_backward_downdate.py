@@ -32,3 +32,24 @@ def test_fast_downdate_matches_rebuild():
     np.testing.assert_allclose(state.v, rebuilt.v, atol=1e-8, rtol=1e-8)
     np.testing.assert_allclose(state.K[: state.k, : state.k], rebuilt.K[: state.k, : state.k], atol=1e-8, rtol=1e-8)
     np.testing.assert_allclose(state.beta_S[: state.k], rebuilt.beta_S[: state.k], atol=1e-8, rtol=1e-8)
+
+
+def test_fast_backward_failure_does_not_mutate_active_set():
+    rng = np.random.default_rng(246)
+    n, p = 50, 4
+    X = rng.standard_normal((n, p))
+    y = rng.standard_normal(n)
+    data = GramData(X.T @ X, X.T @ y, y @ y, n)
+
+    state = FastForwardState.from_active_set(data, [0], tol=1e-12)
+    state.K[0, 0] = -abs(state.K[0, 0])
+    active_before = list(state.active_set)
+    mask_before = state.active_mask.copy()
+    k_before = state.k
+
+    with pytest.raises(ValueError, match="near-singular pivot"):
+        state.apply_backward(0)
+
+    assert state.active_set == active_before
+    np.testing.assert_array_equal(state.active_mask, mask_before)
+    assert state.k == k_before

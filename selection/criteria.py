@@ -59,6 +59,8 @@ class AICCriterion(SelectionCriterion):
     def __init__(self, *, n_samples: int, **kwargs):
         super().__init__(minimize=True, **kwargs)
         self.n_samples = int(n_samples)
+        if self.n_samples <= 0:
+            raise ValueError("n_samples must be positive for AIC.")
 
     def evaluate(self, rss, k: int):
         rss_arr = np.asarray(rss, dtype=float)
@@ -82,6 +84,8 @@ class BICCriterion(SelectionCriterion):
     def __init__(self, *, n_samples: int, **kwargs):
         super().__init__(minimize=True, **kwargs)
         self.n_samples = int(n_samples)
+        if self.n_samples <= 0:
+            raise ValueError("n_samples must be positive for BIC.")
 
     def evaluate(self, rss, k: int):
         rss_arr = np.asarray(rss, dtype=float)
@@ -97,6 +101,8 @@ class AICcCriterion(SelectionCriterion):
     def __init__(self, *, n_samples: int, **kwargs):
         super().__init__(minimize=True, **kwargs)
         self.n_samples = int(n_samples)
+        if self.n_samples <= 0:
+            raise ValueError("n_samples must be positive for AICc.")
 
     def evaluate(self, rss, k: int):
         rss_arr = np.asarray(rss, dtype=float)
@@ -117,6 +123,8 @@ class HQICCriterion(SelectionCriterion):
     def __init__(self, *, n_samples: int, **kwargs):
         super().__init__(minimize=True, **kwargs)
         self.n_samples = int(n_samples)
+        if self.n_samples <= 0:
+            raise ValueError("n_samples must be positive for HQIC.")
         if self.n_samples < 3:
             raise ValueError(
                 "HQIC requires n_samples >= 3 (log(log(n)) must be positive)."
@@ -137,6 +145,8 @@ class EBICCriterion(SelectionCriterion):
     def __init__(self, *, n_samples: int, p: int, gamma: float = 0.5, **kwargs):
         super().__init__(minimize=True, **kwargs)
         self.n_samples = int(n_samples)
+        if self.n_samples <= 0:
+            raise ValueError("n_samples must be positive for EBIC.")
         self.p = int(p)
         self.gamma = float(gamma)
         if not 0.0 <= self.gamma <= 1.0:
@@ -168,6 +178,8 @@ class GCVCriterion(SelectionCriterion):
     def __init__(self, *, n_samples: int, **kwargs):
         super().__init__(minimize=True, **kwargs)
         self.n_samples = int(n_samples)
+        if self.n_samples <= 0:
+            raise ValueError("n_samples must be positive for GCV.")
 
     def evaluate(self, rss, k: int):
         rss_arr = np.asarray(rss, dtype=float)

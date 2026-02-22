@@ -1,7 +1,15 @@
 import numpy as np
 import pytest
 
-from selection.criteria import AICCriterion, BestRSSCriterion
+from selection.criteria import (
+    AICCriterion,
+    AICcCriterion,
+    BICCriterion,
+    BestRSSCriterion,
+    EBICCriterion,
+    GCVCriterion,
+    HQICCriterion,
+)
 from selection.definitions import GramData
 from selection.state import SelectionState
 
@@ -63,3 +71,19 @@ def test_best_candidate_matches_argmin_for_rss():
     idx, score = crit.best_candidate(rss_vals, k=1)
     assert idx == 1
     assert pytest.approx(score) == 0.1
+
+
+@pytest.mark.parametrize(
+    ("criterion_cls", "kwargs"),
+    [
+        (AICCriterion, {}),
+        (BICCriterion, {}),
+        (AICcCriterion, {}),
+        (HQICCriterion, {}),
+        (EBICCriterion, {"p": 5}),
+        (GCVCriterion, {}),
+    ],
+)
+def test_criteria_require_positive_n_samples(criterion_cls, kwargs):
+    with pytest.raises(ValueError, match="n_samples must be positive"):
+        criterion_cls(n_samples=0, **kwargs)

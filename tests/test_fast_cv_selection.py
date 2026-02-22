@@ -31,6 +31,17 @@ def make_cv_problem(folds=4, n=120, p=12, support=4, seed=123):
     return CrossValGramData(fold_data)
 
 
+def test_crossvalgramdata_requires_at_least_two_folds():
+    rng = np.random.default_rng(42)
+    X = rng.standard_normal((20, 4))
+    y = rng.standard_normal(20)
+    fold = GramData(X.T @ X, X.T @ y, y @ y, n_samples=20)
+    with pytest.raises(
+        ValueError, match="requires at least two folds for cross-validation"
+    ):
+        CrossValGramData([fold])
+
+
 def test_fast_cv_forward_matches_standard():
     cv_data = make_cv_problem()
     fast = FastCrossValForwardSelection(criterion_cls=BestRSSCriterion).fit(

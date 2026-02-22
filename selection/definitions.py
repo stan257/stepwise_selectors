@@ -64,6 +64,10 @@ class CrossValGramData:
     def check_data_validity(self) -> int:
         if not self.folds:
             raise ValueError("CrossValidationGramData requires at least one fold.")
+        if len(self.folds) < 2:
+            raise ValueError(
+                "CrossValidationGramData requires at least two folds for cross-validation."
+            )
         first = self.folds[0]
         if not isinstance(first, GramData):
             raise TypeError("All folds must be GramData instances.")

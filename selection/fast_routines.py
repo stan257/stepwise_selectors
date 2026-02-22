@@ -235,8 +235,6 @@ class FastForwardState:
         """Remove one active feature via inverse-Gram and QR downdates."""
         if not (0 <= idx < self.k):
             raise IndexError("Backward index out of range.")
-        removed = self.active_set.pop(idx)
-        self.active_mask[removed] = False
 
         # Update K and beta_S via the standard inverse-Gram downdate.
         Kk = self.K[: self.k, : self.k]
@@ -244,6 +242,8 @@ class FastForwardState:
         k_22 = Kk[idx, idx]
         if k_22 <= self.tol:
             raise ValueError("Backward update failed due to near-singular pivot.")
+        removed = self.active_set.pop(idx)
+        self.active_mask[removed] = False
         idx_keep = np.delete(np.arange(self.k), idx)
         K_11 = Kk[np.ix_(idx_keep, idx_keep)]
         k_12 = Kk[idx_keep, idx]
