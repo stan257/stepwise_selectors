@@ -3,7 +3,7 @@ import pytest
 
 from selection.criteria import BestRSSCriterion
 from selection.definitions import GramData
-from selection.fast_routines import FastForwardSelection
+from selection.routines_core import ForwardSelection
 from tests.helpers import explicit_beta_rss
 
 
@@ -34,7 +34,7 @@ def test_fast_forward_matches_explicit_across_regimes(kind: str):
     data = _make_data_scenario(kind, seed=2025)
     max_steps = 5
 
-    state = FastForwardSelection(criterion_cls=BestRSSCriterion).fit(
+    state = ForwardSelection(criterion_cls=BestRSSCriterion).fit(
         data=data, max_steps=max_steps
     )
     beta, rss = explicit_beta_rss(data, state.active_set)

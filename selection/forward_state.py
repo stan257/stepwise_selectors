@@ -10,7 +10,7 @@ from .definitions import GramData
 
 
 @dataclass
-class FastForwardState:
+class ForwardState:
     data: GramData
     tol: float
     active_set: list[int]
@@ -26,7 +26,7 @@ class FastForwardState:
     k: int
 
     @classmethod
-    def create(cls, data: GramData, tol: float) -> "FastForwardState":
+    def create(cls, data: GramData, tol: float) -> "ForwardState":
         p = data.gram.shape[0]
         cap = min(64, p)
         return cls(
@@ -48,7 +48,7 @@ class FastForwardState:
     @classmethod
     def from_active_set(
         cls, data: GramData, active_set: list[int], tol: float
-    ) -> "FastForwardState":
+    ) -> "ForwardState":
         if not active_set:
             return cls.create(data, tol)
         p = data.gram.shape[0]
@@ -82,8 +82,8 @@ class FastForwardState:
         state.beta_S[:k] = np.linalg.solve(R, state.qy[:k])
         return state
 
-    def clone(self) -> "FastForwardState":
-        return FastForwardState(
+    def clone(self) -> "ForwardState":
+        return ForwardState(
             data=self.data,
             tol=self.tol,
             active_set=list(self.active_set),
@@ -276,4 +276,4 @@ class FastForwardState:
             self.rss = float(self.data.y_norm - np.dot(self.qy[: self.k], self.qy[: self.k]))
 
 
-__all__ = ["FastForwardState"]
+__all__ = ["ForwardState"]

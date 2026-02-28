@@ -1,4 +1,4 @@
-"""Fast greedy selectors for single-dataset GramData."""
+"""Greedy selectors for single-dataset GramData."""
 
 from __future__ import annotations
 
@@ -9,12 +9,12 @@ import numpy as np
 from .constants import ABS_TOL
 from .criteria import AICCriterion, SelectionCriterion
 from .definitions import GramData
-from .fast_base import _DISALLOWED_CV_CRITERIA, _validate_state_target
-from .fast_state import FastForwardState
+from .routines_base import _DISALLOWED_CV_CRITERIA, _validate_state_target
+from .forward_state import ForwardState
 from .state import SelectionState
 
 
-class FastForwardSelection:
+class ForwardSelection:
     """Forward selection with O(k·p) per-step candidate updates.
 
     This routine maintains residual correlations and variances for all features
@@ -66,31 +66,31 @@ class FastForwardSelection:
             state, data, selector_name=type(self).__name__
         )
         if result_state is not None and result_state.active_set:
-            raise ValueError("FastForwardSelection does not support warm starts.")
+            raise ValueError("ForwardSelection does not support warm starts.")
 
         criterion = self._init_criterion(data)
-        fast_state = FastForwardState.create(data, self.tol)
+        work_state = ForwardState.create(data, self.tol)
 
-        while max_steps is None or fast_state.k < max_steps:
-            scored = fast_state.candidate_scores()
+        while max_steps is None or work_state.k < max_steps:
+            scored = work_state.candidate_scores()
             if scored is None:
                 break
             candidates, rss_new = scored
             best_idx, best_score = criterion.best_candidate(
-                rss_new, fast_state.k + 1
+                rss_new, work_state.k + 1
             )
             if not criterion.is_improvement(best_score):
                 break
             feat_idx = int(candidates[best_idx])
-            fast_state.apply_forward(feat_idx)
+            work_state.apply_forward(feat_idx)
             criterion.update_current(best_score)
 
         result = result_state if result_state is not None else SelectionState(data)
-        result.init_from_active_set(fast_state.active_set)
+        result.init_from_active_set(work_state.active_set)
         return result
 
 
-class FastBackwardSelection(FastForwardSelection):
+class BackwardSelection(ForwardSelection):
     """Backward selection using fast Gram-only updates."""
 
     def __init__(self, *, allow_worse: bool = False, **kwargs):
@@ -108,36 +108,36 @@ class FastBackwardSelection(FastForwardSelection):
             state, data, selector_name=type(self).__name__
         )
         if result_state is not None and result_state.active_set:
-            raise ValueError("FastBackwardSelection does not support warm starts.")
+            raise ValueError("BackwardSelection does not support warm starts.")
 
         criterion = self._init_criterion(data)
         full_active = list(range(data.gram.shape[0]))
-        fast_state = FastForwardState.from_active_set(data, full_active, self.tol)
+        work_state = ForwardState.from_active_set(data, full_active, self.tol)
         initial = float(
-            np.asarray(criterion.evaluate(fast_state.rss, len(fast_state.active_set)))
+            np.asarray(criterion.evaluate(work_state.rss, len(work_state.active_set)))
         )
         criterion.update_current(initial)
 
         steps = 0
-        while fast_state.k and (max_steps is None or steps < max_steps):
-            rss_values = fast_state.backward_scores()
+        while work_state.k and (max_steps is None or steps < max_steps):
+            rss_values = work_state.backward_scores()
             if rss_values is None:
                 break
             best_idx, best_score = criterion.best_candidate(
-                rss_values, fast_state.k - 1
+                rss_values, work_state.k - 1
             )
             if not self.allow_worse and not criterion.is_improvement(best_score):
                 break
-            fast_state.apply_backward(best_idx)
+            work_state.apply_backward(best_idx)
             criterion.update_current(best_score)
             steps += 1
 
         result = result_state if result_state is not None else SelectionState(data)
-        result.init_from_active_set(fast_state.active_set)
+        result.init_from_active_set(work_state.active_set)
         return result
 
 
-class FastMixedSelection(FastForwardSelection):
+class MixedSelection(ForwardSelection):
     """Mixed forward/backward selection with fast updates."""
 
     def fit(
@@ -152,27 +152,27 @@ class FastMixedSelection(FastForwardSelection):
             state, data, selector_name=type(self).__name__
         )
         if result_state is not None and result_state.active_set:
-            raise ValueError("FastMixedSelection does not support warm starts.")
+            raise ValueError("MixedSelection does not support warm starts.")
 
         criterion = self._init_criterion(data)
-        fast_state = FastForwardState.create(data, self.tol)
+        work_state = ForwardState.create(data, self.tol)
 
         forward_steps = 0
         total_steps = 0
         while True:
             if max_total_steps is not None and total_steps >= max_total_steps:
                 break
-            scored = fast_state.candidate_scores()
+            scored = work_state.candidate_scores()
             if scored is None:
                 break
             candidates, rss_new = scored
             best_idx, best_score = criterion.best_candidate(
-                rss_new, fast_state.k + 1
+                rss_new, work_state.k + 1
             )
             if not criterion.is_improvement(best_score):
                 break
             feat_idx = int(candidates[best_idx])
-            fast_state.apply_forward(feat_idx)
+            work_state.apply_forward(feat_idx)
             criterion.update_current(best_score)
             forward_steps += 1
             total_steps += 1
@@ -183,25 +183,25 @@ class FastMixedSelection(FastForwardSelection):
             while True:
                 if max_total_steps is not None and total_steps >= max_total_steps:
                     break
-                rss_values = fast_state.backward_scores()
+                rss_values = work_state.backward_scores()
                 if rss_values is None:
                     break
                 best_idx, best_score = criterion.best_candidate(
-                    rss_values, fast_state.k - 1
+                    rss_values, work_state.k - 1
                 )
                 if not criterion.is_improvement(best_score):
                     break
-                fast_state.apply_backward(best_idx)
+                work_state.apply_backward(best_idx)
                 criterion.update_current(best_score)
                 total_steps += 1
 
         result = result_state if result_state is not None else SelectionState(data)
-        result.init_from_active_set(fast_state.active_set)
+        result.init_from_active_set(work_state.active_set)
         return result
 
 
 __all__ = [
-    "FastForwardSelection",
-    "FastBackwardSelection",
-    "FastMixedSelection",
+    "ForwardSelection",
+    "BackwardSelection",
+    "MixedSelection",
 ]

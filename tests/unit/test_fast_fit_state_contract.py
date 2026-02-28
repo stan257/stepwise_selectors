@@ -2,13 +2,13 @@ import numpy as np
 import pytest
 
 from selection.criteria import BestRSSCriterion
-from selection.fast_routines import (
-    FastBackwardSelection,
-    FastBeamBackwardSelection,
-    FastBeamForwardSelection,
-    FastBeamMixedSelection,
-    FastForwardSelection,
-    FastMixedSelection,
+from selection.routines_core import (
+    BackwardSelection,
+    BeamBackwardSelection,
+    BeamForwardSelection,
+    BeamMixedSelection,
+    ForwardSelection,
+    MixedSelection,
 )
 from selection.state import SelectionState
 from tests.helpers import make_regression_gram
@@ -16,37 +16,37 @@ from tests.helpers import make_regression_gram
 
 NON_CV_SELECTOR_CASES = [
     pytest.param(
-        FastForwardSelection,
+        ForwardSelection,
         {"criterion_cls": BestRSSCriterion},
         {"max_steps": 3},
         id="forward",
     ),
     pytest.param(
-        FastBackwardSelection,
+        BackwardSelection,
         {"criterion_cls": BestRSSCriterion, "allow_worse": True},
         {"max_steps": 3},
         id="backward",
     ),
     pytest.param(
-        FastMixedSelection,
+        MixedSelection,
         {"criterion_cls": BestRSSCriterion},
         {"max_forward_steps": 3, "max_total_steps": 5},
         id="mixed",
     ),
     pytest.param(
-        FastBeamForwardSelection,
+        BeamForwardSelection,
         {"criterion_cls": BestRSSCriterion, "beam_width": 2},
         {"max_steps": 3},
         id="beam_forward",
     ),
     pytest.param(
-        FastBeamBackwardSelection,
+        BeamBackwardSelection,
         {"criterion_cls": BestRSSCriterion, "beam_width": 2, "allow_worse": True},
         {"max_steps": 3},
         id="beam_backward",
     ),
     pytest.param(
-        FastBeamMixedSelection,
+        BeamMixedSelection,
         {"criterion_cls": BestRSSCriterion, "beam_width": 2},
         {"max_forward_steps": 3, "max_total_steps": 5},
         id="beam_mixed",

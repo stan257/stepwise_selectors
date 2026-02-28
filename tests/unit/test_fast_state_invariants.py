@@ -1,7 +1,7 @@
 import numpy as np
 
 from selection.definitions import GramData
-from selection.fast_routines import FastForwardState
+from selection.routines_core import ForwardState
 
 
 def test_fast_state_invariants_after_random_steps():
@@ -12,7 +12,7 @@ def test_fast_state_invariants_after_random_steps():
     y = X @ beta + 0.1 * rng.standard_normal(n)
     data = GramData(X.T @ X, X.T @ y, y @ y, n)
 
-    state = FastForwardState.create(data, tol=1e-12)
+    state = ForwardState.create(data, tol=1e-12)
 
     for _ in range(30):
         scored = state.candidate_scores()
@@ -64,7 +64,7 @@ def test_fast_state_long_horizon_stability():
     y = X @ beta + 0.1 * rng.standard_normal(n)
     data = GramData(X.T @ X, X.T @ y, y @ y, n)
 
-    state = FastForwardState.create(data, tol=1e-12)
+    state = ForwardState.create(data, tol=1e-12)
 
     for step in range(200):
         scored = state.candidate_scores()

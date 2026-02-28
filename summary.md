@@ -76,58 +76,58 @@ These classes remain the output interface for `.fit(...)` results and some valid
 
 ---
 
-## Fast module layout
-The fast implementation is now split by responsibility:
+## Core module layout
+The implementation is split by responsibility:
 
-- `selection/fast_state.py`
-  - `FastForwardState` and its QR/Gram rank-one update and downdate machinery.
+- `selection/forward_state.py`
+  - `ForwardState` and its QR/Gram rank-one update and downdate machinery.
 
-- `selection/fast_single.py`
+- `selection/routines_greedy.py`
   - Single-dataset greedy selectors:
-    - `FastForwardSelection`
-    - `FastBackwardSelection`
-    - `FastMixedSelection`
+    - `ForwardSelection`
+    - `BackwardSelection`
+    - `MixedSelection`
 
-- `selection/fast_beam_single.py`
+- `selection/routines_beam.py`
   - Single-dataset beam selectors:
-    - `FastBeamForwardSelection`
-    - `FastBeamBackwardSelection`
-    - `FastBeamMixedSelection`
+    - `BeamForwardSelection`
+    - `BeamBackwardSelection`
+    - `BeamMixedSelection`
   - Beam helper type/functions:
-    - `FastBeam`
-    - `_fast_beam_*`
+    - `Beam`
+    - `_beam_*`
 
-- `selection/fast_cv_core.py`
+- `selection/routines_cv_scoring.py`
   - Shared CV scoring/rebuild helpers:
-    - `_fast_cv_rss`
-    - `_fast_cv_forward_scores`
-    - `_fast_cv_backward_scores`
-    - `_rebuild_fast_states`
+    - `_cv_rss`
+    - `_cv_forward_scores`
+    - `_cv_backward_scores`
+    - `_rebuild_states`
     - `_build_cv_state_from_active_set`
 
-- `selection/fast_beam_cv.py`
+- `selection/routines_cv.py`
   - CV greedy selectors:
-    - `FastCrossValForwardSelection`
-    - `FastCrossValBackwardSelection`
-    - `FastCrossValMixedSelection`
+    - `CrossValForwardSelection`
+    - `CrossValBackwardSelection`
+    - `CrossValMixedSelection`
   - CV beam selectors:
-    - `FastBeamCrossValForwardSelection`
-    - `FastBeamCrossValBackwardSelection`
-    - `FastBeamCrossValMixedSelection`
+    - `BeamCrossValForwardSelection`
+    - `BeamCrossValBackwardSelection`
+    - `BeamCrossValMixedSelection`
   - CV beam helper type/functions:
-    - `FastCVBeam`
-    - `_fast_cv_beam_*`
+    - `CVBeam`
+    - `_cv_beam_*`
 
-- `selection/fast_routines.py`
-  - Compatibility facade that re-exports the historical `selection.fast_routines` symbols.
+- `selection/routines_core.py`
+  - Facade that re-exports the core selector surface.
   - Keeps monkeypatchable private helper hooks used by tests.
 
 Important behavior:
 - CV candidate scoring uses summed fold validation RSS (same scale as `rss_cv`).
-- `FastBeamCrossValBackwardSelection` is improvement-only by default; `allow_worse=True` enables forced removals.
+- `BeamCrossValBackwardSelection` is improvement-only by default; `allow_worse=True` enables forced removals.
 - Beam pruning deduplicates by active-set bitmask signatures.
 - Rebuilds from active set are used after accepted moves to limit numerical drift.
-- Warm starts are intentionally disallowed for fast beam/CV selectors where state reconstruction assumptions are strict.
+- Warm starts are intentionally disallowed for beam/CV selectors where state reconstruction assumptions are strict.
 
 ---
 
@@ -136,25 +136,22 @@ Important behavior:
 - Exports:
   - `GroupForwardSelection`
   - `GroupBackwardSelection`
-  - `FastGroupForwardSelection`
-  - `FastGroupBackwardSelection`
 
 ---
 
 ## `selection/routines.py` – default public aliases
-- Re-exports fast selectors under default names:
+- Re-exports core selectors under default names:
   - `ForwardSelection`, `BackwardSelection`, `MixedSelection`
   - `BeamForwardSelection`, `BeamBackwardSelection`, `BeamMixedSelection`
   - `CrossValForwardSelection`, `CrossValBackwardSelection`, `CrossValMixedSelection`
   - `BeamCrossValForwardSelection`, `BeamCrossValBackwardSelection`, `BeamCrossValMixedSelection`
 
-This preserves a stable import surface while keeping implementation fast-only.
+This preserves a stable import surface while keeping implementation modular.
 
 ---
 
 ## `selection/__init__.py` – package API
-- Aggregates criteria, data definitions, grouped selectors, fast selectors, and default aliases.
-- Both explicit `Fast*` and alias names are exported in `__all__`.
+- Aggregates criteria, data definitions, grouped selectors, and default selectors.
 
 ---
 
@@ -168,7 +165,7 @@ Major coverage themes:
 - Criterion correctness and tolerance logic.
 - State update algebra (forward/backward) and rank-deficiency handling.
 - Equivalence/consistency across selector families.
-- Fast CV scoring correctness vs explicit OOS computations.
+- CV scoring correctness vs explicit OOS computations.
 - Beam behavior (deduplication, pruning, regression checks, deterministic behavior).
 - Golden-output and regression stability checks.
 
@@ -185,8 +182,8 @@ Notable files:
 
 ## Data-flow summary
 1. Build `GramData` / `CrossValGramData`.
-2. Run a selector from `selection.routines` (alias) or `selection.fast_routines` (explicit).
-3. Internal optimization runs on fast Gram-only states.
+2. Run a selector from `selection.routines` (alias) or `selection.routines_core` (explicit).
+3. Internal optimization runs on Gram-only states.
 4. Final result is materialized as `SelectionState` or `CrossValSelectionState` with `active_set` and RSS metrics; CV `beta` is a full-data post-selection refit.
 
 This is the current architecture baseline: no separate legacy `beam_search.py`, `beam_utils.py`, or `cv_utils.py` modules remain.

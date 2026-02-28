@@ -3,7 +3,7 @@ import pytest
 
 from selection.criteria import BestRSSCriterion
 from selection.definitions import GramData
-from selection.fast_routines import FastBeamForwardSelection
+from selection.routines_core import BeamForwardSelection
 from tests.helpers import explicit_beta_rss
 
 
@@ -16,7 +16,7 @@ def test_fast_beam_forward_best_rss_matches_explicit_solution():
 
     data = GramData(X.T @ X, X.T @ y, y @ y, n)
 
-    state = FastBeamForwardSelection(
+    state = BeamForwardSelection(
         beam_width=3, criterion_cls=BestRSSCriterion
     ).fit(data=data, max_steps=k)
     beta_expected, rss_expected = explicit_beta_rss(data, state.active_set)

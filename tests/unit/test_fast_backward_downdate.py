@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from selection.definitions import GramData
-from selection.fast_routines import FastForwardState
+from selection.routines_core import ForwardState
 
 
 def test_fast_downdate_matches_rebuild():
@@ -14,7 +14,7 @@ def test_fast_downdate_matches_rebuild():
     data = GramData(X.T @ X, X.T @ y, y @ y, n)
 
     # Build a forward state with a few steps.
-    state = FastForwardState.create(data, tol=1e-10)
+    state = ForwardState.create(data, tol=1e-10)
     for _ in range(6):
         cand, rss_new = state.candidate_scores()
         feat = int(cand[int(np.argmin(rss_new))])
@@ -25,7 +25,7 @@ def test_fast_downdate_matches_rebuild():
     active_after = state.active_set[:removed_pos] + state.active_set[removed_pos + 1 :]
 
     state.apply_backward(removed_pos)
-    rebuilt = FastForwardState.from_active_set(data, active_after, tol=1e-10)
+    rebuilt = ForwardState.from_active_set(data, active_after, tol=1e-10)
 
     np.testing.assert_allclose(state.rss, rebuilt.rss, atol=1e-8, rtol=1e-8)
     np.testing.assert_allclose(state.r, rebuilt.r, atol=1e-8, rtol=1e-8)
@@ -41,7 +41,7 @@ def test_fast_backward_failure_does_not_mutate_active_set():
     y = rng.standard_normal(n)
     data = GramData(X.T @ X, X.T @ y, y @ y, n)
 
-    state = FastForwardState.from_active_set(data, [0], tol=1e-12)
+    state = ForwardState.from_active_set(data, [0], tol=1e-12)
     state.K[0, 0] = -abs(state.K[0, 0])
     active_before = list(state.active_set)
     mask_before = state.active_mask.copy()

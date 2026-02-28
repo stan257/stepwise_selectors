@@ -3,13 +3,13 @@ import pytest
 
 from selection.criteria import BestRSSCriterion
 from selection.definitions import CrossValGramData, GramData
-from selection.fast_routines import (
-    FastBeamCrossValMixedSelection,
-    FastCrossValMixedSelection,
-    FastForwardState,
-    _fast_cv_backward_scores,
-    _fast_cv_forward_scores,
-    _fast_cv_rss,
+from selection.routines_core import (
+    BeamCrossValMixedSelection,
+    CrossValMixedSelection,
+    ForwardState,
+    _cv_backward_scores,
+    _cv_forward_scores,
+    _cv_rss,
 )
 
 
@@ -58,29 +58,29 @@ def _explicit_cv_backward_scores(X_folds, y_folds, active):
     return np.array(scores, dtype=float)
 
 
-def test_fast_cv_rss_matches_explicit_validation():
+def test_cv_rss_matches_explicit_validation():
     cv_data, X_folds, y_folds = _make_explicit_cv(seed=321, folds=3, n=50, p=10)
     active = [0, 2, 4]
 
     fast_states = [
-        FastForwardState.from_active_set(
+        ForwardState.from_active_set(
             cv_data.train_data_for_fold(k), active, tol=1e-12
         )
         for k in range(cv_data.n_folds)
     ]
-    fast_rss = _fast_cv_rss(fast_states, cv_data)
+    fast_rss = _cv_rss(fast_states, cv_data)
     explicit = _explicit_cv_rss(X_folds, y_folds, active)
 
     assert pytest.approx(fast_rss, rel=1e-8, abs=1e-8) == explicit
 
 
-def test_fast_cv_forward_scores_match_explicit_single_feature():
+def test_cv_forward_scores_match_explicit_single_feature():
     cv_data, X_folds, y_folds = _make_explicit_cv(seed=444, folds=3, n=60, p=8)
     fast_states = [
-        FastForwardState.create(cv_data.train_data_for_fold(k), tol=1e-12)
+        ForwardState.create(cv_data.train_data_for_fold(k), tol=1e-12)
         for k in range(cv_data.n_folds)
     ]
-    scored = _fast_cv_forward_scores(fast_states, cv_data, tol=1e-12)
+    scored = _cv_forward_scores(fast_states, cv_data, tol=1e-12)
     assert scored is not None
     candidates, aggregated = scored
 
@@ -91,25 +91,25 @@ def test_fast_cv_forward_scores_match_explicit_single_feature():
         assert pytest.approx(aggregated[idx], rel=1e-8, abs=1e-8) == explicit
 
 
-def test_fast_cv_backward_scores_match_explicit():
+def test_cv_backward_scores_match_explicit():
     cv_data, X_folds, y_folds = _make_explicit_cv(seed=555, folds=3, n=50, p=8)
     active = [0, 1, 2]
     fast_states = [
-        FastForwardState.from_active_set(
+        ForwardState.from_active_set(
             cv_data.train_data_for_fold(k), active, tol=1e-12
         )
         for k in range(cv_data.n_folds)
     ]
-    scores = _fast_cv_backward_scores(fast_states, cv_data, tol=1e-12)
+    scores = _cv_backward_scores(fast_states, cv_data, tol=1e-12)
     explicit = _explicit_cv_backward_scores(X_folds, y_folds, active)
     np.testing.assert_allclose(scores, explicit, atol=1e-8, rtol=1e-8)
 
 
-def test_fast_cv_backward_scores_reject_nonpositive_pivots():
+def test_cv_backward_scores_reject_nonpositive_pivots():
     cv_data, _, _ = _make_explicit_cv(seed=556, folds=3, n=50, p=8)
     active = [0, 1]
     fast_states = [
-        FastForwardState.from_active_set(
+        ForwardState.from_active_set(
             cv_data.train_data_for_fold(k), active, tol=1e-12
         )
         for k in range(cv_data.n_folds)
@@ -117,7 +117,7 @@ def test_fast_cv_backward_scores_reject_nonpositive_pivots():
     for state in fast_states:
         state.K[0, 0] = -abs(state.K[0, 0])
 
-    scores = _fast_cv_backward_scores(fast_states, cv_data, tol=1e-12)
+    scores = _cv_backward_scores(fast_states, cv_data, tol=1e-12)
 
     assert scores is not None
     assert np.isinf(scores[0])
@@ -125,7 +125,7 @@ def test_fast_cv_backward_scores_reject_nonpositive_pivots():
 
 def test_fast_cv_mixed_rss_matches_explicit():
     cv_data, X_folds, y_folds = _make_explicit_cv(seed=777, folds=3, n=60, p=9)
-    state = FastCrossValMixedSelection(criterion_cls=BestRSSCriterion).fit(
+    state = CrossValMixedSelection(criterion_cls=BestRSSCriterion).fit(
         data=cv_data, max_forward_steps=3, max_total_steps=5
     )
     explicit = _explicit_cv_rss(X_folds, y_folds, state.active_set)
@@ -134,7 +134,7 @@ def test_fast_cv_mixed_rss_matches_explicit():
 
 def test_fast_cv_beam_mixed_rss_matches_explicit():
     cv_data, X_folds, y_folds = _make_explicit_cv(seed=888, folds=3, n=60, p=9)
-    state = FastBeamCrossValMixedSelection(beam_width=2, criterion_cls=BestRSSCriterion).fit(
+    state = BeamCrossValMixedSelection(beam_width=2, criterion_cls=BestRSSCriterion).fit(
         data=cv_data, max_forward_steps=3, max_total_steps=5
     )
     explicit = _explicit_cv_rss(X_folds, y_folds, state.active_set)

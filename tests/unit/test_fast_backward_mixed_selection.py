@@ -3,7 +3,7 @@ import pytest
 
 from selection.criteria import BestRSSCriterion
 from selection.definitions import GramData
-from selection.fast_routines import FastBackwardSelection, FastMixedSelection
+from selection.routines_core import BackwardSelection, MixedSelection
 from tests.helpers import explicit_beta_rss
 
 
@@ -16,7 +16,7 @@ def test_fast_backward_best_rss_matches_explicit_solution():
 
     data = GramData(X.T @ X, X.T @ y, y @ y, n)
 
-    state = FastBackwardSelection(criterion_cls=BestRSSCriterion, allow_worse=True).fit(
+    state = BackwardSelection(criterion_cls=BestRSSCriterion, allow_worse=True).fit(
         data=data, max_steps=steps
     )
     beta_expected, rss_expected = explicit_beta_rss(data, state.active_set)
@@ -36,7 +36,7 @@ def test_fast_mixed_aic_diagonal_returns_explicitly_consistent_state():
 
     data = GramData(gram, cov, y_norm, n_samples)
 
-    state = FastMixedSelection().fit(data=data, max_forward_steps=5, max_total_steps=8)
+    state = MixedSelection().fit(data=data, max_forward_steps=5, max_total_steps=8)
     beta_expected, rss_expected = explicit_beta_rss(data, state.active_set)
 
     np.testing.assert_allclose(state.beta, beta_expected, atol=1e-8, rtol=1e-8)

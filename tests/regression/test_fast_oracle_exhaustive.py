@@ -13,7 +13,7 @@ from selection.criteria import (
     HQICCriterion,
 )
 from selection.definitions import GramData
-from selection.fast_routines import FastBeamForwardSelection, FastForwardSelection
+from selection.routines_core import BeamForwardSelection, ForwardSelection
 
 
 def _explicit_rss(X: np.ndarray, y: np.ndarray, subset: tuple[int, ...]) -> tuple[float, np.ndarray]:
@@ -57,7 +57,7 @@ def test_fast_beam_forward_matches_exhaustive_best_subset():
     data = GramData(X.T @ X, X.T @ y, y @ y, n)
     # Beam width large enough to retain all subsets up to size k.
     beam_width = 100  # >= C(8, 3) = 56
-    state = FastBeamForwardSelection(
+    state = BeamForwardSelection(
         beam_width=beam_width, criterion_cls=BestRSSCriterion
     ).fit(data=data, max_steps=k)
 
@@ -109,7 +109,7 @@ def test_fast_forward_matches_exhaustive_across_criteria():
                 elif abs(score - best_score) <= 1e-10:
                     best_sets.add(subset)
 
-        state = FastForwardSelection(
+        state = ForwardSelection(
             criterion_cls=crit_cls, criterion_kwargs=kwargs
         ).fit(data=data, max_steps=p)
 

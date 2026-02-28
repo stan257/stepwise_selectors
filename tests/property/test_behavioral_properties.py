@@ -13,15 +13,15 @@ import pytest
 
 from selection.criteria import AICCriterion, BestRSSCriterion
 from selection.definitions import CrossValGramData, GramData
-from selection.fast_routines import (
-    FastBackwardSelection,
-    FastCrossValForwardSelection,
-    FastForwardState,
-    FastMixedSelection,
+from selection.routines_core import (
+    BackwardSelection,
+    CrossValForwardSelection,
+    ForwardState,
+    MixedSelection,
 )
 from selection.grouped_routines import (
-    FastGroupBackwardSelection,
-    FastGroupForwardSelection,
+    GroupBackwardSelection,
+    GroupForwardSelection,
 )
 from selection.routines import ForwardSelection
 from selection.state import SelectionState
@@ -29,7 +29,7 @@ from tests.helpers import explicit_beta_rss, explicit_cv_rss, make_regression_gr
 
 
 # ---------------------------------------------------------------------------
-# Test 1: FastForwardState and SelectionState pick identical features
+# Test 1: ForwardState and SelectionState pick identical features
 # ---------------------------------------------------------------------------
 
 
@@ -40,7 +40,7 @@ def test_fast_and_reference_select_same_features_stepwise(seed: int):
     n, p = 80, 10
     data = make_regression_gram(seed, n=n, p=p)
 
-    fast = FastForwardState.create(data, tol=1e-10)
+    fast = ForwardState.create(data, tol=1e-10)
     ref = SelectionState(data)
     ref.init_empty()
 
@@ -72,7 +72,7 @@ def test_fast_and_reference_select_same_features_stepwise(seed: int):
         ref.apply_forward_step(ref_cache, ref_best_pos)
 
     # From the full model, backward scores should match.
-    full_fast = FastForwardState.from_active_set(data, list(range(p)), tol=1e-10)
+    full_fast = ForwardState.from_active_set(data, list(range(p)), tol=1e-10)
     full_ref = SelectionState(data)
     full_ref.init_full()
 
@@ -96,7 +96,7 @@ def test_backward_rss_monotone_and_matches_ols(seed: int):
 
     rss_path: list[float] = []
     for max_steps in range(p + 1):
-        state = FastBackwardSelection(
+        state = BackwardSelection(
             criterion_cls=BestRSSCriterion, allow_worse=True
         ).fit(data=data, max_steps=max_steps)
 
@@ -154,7 +154,7 @@ def test_cv_forward_finds_optimal_subset_on_diagonal():
                 best_subset = set(subset)
 
         # Run CV forward selection.
-        state = FastCrossValForwardSelection(criterion_cls=BestRSSCriterion).fit(
+        state = CrossValForwardSelection(criterion_cls=BestRSSCriterion).fit(
             data=cv_data, max_steps=k
         )
 
@@ -222,7 +222,7 @@ def test_grouped_active_set_is_always_union_of_complete_groups(seed: int):
 
     # Forward: start empty, add groups one by one.
     for max_steps in range(1, len(groups) + 1):
-        result = FastGroupForwardSelection(
+        result = GroupForwardSelection(
             groups, criterion_cls=BestRSSCriterion
         ).fit(data=data, max_steps=max_steps)
 
@@ -241,7 +241,7 @@ def test_grouped_active_set_is_always_union_of_complete_groups(seed: int):
     # Backward: use AIC so removing groups can improve the criterion.
     # Start full, remove groups one by one.
     for max_steps in range(1, len(groups)):
-        result = FastGroupBackwardSelection(
+        result = GroupBackwardSelection(
             groups, criterion_cls=AICCriterion
         ).fit(data=data, max_steps=max_steps)
 
@@ -296,7 +296,7 @@ def test_mixed_selection_improves_over_pure_forward():
 
     # Mixed with AIC: backward refinement after each forward step can remove
     # features that became redundant, allowing a strictly better model.
-    mixed_state = FastMixedSelection(criterion_cls=AICCriterion).fit(
+    mixed_state = MixedSelection(criterion_cls=AICCriterion).fit(
         data=data, max_total_steps=30
     )
 

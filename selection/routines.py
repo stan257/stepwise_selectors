@@ -1,18 +1,18 @@
-"""Fast selection routines (default API)."""
+"""Default public selection routines."""
 
-from .fast_routines import (
-    FastBackwardSelection as BackwardSelection,
-    FastBeamBackwardSelection as BeamBackwardSelection,
-    FastBeamCrossValBackwardSelection as BeamCrossValBackwardSelection,
-    FastBeamCrossValForwardSelection as BeamCrossValForwardSelection,
-    FastBeamCrossValMixedSelection as BeamCrossValMixedSelection,
-    FastBeamForwardSelection as BeamForwardSelection,
-    FastBeamMixedSelection as BeamMixedSelection,
-    FastCrossValBackwardSelection as CrossValBackwardSelection,
-    FastCrossValForwardSelection as CrossValForwardSelection,
-    FastCrossValMixedSelection as CrossValMixedSelection,
-    FastForwardSelection as ForwardSelection,
-    FastMixedSelection as MixedSelection,
+from .routines_core import (
+    BackwardSelection as BackwardSelection,
+    BeamBackwardSelection as BeamBackwardSelection,
+    BeamCrossValBackwardSelection as BeamCrossValBackwardSelection,
+    BeamCrossValForwardSelection as BeamCrossValForwardSelection,
+    BeamCrossValMixedSelection as BeamCrossValMixedSelection,
+    BeamForwardSelection as BeamForwardSelection,
+    BeamMixedSelection as BeamMixedSelection,
+    CrossValBackwardSelection as CrossValBackwardSelection,
+    CrossValForwardSelection as CrossValForwardSelection,
+    CrossValMixedSelection as CrossValMixedSelection,
+    ForwardSelection as ForwardSelection,
+    MixedSelection as MixedSelection,
 )
 
 __all__ = [

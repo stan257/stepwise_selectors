@@ -4,8 +4,8 @@ import pytest
 from selection.criteria import AICCriterion, BestRSSCriterion
 from selection.definitions import GramData
 from selection.grouped_routines import (
-    FastGroupBackwardSelection,
-    FastGroupForwardSelection,
+    GroupBackwardSelection,
+    GroupForwardSelection,
 )
 from selection.state import GroupedSelectionState
 from tests.helpers import explicit_beta_rss
@@ -29,7 +29,7 @@ def _active_features(active_groups: list[int], groups: list[list[int]]) -> list[
 
 def test_fast_group_forward_matches_explicit_solution():
     data, groups = make_group_problem()
-    state = FastGroupForwardSelection(groups, criterion_cls=BestRSSCriterion).fit(
+    state = GroupForwardSelection(groups, criterion_cls=BestRSSCriterion).fit(
         data=data, max_steps=2
     )
     assert isinstance(state, GroupedSelectionState)
@@ -45,7 +45,7 @@ def test_fast_group_forward_matches_explicit_solution():
 
 def test_fast_group_backward_matches_explicit_solution():
     data, groups = make_group_problem()
-    state = FastGroupBackwardSelection(groups, criterion_cls=AICCriterion).fit(
+    state = GroupBackwardSelection(groups, criterion_cls=AICCriterion).fit(
         data=data, max_steps=1
     )
     assert isinstance(state, GroupedSelectionState)

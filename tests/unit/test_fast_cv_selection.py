@@ -3,13 +3,13 @@ import pytest
 
 from selection.criteria import AICCriterion, BestRSSCriterion, GCVCriterion
 from selection.definitions import CrossValGramData, GramData
-from selection.fast_routines import (
-    FastBeamCrossValBackwardSelection,
-    FastBeamCrossValForwardSelection,
-    FastBeamCrossValMixedSelection,
-    FastCrossValBackwardSelection,
-    FastCrossValForwardSelection,
-    FastCrossValMixedSelection,
+from selection.routines_core import (
+    BeamCrossValBackwardSelection,
+    BeamCrossValForwardSelection,
+    BeamCrossValMixedSelection,
+    CrossValBackwardSelection,
+    CrossValForwardSelection,
+    CrossValMixedSelection,
 )
 from selection.routines import (
     BeamCrossValBackwardSelection,
@@ -36,7 +36,7 @@ def test_crossvalgramdata_requires_at_least_two_folds():
 
 def test_fast_cv_forward_matches_explicit_rss():
     cv_data = make_cv_problem()
-    state = FastCrossValForwardSelection(criterion_cls=BestRSSCriterion).fit(
+    state = CrossValForwardSelection(criterion_cls=BestRSSCriterion).fit(
         data=cv_data, max_steps=4
     )
     expected_rss = explicit_cv_rss(cv_data, state.active_set)
@@ -45,7 +45,7 @@ def test_fast_cv_forward_matches_explicit_rss():
 
 def test_fast_cv_backward_matches_explicit_rss():
     cv_data = make_cv_problem()
-    state = FastCrossValBackwardSelection(criterion_cls=BestRSSCriterion).fit(
+    state = CrossValBackwardSelection(criterion_cls=BestRSSCriterion).fit(
         data=cv_data, max_steps=4
     )
     expected_rss = explicit_cv_rss(cv_data, state.active_set)
@@ -54,7 +54,7 @@ def test_fast_cv_backward_matches_explicit_rss():
 
 def test_fast_cv_mixed_matches_explicit_rss():
     cv_data = make_cv_problem()
-    state = FastCrossValMixedSelection(criterion_cls=BestRSSCriterion).fit(
+    state = CrossValMixedSelection(criterion_cls=BestRSSCriterion).fit(
         data=cv_data, max_forward_steps=3, max_total_steps=5
     )
     expected_rss = explicit_cv_rss(cv_data, state.active_set)
@@ -63,14 +63,14 @@ def test_fast_cv_mixed_matches_explicit_rss():
 
 def test_fast_cv_state_exposes_full_data_postselection_beta():
     cv_data = make_cv_problem(seed=2026, folds=4, n=100, p=10, support=4)
-    state = FastCrossValForwardSelection(criterion_cls=BestRSSCriterion).fit(
+    state = CrossValForwardSelection(criterion_cls=BestRSSCriterion).fit(
         data=cv_data, max_steps=4
     )
     full_data = cv_data.make_full_data()
     expected_beta = explicit_beta_from_active(full_data, state.active_set)
     np.testing.assert_allclose(state.beta, expected_beta, atol=1e-8, rtol=1e-8)
 
-    empty = FastCrossValForwardSelection(criterion_cls=BestRSSCriterion).fit(
+    empty = CrossValForwardSelection(criterion_cls=BestRSSCriterion).fit(
         data=cv_data, max_steps=0
     )
     np.testing.assert_allclose(empty.beta, np.zeros_like(empty.beta), atol=0.0, rtol=0.0)
@@ -78,37 +78,37 @@ def test_fast_cv_state_exposes_full_data_postselection_beta():
 
 CV_SELECTOR_CASES = [
     pytest.param(
-        FastCrossValForwardSelection,
+        CrossValForwardSelection,
         {"criterion_cls": BestRSSCriterion},
         {"max_steps": 3},
         id="cv_forward",
     ),
     pytest.param(
-        FastCrossValBackwardSelection,
+        CrossValBackwardSelection,
         {"criterion_cls": BestRSSCriterion},
         {"max_steps": 3},
         id="cv_backward",
     ),
     pytest.param(
-        FastCrossValMixedSelection,
+        CrossValMixedSelection,
         {"criterion_cls": BestRSSCriterion},
         {"max_forward_steps": 3, "max_total_steps": 5},
         id="cv_mixed",
     ),
     pytest.param(
-        FastBeamCrossValForwardSelection,
+        BeamCrossValForwardSelection,
         {"criterion_cls": BestRSSCriterion, "beam_width": 2},
         {"max_steps": 3},
         id="cv_beam_forward",
     ),
     pytest.param(
-        FastBeamCrossValBackwardSelection,
+        BeamCrossValBackwardSelection,
         {"criterion_cls": BestRSSCriterion, "beam_width": 2, "allow_worse": True},
         {"max_steps": 3},
         id="cv_beam_backward",
     ),
     pytest.param(
-        FastBeamCrossValMixedSelection,
+        BeamCrossValMixedSelection,
         {"criterion_cls": BestRSSCriterion, "beam_width": 2},
         {"max_forward_steps": 3, "max_total_steps": 5},
         id="cv_beam_mixed",

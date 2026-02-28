@@ -1,22 +1,22 @@
-"""Core CV scoring helpers for fast selection routines."""
+"""Core CV scoring helpers for selection routines."""
 
 from __future__ import annotations
 
 import numpy as np
 
 from .definitions import CrossValGramData
-from .fast_state import FastForwardState
+from .forward_state import ForwardState
 from .state import CrossValSelectionState
 
 
-def _fast_cv_rss(fast_states: list[FastForwardState], data: CrossValGramData) -> float:
+def _cv_rss(fold_states: list[ForwardState], data: CrossValGramData) -> float:
     """Compute summed validation RSS for the shared active set across folds."""
-    if not fast_states or not fast_states[0].active_set:
+    if not fold_states or not fold_states[0].active_set:
         return float(np.sum(data.y_norm_folds))
-    idx = np.array(fast_states[0].active_set, dtype=int)
+    idx = np.array(fold_states[0].active_set, dtype=int)
     rss_sum = 0.0
-    for fold_idx, fast_state in enumerate(fast_states):
-        beta_S = fast_state.beta_S[: fast_state.k]
+    for fold_idx, work_state in enumerate(fold_states):
+        beta_S = work_state.beta_S[: work_state.k]
         G_val = data.gram_folds[fold_idx]
         c_val = data.cov_folds[fold_idx]
         y_norm_val = data.y_norm_folds[fold_idx]
@@ -31,12 +31,12 @@ def _fast_cv_rss(fast_states: list[FastForwardState], data: CrossValGramData) ->
     return float(rss_sum)
 
 
-def _rebuild_fast_states(
+def _rebuild_states(
     data: CrossValGramData, active_set: list[int], tol: float
-) -> list[FastForwardState]:
-    """Rebuild fast states from scratch to limit numerical drift."""
+) -> list[ForwardState]:
+    """Rebuild fold states from scratch to limit numerical drift."""
     return [
-        FastForwardState.from_active_set(data.train_data_for_fold(k), active_set, tol)
+        ForwardState.from_active_set(data.train_data_for_fold(k), active_set, tol)
         for k in range(data.n_folds)
     ]
 
@@ -56,8 +56,8 @@ def _build_cv_state_from_active_set(
     return cv_state
 
 
-def _fast_cv_forward_scores(
-    fast_states: list[FastForwardState], data: CrossValGramData, tol: float
+def _cv_forward_scores(
+    fold_states: list[ForwardState], data: CrossValGramData, tol: float
 ) -> tuple[list[int], np.ndarray] | None:
     """Return common candidates and aggregated (summed) validation RSS.
 
@@ -65,7 +65,7 @@ def _fast_cv_forward_scores(
     design matrices, then sums fold RSS to match rss_cv scale.
     """
     candidate_lists = []
-    for state in fast_states:
+    for state in fold_states:
         scored = state.candidate_scores()
         if scored is None:
             return None
@@ -77,9 +77,9 @@ def _fast_cv_forward_scores(
         return None
     candidates = sorted(common)
     num_candidates = len(candidates)
-    rss_matrix = np.empty((len(fast_states), num_candidates), dtype=float)
+    rss_matrix = np.empty((len(fold_states), num_candidates), dtype=float)
 
-    for fold_idx, state in enumerate(fast_states):
+    for fold_idx, state in enumerate(fold_states):
         idx_S = np.array(state.active_set, dtype=int)
         k = state.k
         resid_corr = state.r[candidates]
@@ -117,17 +117,17 @@ def _fast_cv_forward_scores(
     return candidates, aggregated
 
 
-def _fast_cv_backward_scores(
-    fast_states: list[FastForwardState], data: CrossValGramData, tol: float
+def _cv_backward_scores(
+    fold_states: list[ForwardState], data: CrossValGramData, tol: float
 ) -> np.ndarray | None:
     """Compute aggregated CV backward scores using Gram-only downdates."""
-    if not fast_states or not fast_states[0].active_set:
+    if not fold_states or not fold_states[0].active_set:
         return None
-    idx_full = np.array(fast_states[0].active_set, dtype=int)
+    idx_full = np.array(fold_states[0].active_set, dtype=int)
     k = len(idx_full)
-    rss_matrix = np.empty((len(fast_states), k), dtype=float)
+    rss_matrix = np.empty((len(fold_states), k), dtype=float)
 
-    for fold_idx, state in enumerate(fast_states):
+    for fold_idx, state in enumerate(fold_states):
         Kk = state.K[:k, :k]
         beta_k = state.beta_S[:k]
         G_val = data.gram_folds[fold_idx]
@@ -166,9 +166,9 @@ def _fast_cv_backward_scores(
 
 
 __all__ = [
-    "_fast_cv_rss",
-    "_rebuild_fast_states",
+    "_cv_rss",
+    "_rebuild_states",
     "_build_cv_state_from_active_set",
-    "_fast_cv_forward_scores",
-    "_fast_cv_backward_scores",
+    "_cv_forward_scores",
+    "_cv_backward_scores",
 ]

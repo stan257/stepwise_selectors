@@ -3,21 +3,21 @@ import pytest
 
 from selection.criteria import BestRSSCriterion
 from selection.definitions import GramData
-from selection.fast_routines import (
-    FastBackwardSelection,
-    FastBeamBackwardSelection,
-    FastBeamCrossValBackwardSelection,
-    FastBeamCrossValForwardSelection,
-    FastBeamCrossValMixedSelection,
-    FastBeamForwardSelection,
-    FastBeamMixedSelection,
-    FastCrossValBackwardSelection,
-    FastCrossValForwardSelection,
-    FastCrossValMixedSelection,
-    FastForwardSelection,
-    FastMixedSelection,
+from selection.routines_core import (
+    BackwardSelection,
+    BeamBackwardSelection,
+    BeamCrossValBackwardSelection,
+    BeamCrossValForwardSelection,
+    BeamCrossValMixedSelection,
+    BeamForwardSelection,
+    BeamMixedSelection,
+    CrossValBackwardSelection,
+    CrossValForwardSelection,
+    CrossValMixedSelection,
+    ForwardSelection,
+    MixedSelection,
 )
-from selection.grouped_routines import FastGroupBackwardSelection, FastGroupForwardSelection
+from selection.grouped_routines import GroupBackwardSelection, GroupForwardSelection
 from tests.helpers import (
     explicit_beta_rss,
     explicit_cv_rss,
@@ -48,15 +48,15 @@ def test_fast_greedy_consistency_sweep(seed: int, p: int):
     data = make_regression_gram(seed, n=140, p=p)
     max_steps = min(6, p // 2)
 
-    fast_f = FastForwardSelection(criterion_cls=BestRSSCriterion).fit(
+    fast_f = ForwardSelection(criterion_cls=BestRSSCriterion).fit(
         data=data, max_steps=max_steps
     )
     _assert_state_consistent(fast_f, data)
 
-    fast_b = FastBackwardSelection(allow_worse=True).fit(data=data, max_steps=4)
+    fast_b = BackwardSelection(allow_worse=True).fit(data=data, max_steps=4)
     _assert_state_consistent(fast_b, data)
 
-    fast_m = FastMixedSelection(criterion_cls=BestRSSCriterion).fit(
+    fast_m = MixedSelection(criterion_cls=BestRSSCriterion).fit(
         data=data, max_forward_steps=3, max_total_steps=5
     )
     _assert_state_consistent(fast_m, data)
@@ -66,17 +66,17 @@ def test_fast_greedy_consistency_sweep(seed: int, p: int):
 def test_fast_beam_consistency_sweep(seed: int):
     data = make_regression_gram(seed, n=120, p=25)
 
-    fast_f = FastBeamForwardSelection(
+    fast_f = BeamForwardSelection(
         beam_width=3, criterion_cls=BestRSSCriterion
     ).fit(data=data, max_steps=4)
     _assert_state_consistent(fast_f, data)
 
-    fast_b = FastBeamBackwardSelection(
+    fast_b = BeamBackwardSelection(
         beam_width=2, allow_worse=True, criterion_cls=BestRSSCriterion
     ).fit(data=data, max_steps=3)
     _assert_state_consistent(fast_b, data)
 
-    fast_m = FastBeamMixedSelection(
+    fast_m = BeamMixedSelection(
         beam_width=2, criterion_cls=BestRSSCriterion
     ).fit(data=data, max_forward_steps=3, max_total_steps=6)
     _assert_state_consistent(fast_m, data)
@@ -86,21 +86,21 @@ def test_fast_beam_consistency_sweep(seed: int):
 def test_fast_cv_consistency_sweep(seed: int):
     cv_data = make_cv_regression_gram(seed, folds=3, n=80, p=18)
 
-    fast_f = FastCrossValForwardSelection(
+    fast_f = CrossValForwardSelection(
         criterion_cls=BestRSSCriterion
     ).fit(data=cv_data, max_steps=4)
     assert pytest.approx(fast_f.rss_cv, rel=1e-8, abs=1e-8) == explicit_cv_rss(
         cv_data, fast_f.active_set
     )
 
-    fast_b = FastCrossValBackwardSelection(
+    fast_b = CrossValBackwardSelection(
         criterion_cls=BestRSSCriterion
     ).fit(data=cv_data, max_steps=3)
     assert pytest.approx(fast_b.rss_cv, rel=1e-8, abs=1e-8) == explicit_cv_rss(
         cv_data, fast_b.active_set
     )
 
-    fast_m = FastCrossValMixedSelection(
+    fast_m = CrossValMixedSelection(
         criterion_cls=BestRSSCriterion
     ).fit(data=cv_data, max_forward_steps=3, max_total_steps=5)
     assert pytest.approx(fast_m.rss_cv, rel=1e-8, abs=1e-8) == explicit_cv_rss(
@@ -112,21 +112,21 @@ def test_fast_cv_consistency_sweep(seed: int):
 def test_fast_cv_beam_consistency_sweep(seed: int):
     cv_data = make_cv_regression_gram(seed, folds=3, n=70, p=16)
 
-    fast_f = FastBeamCrossValForwardSelection(
+    fast_f = BeamCrossValForwardSelection(
         beam_width=2, criterion_cls=BestRSSCriterion
     ).fit(data=cv_data, max_steps=3)
     assert pytest.approx(fast_f.rss_cv, rel=1e-8, abs=1e-8) == explicit_cv_rss(
         cv_data, fast_f.active_set
     )
 
-    fast_b = FastBeamCrossValBackwardSelection(
+    fast_b = BeamCrossValBackwardSelection(
         beam_width=2, criterion_cls=BestRSSCriterion
     ).fit(data=cv_data, max_steps=3)
     assert pytest.approx(fast_b.rss_cv, rel=1e-8, abs=1e-8) == explicit_cv_rss(
         cv_data, fast_b.active_set
     )
 
-    fast_m = FastBeamCrossValMixedSelection(
+    fast_m = BeamCrossValMixedSelection(
         beam_width=2, criterion_cls=BestRSSCriterion
     ).fit(data=cv_data, max_forward_steps=3, max_total_steps=5)
     assert pytest.approx(fast_m.rss_cv, rel=1e-8, abs=1e-8) == explicit_cv_rss(
@@ -139,12 +139,12 @@ def test_fast_grouped_consistency_sweep(seed: int):
     data = make_regression_gram(seed, n=100, p=12)
     groups = [list(range(i, i + 3)) for i in range(0, 12, 3)]
 
-    fast_f = FastGroupForwardSelection(groups, criterion_cls=BestRSSCriterion).fit(
+    fast_f = GroupForwardSelection(groups, criterion_cls=BestRSSCriterion).fit(
         data=data, max_steps=3
     )
     _assert_group_state_consistent(fast_f, data, groups)
 
-    fast_b = FastGroupBackwardSelection(groups, criterion_cls=BestRSSCriterion).fit(
+    fast_b = GroupBackwardSelection(groups, criterion_cls=BestRSSCriterion).fit(
         data=data, max_steps=2
     )
     _assert_group_state_consistent(fast_b, data, groups)

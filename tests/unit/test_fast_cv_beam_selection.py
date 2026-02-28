@@ -3,12 +3,12 @@ import pytest
 
 from selection.criteria import BestRSSCriterion
 from selection.definitions import CrossValGramData, GramData
-from selection.fast_routines import (
-    FastBeamCrossValBackwardSelection,
-    FastBeamCrossValForwardSelection,
-    FastBeamCrossValMixedSelection,
-    FastCVBeam,
-    _fast_cv_beam_backward_children,
+from selection.routines_core import (
+    BeamCrossValBackwardSelection,
+    BeamCrossValForwardSelection,
+    BeamCrossValMixedSelection,
+    CVBeam,
+    _cv_beam_backward_children,
 )
 from tests.helpers import explicit_cv_rss, make_cv_problem
 
@@ -26,7 +26,7 @@ def _make_full_model_optimal_cv(*, folds: int = 3, n: int = 50, p: int = 6):
 
 def test_fast_cv_beam_forward_matches_explicit_rss():
     cv_data = make_cv_problem()
-    state = FastBeamCrossValForwardSelection(
+    state = BeamCrossValForwardSelection(
         beam_width=2, criterion_cls=BestRSSCriterion
     ).fit(data=cv_data, max_steps=4)
     expected_rss = explicit_cv_rss(cv_data, state.active_set)
@@ -35,7 +35,7 @@ def test_fast_cv_beam_forward_matches_explicit_rss():
 
 def test_fast_cv_beam_backward_matches_explicit_rss():
     cv_data = make_cv_problem()
-    state = FastBeamCrossValBackwardSelection(
+    state = BeamCrossValBackwardSelection(
         beam_width=2, criterion_cls=BestRSSCriterion
     ).fit(data=cv_data, max_steps=3)
     expected_rss = explicit_cv_rss(cv_data, state.active_set)
@@ -44,7 +44,7 @@ def test_fast_cv_beam_backward_matches_explicit_rss():
 
 def test_fast_cv_beam_mixed_matches_explicit_rss():
     cv_data = make_cv_problem()
-    state = FastBeamCrossValMixedSelection(
+    state = BeamCrossValMixedSelection(
         beam_width=2, criterion_cls=BestRSSCriterion
     ).fit(data=cv_data, max_forward_steps=3, max_total_steps=5)
     expected_rss = explicit_cv_rss(cv_data, state.active_set)
@@ -63,16 +63,16 @@ def test_cv_beam_backward_children_propagates_unexpected_errors(monkeypatch):
 
     criterion = BestRSSCriterion()
     criterion.update_current(10.0)
-    beam = FastCVBeam([_DummyFastState()], criterion, 10.0)
+    beam = CVBeam([_DummyFastState()], criterion, 10.0)
     cv_data = make_cv_problem(folds=2, n=20, p=4, support=1, seed=777)
 
     monkeypatch.setattr(
-        "selection.fast_routines._fast_cv_backward_scores",
+        "selection.routines_core._cv_backward_scores",
         lambda states, data, tol: np.array([1.0]),
     )
 
     with pytest.raises(RuntimeError, match="unexpected failure"):
-        _fast_cv_beam_backward_children(
+        _cv_beam_backward_children(
             beam, beam_width=1, data=cv_data, tol=1e-10, allow_worse=True
         )
 
@@ -80,10 +80,10 @@ def test_cv_beam_backward_children_propagates_unexpected_errors(monkeypatch):
 def test_fast_cv_beam_backward_is_improvement_only_by_default():
     cv_data = _make_full_model_optimal_cv(folds=3, n=40, p=6)
 
-    strict = FastBeamCrossValBackwardSelection(
+    strict = BeamCrossValBackwardSelection(
         beam_width=2, criterion_cls=BestRSSCriterion
     ).fit(data=cv_data, max_steps=1)
-    relaxed = FastBeamCrossValBackwardSelection(
+    relaxed = BeamCrossValBackwardSelection(
         beam_width=2, criterion_cls=BestRSSCriterion, allow_worse=True
     ).fit(data=cv_data, max_steps=1)
 

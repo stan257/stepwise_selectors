@@ -3,11 +3,11 @@ import pytest
 from selection.constants import ABS_TOL
 from selection.criteria import BestRSSCriterion
 from selection.definitions import CrossValGramData, GramData
-from selection.fast_routines import (
-    FastForwardState,
-    _fast_cv_backward_scores,
-    _fast_cv_forward_scores,
-    _fast_cv_rss,
+from selection.routines_core import (
+    ForwardState,
+    _cv_backward_scores,
+    _cv_forward_scores,
+    _cv_rss,
 )
 from selection.routines import (
     BackwardSelection,
@@ -491,7 +491,7 @@ def test_crossval_mixed_keeps_fold_state_in_sync():
 
     def rebuild_fast_states(active_set):
         return [
-            FastForwardState.from_active_set(
+            ForwardState.from_active_set(
                 cv_data.train_data_for_fold(k), active_set, ABS_TOL
             )
             for k in range(cv_data.n_folds)
@@ -506,7 +506,7 @@ def test_crossval_mixed_keeps_fold_state_in_sync():
         return state
 
     fast_states = [
-        FastForwardState.create(cv_data.train_data_for_fold(k), ABS_TOL)
+        ForwardState.create(cv_data.train_data_for_fold(k), ABS_TOL)
         for k in range(cv_data.n_folds)
     ]
 
@@ -517,7 +517,7 @@ def test_crossval_mixed_keeps_fold_state_in_sync():
             break
         if forward_steps >= max_forward_steps:
             break
-        forward_data = _fast_cv_forward_scores(fast_states, cv_data, ABS_TOL)
+        forward_data = _cv_forward_scores(fast_states, cv_data, ABS_TOL)
         if forward_data is None:
             break
         candidates, aggregated = forward_data
@@ -534,14 +534,14 @@ def test_crossval_mixed_keeps_fold_state_in_sync():
         cv_state = materialize_cv_state(list(fast_states[0].active_set))
         assert list(fold_sets[0]) == cv_state.active_set
 
-        assert pytest.approx(cv_state.rss_cv, rel=1e-9, abs=1e-9) == _fast_cv_rss(
+        assert pytest.approx(cv_state.rss_cv, rel=1e-9, abs=1e-9) == _cv_rss(
             fast_states, cv_data
         )
 
         # Try one backward step if budget allows.
         if max_total_steps is not None and ops >= max_total_steps:
             break
-        backward_data = _fast_cv_backward_scores(fast_states, cv_data, ABS_TOL)
+        backward_data = _cv_backward_scores(fast_states, cv_data, ABS_TOL)
         if backward_data is None:
             break
         best_local = int(np.argmin(backward_data))
@@ -556,7 +556,7 @@ def test_crossval_mixed_keeps_fold_state_in_sync():
         assert all(fs == fold_sets[0] for fs in fold_sets)
         cv_state = materialize_cv_state(list(fast_states[0].active_set))
         assert list(fold_sets[0]) == cv_state.active_set
-        assert pytest.approx(cv_state.rss_cv, rel=1e-9, abs=1e-9) == _fast_cv_rss(
+        assert pytest.approx(cv_state.rss_cv, rel=1e-9, abs=1e-9) == _cv_rss(
             fast_states, cv_data
         )
 
@@ -565,20 +565,20 @@ def test_cv_forward_scores_matches_reference_intersection():
     """Ensure vectorized candidate intersection matches the prior mapping logic."""
     cv_data, _ = make_cv_support_problem(p=12, support=4, folds=3, n=200, seed=123)
     fast_states = [
-        FastForwardState.create(cv_data.train_data_for_fold(k), ABS_TOL)
+        ForwardState.create(cv_data.train_data_for_fold(k), ABS_TOL)
         for k in range(cv_data.n_folds)
     ]
 
     # Advance to a non-empty support before checking candidate intersections.
     for _ in range(2):
-        scored = _fast_cv_forward_scores(fast_states, cv_data, ABS_TOL)
+        scored = _cv_forward_scores(fast_states, cv_data, ABS_TOL)
         assert scored is not None
         candidates, aggregated = scored
         feat_idx = int(candidates[int(np.argmin(aggregated))])
         for fold_state in fast_states:
             fold_state.apply_forward(feat_idx)
         fast_states = [
-            FastForwardState.from_active_set(
+            ForwardState.from_active_set(
                 cv_data.train_data_for_fold(k),
                 list(fast_states[0].active_set),
                 ABS_TOL,
@@ -624,7 +624,7 @@ def test_cv_forward_scores_matches_reference_intersection():
         return candidates, np.sum(rss_matrix, axis=0)
 
     ref = reference_forward_scores(fast_states)
-    fast = _fast_cv_forward_scores(fast_states, cv_data, ABS_TOL)
+    fast = _cv_forward_scores(fast_states, cv_data, ABS_TOL)
     assert ref is not None and fast is not None
     ref_candidates, ref_agg = ref
     fast_candidates, fast_agg = fast
