@@ -2,16 +2,20 @@
 
 from __future__ import annotations
 
-import inspect
 from numbers import Integral
 from typing import Iterable, Sequence
 
 import numpy as np
 
 from .constants import ABS_TOL
-from .criteria import AICCriterion, SelectionCriterion
+from .criteria import AICCriterion, CriterionProtocol
 from .definitions import GramData
 from .forward_state import ForwardState
+from .interface_validation import (
+    validate_optional_non_negative_int,
+    validate_positive_finite_float,
+)
+from .routines_base import _resolve_criterion
 from .state import GroupedSelectionState
 
 
@@ -91,9 +95,14 @@ class BaseGroupedSelection:
         groups: Sequence[Sequence[int]],
         *,
         tol: float = ABS_TOL,
+        criterion=None,
         criterion_cls=None,
         criterion_kwargs=None,
     ):
+        if criterion is not None and criterion_cls is not None:
+            raise ValueError(
+                f"{type(self).__name__} accepts either `criterion` or `criterion_cls`, not both."
+            )
         normalized_groups = []
         for group in groups:
             normalized_groups.append(tuple(_normalize_group_feature_index(f) for f in group))
@@ -117,18 +126,23 @@ class BaseGroupedSelection:
                 )
             seen.update(current)
         self.num_groups = len(self.groups)
-        self.tol = tol
-        self.criterion_cls = criterion_cls or AICCriterion
+        self.tol = validate_positive_finite_float(tol, name="tol")
+        self.criterion = criterion
+        if criterion is None:
+            self.criterion_cls = criterion_cls or AICCriterion
+        else:
+            self.criterion_cls = criterion if isinstance(criterion, type) else type(criterion)
         self.criterion_kwargs = dict(criterion_kwargs or {})
 
-    def _init_criterion(self, data: GramData) -> SelectionCriterion:
-        params = dict(self.criterion_kwargs)
-        init_params = inspect.signature(self.criterion_cls.__init__).parameters
-        if "n_samples" in init_params and "n_samples" not in params:
-            params["n_samples"] = data.n_samples
-        if "p" in init_params and "p" not in params:
-            params["p"] = data.gram.shape[0]
-        return self.criterion_cls(**params)
+    def _init_criterion(self, data: GramData) -> CriterionProtocol:
+        return _resolve_criterion(
+            selector_name=type(self).__name__,
+            data=data,
+            criterion=self.criterion,
+            criterion_cls=self.criterion_cls if self.criterion is None else None,
+            default_criterion_cls=AICCriterion,
+            criterion_kwargs=self.criterion_kwargs,
+        )
 
 
 class GroupForwardSelection(BaseGroupedSelection):
@@ -137,6 +151,7 @@ class GroupForwardSelection(BaseGroupedSelection):
     def fit(
         self, *, data: GramData, max_steps: int | None = None
     ) -> GroupedSelectionState:
+        max_steps = validate_optional_non_negative_int(max_steps, name="max_steps")
         _validate_group_feature_bounds(self.groups, data.gram.shape[0])
         criterion = self._init_criterion(data)
         active: list[int] = []
@@ -192,6 +207,7 @@ class GroupBackwardSelection(BaseGroupedSelection):
     def fit(
         self, *, data: GramData, max_steps: int | None = None
     ) -> GroupedSelectionState:
+        max_steps = validate_optional_non_negative_int(max_steps, name="max_steps")
         _validate_group_feature_bounds(self.groups, data.gram.shape[0])
         criterion = self._init_criterion(data)
         active = list(range(self.num_groups))

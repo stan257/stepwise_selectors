@@ -13,21 +13,33 @@ class GramData:
     dtype: np.dtype | None = None
 
     def __post_init__(self):
-        if not isinstance(self.gram, np.ndarray):
-            raise TypeError("Gram matrix must be a numpy array.")
-        if not isinstance(self.cov, np.ndarray):
-            raise TypeError("cov vector must be a numpy array.")
         # Ensure contiguous storage (and optional casting) for BLAS-friendly access.
         dtype = None if self.dtype is None else np.dtype(self.dtype)
-        object.__setattr__(self, "gram", np.ascontiguousarray(self.gram, dtype=dtype))
-        object.__setattr__(self, "cov", np.ascontiguousarray(self.cov, dtype=dtype))
+        try:
+            gram_arr = np.asarray(self.gram, dtype=dtype)
+        except (TypeError, ValueError) as err:
+            raise TypeError("Gram matrix must be array-like and numeric.") from err
+        try:
+            cov_arr = np.asarray(self.cov, dtype=dtype)
+        except (TypeError, ValueError) as err:
+            raise TypeError("cov vector must be array-like and numeric.") from err
+        object.__setattr__(self, "gram", np.ascontiguousarray(gram_arr))
+        object.__setattr__(self, "cov", np.ascontiguousarray(cov_arr))
         if not isinstance(self.y_norm, Real):
             raise TypeError("y_norm must be a real number.")
-        if not isinstance(self.n_samples, Integral):
+        if isinstance(self.n_samples, bool) or not isinstance(self.n_samples, Integral):
             raise TypeError("n_samples must be an integer.")
-        if not np.all(np.isfinite(self.gram)):
+        try:
+            gram_finite = np.all(np.isfinite(self.gram))
+        except TypeError as err:
+            raise TypeError("Gram matrix must contain numeric values.") from err
+        if not gram_finite:
             raise ValueError("Gram matrix must contain only finite values.")
-        if not np.all(np.isfinite(self.cov)):
+        try:
+            cov_finite = np.all(np.isfinite(self.cov))
+        except TypeError as err:
+            raise TypeError("cov vector must contain numeric values.") from err
+        if not cov_finite:
             raise ValueError("cov vector must contain only finite values.")
         if not np.isfinite(self.y_norm):
             raise ValueError("y_norm must be finite.")

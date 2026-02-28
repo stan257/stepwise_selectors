@@ -8,6 +8,11 @@ import numpy as np
 
 from .criteria import SelectionCriterion
 from .definitions import GramData
+from .interface_validation import (
+    validate_bool,
+    validate_optional_non_negative_int,
+    validate_positive_int,
+)
 from .routines_base import _validate_state_target
 from .routines_greedy import ForwardSelection
 from .forward_state import ForwardState
@@ -111,7 +116,7 @@ class BeamForwardSelection(ForwardSelection):
 
     def __init__(self, *, beam_width: int = 1, **kwargs):
         super().__init__(**kwargs)
-        self.beam_width = max(1, int(beam_width))
+        self.beam_width = validate_positive_int(beam_width, name="beam_width")
 
     def fit(
         self,
@@ -126,6 +131,7 @@ class BeamForwardSelection(ForwardSelection):
         if result_state is not None and result_state.active_set:
             raise ValueError("BeamForwardSelection does not support warm starts.")
 
+        max_steps = validate_optional_non_negative_int(max_steps, name="max_steps")
         criterion = self._init_criterion(data)
         initial = Beam(
             ForwardState.create(data, self.tol), criterion, criterion.current_value
@@ -155,8 +161,8 @@ class BeamBackwardSelection(ForwardSelection):
 
     def __init__(self, *, beam_width: int = 1, allow_worse: bool = False, **kwargs):
         super().__init__(**kwargs)
-        self.beam_width = max(1, int(beam_width))
-        self.allow_worse = allow_worse
+        self.beam_width = validate_positive_int(beam_width, name="beam_width")
+        self.allow_worse = validate_bool(allow_worse, name="allow_worse")
 
     def fit(
         self,
@@ -171,6 +177,7 @@ class BeamBackwardSelection(ForwardSelection):
         if result_state is not None and result_state.active_set:
             raise ValueError("BeamBackwardSelection does not support warm starts.")
 
+        max_steps = validate_optional_non_negative_int(max_steps, name="max_steps")
         criterion = self._init_criterion(data)
         full_active = list(range(data.gram.shape[0]))
         initial_state = ForwardState.from_active_set(data, full_active, self.tol)
@@ -206,7 +213,7 @@ class BeamMixedSelection(ForwardSelection):
 
     def __init__(self, *, beam_width: int = 1, **kwargs):
         super().__init__(**kwargs)
-        self.beam_width = max(1, int(beam_width))
+        self.beam_width = validate_positive_int(beam_width, name="beam_width")
 
     def fit(
         self,
@@ -222,6 +229,12 @@ class BeamMixedSelection(ForwardSelection):
         if result_state is not None and result_state.active_set:
             raise ValueError("BeamMixedSelection does not support warm starts.")
 
+        max_forward_steps = validate_optional_non_negative_int(
+            max_forward_steps, name="max_forward_steps"
+        )
+        max_total_steps = validate_optional_non_negative_int(
+            max_total_steps, name="max_total_steps"
+        )
         criterion = self._init_criterion(data)
         initial = Beam(
             ForwardState.create(data, self.tol), criterion, criterion.current_value

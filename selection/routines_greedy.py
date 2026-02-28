@@ -2,14 +2,21 @@
 
 from __future__ import annotations
 
-import inspect
-
 import numpy as np
 
 from .constants import ABS_TOL
-from .criteria import AICCriterion, SelectionCriterion
+from .interface_validation import (
+    validate_bool,
+    validate_optional_non_negative_int,
+    validate_positive_finite_float,
+)
+from .criteria import AICCriterion, CriterionProtocol
 from .definitions import GramData
-from .routines_base import _DISALLOWED_CV_CRITERIA, _validate_state_target
+from .routines_base import (
+    _resolve_criterion,
+    _validate_cv_criterion,
+    _validate_state_target,
+)
 from .forward_state import ForwardState
 from .state import SelectionState
 
@@ -29,28 +36,46 @@ class ForwardSelection:
         self,
         *,
         tol: float = ABS_TOL,
+        criterion=None,
         criterion_cls=None,
         criterion_kwargs=None,
     ):
-        self.tol = tol
-        cls = criterion_cls or self._default_criterion
-        if self._reject_ic and issubclass(cls, _DISALLOWED_CV_CRITERIA):
+        self.tol = validate_positive_finite_float(tol, name="tol")
+        if criterion is not None and criterion_cls is not None:
             raise ValueError(
-                f"{type(self).__name__} uses cross-validation for regularisation; "
-                f"{cls.__name__} is not supported for CV selection routines. "
-                f"Use BestRSSCriterion (the default) instead."
+                f"{type(self).__name__} accepts either `criterion` or `criterion_cls`, not both."
             )
-        self.criterion_cls = cls
+        self.criterion = criterion
+        if criterion is None:
+            self.criterion_cls = criterion_cls or self._default_criterion
+        else:
+            self.criterion_cls = criterion if isinstance(criterion, type) else type(criterion)
         self.criterion_kwargs = dict(criterion_kwargs or {})
+        if self._reject_ic:
+            candidate = criterion if criterion is not None else self.criterion_cls
+            if getattr(candidate, "cv_compatible", True) is False:
+                name = (
+                    candidate.__name__
+                    if isinstance(candidate, type)
+                    else type(candidate).__name__
+                )
+                raise ValueError(
+                    f"{type(self).__name__} uses cross-validation for regularisation; "
+                    f"{name} is not supported for CV selection routines. "
+                    f"Use BestRSSCriterion (the default) instead."
+                )
 
-    def _init_criterion(self, data: GramData) -> SelectionCriterion:
-        params = dict(self.criterion_kwargs)
-        init_params = inspect.signature(self.criterion_cls.__init__).parameters
-        if "n_samples" in init_params and "n_samples" not in params:
-            params["n_samples"] = data.n_samples
-        if "p" in init_params and "p" not in params:
-            params["p"] = data.gram.shape[0]
-        criterion = self.criterion_cls(**params)
+    def _init_criterion(self, data: GramData) -> CriterionProtocol:
+        criterion = _resolve_criterion(
+            selector_name=type(self).__name__,
+            data=data,
+            criterion=self.criterion,
+            criterion_cls=self.criterion_cls if self.criterion is None else None,
+            default_criterion_cls=self._default_criterion,
+            criterion_kwargs=self.criterion_kwargs,
+        )
+        if self._reject_ic:
+            _validate_cv_criterion(criterion, selector_name=type(self).__name__)
         initial = float(np.asarray(criterion.evaluate(data.y_norm, 0)))
         criterion.update_current(initial)
         return criterion
@@ -68,6 +93,7 @@ class ForwardSelection:
         if result_state is not None and result_state.active_set:
             raise ValueError("ForwardSelection does not support warm starts.")
 
+        max_steps = validate_optional_non_negative_int(max_steps, name="max_steps")
         criterion = self._init_criterion(data)
         work_state = ForwardState.create(data, self.tol)
 
@@ -95,7 +121,7 @@ class BackwardSelection(ForwardSelection):
 
     def __init__(self, *, allow_worse: bool = False, **kwargs):
         super().__init__(**kwargs)
-        self.allow_worse = allow_worse
+        self.allow_worse = validate_bool(allow_worse, name="allow_worse")
 
     def fit(
         self,
@@ -110,6 +136,7 @@ class BackwardSelection(ForwardSelection):
         if result_state is not None and result_state.active_set:
             raise ValueError("BackwardSelection does not support warm starts.")
 
+        max_steps = validate_optional_non_negative_int(max_steps, name="max_steps")
         criterion = self._init_criterion(data)
         full_active = list(range(data.gram.shape[0]))
         work_state = ForwardState.from_active_set(data, full_active, self.tol)
@@ -154,6 +181,12 @@ class MixedSelection(ForwardSelection):
         if result_state is not None and result_state.active_set:
             raise ValueError("MixedSelection does not support warm starts.")
 
+        max_forward_steps = validate_optional_non_negative_int(
+            max_forward_steps, name="max_forward_steps"
+        )
+        max_total_steps = validate_optional_non_negative_int(
+            max_total_steps, name="max_total_steps"
+        )
         criterion = self._init_criterion(data)
         work_state = ForwardState.create(data, self.tol)
 

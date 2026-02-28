@@ -8,6 +8,11 @@ import numpy as np
 
 from .criteria import BestRSSCriterion, SelectionCriterion
 from .definitions import CrossValGramData
+from .interface_validation import (
+    validate_bool,
+    validate_optional_non_negative_int,
+    validate_positive_int,
+)
 from .routines_base import _validate_cv_state_target
 from .routines_cv_scoring import (
     _build_cv_state_from_active_set,
@@ -156,6 +161,7 @@ class CrossValForwardSelection(ForwardSelection):
         if result_state is not None and result_state.active_set:
             raise ValueError("CrossValForwardSelection does not support warm starts.")
 
+        max_steps = validate_optional_non_negative_int(max_steps, name="max_steps")
         criterion = self._init_criterion(data.make_full_data())
         fold_states = [
             ForwardState.create(data.train_data_for_fold(k), self.tol)
@@ -209,6 +215,7 @@ class CrossValBackwardSelection(ForwardSelection):
         if result_state is not None and result_state.active_set:
             raise ValueError("CrossValBackwardSelection does not support warm starts.")
 
+        max_steps = validate_optional_non_negative_int(max_steps, name="max_steps")
         criterion = self._init_criterion(data.make_full_data())
         full_active = list(range(data.gram_total.shape[0]))
         fold_states = [
@@ -271,6 +278,12 @@ class CrossValMixedSelection(ForwardSelection):
         if result_state is not None and result_state.active_set:
             raise ValueError("CrossValMixedSelection does not support warm starts.")
 
+        max_forward_steps = validate_optional_non_negative_int(
+            max_forward_steps, name="max_forward_steps"
+        )
+        max_total_steps = validate_optional_non_negative_int(
+            max_total_steps, name="max_total_steps"
+        )
         criterion = self._init_criterion(data.make_full_data())
         fold_states = [
             ForwardState.create(data.train_data_for_fold(k), self.tol)
@@ -341,7 +354,7 @@ class BeamCrossValForwardSelection(ForwardSelection):
 
     def __init__(self, *, beam_width: int = 1, **kwargs):
         super().__init__(**kwargs)
-        self.beam_width = max(1, int(beam_width))
+        self.beam_width = validate_positive_int(beam_width, name="beam_width")
 
     def fit(
         self,
@@ -358,6 +371,7 @@ class BeamCrossValForwardSelection(ForwardSelection):
                 "BeamCrossValForwardSelection does not support warm starts."
             )
 
+        max_steps = validate_optional_non_negative_int(max_steps, name="max_steps")
         criterion = self._init_criterion(data.make_full_data())
         fold_states = [
             ForwardState.create(data.train_data_for_fold(k), self.tol)
@@ -400,8 +414,8 @@ class BeamCrossValBackwardSelection(ForwardSelection):
         self, *, beam_width: int = 1, allow_worse: bool = False, **kwargs
     ):
         super().__init__(**kwargs)
-        self.beam_width = max(1, int(beam_width))
-        self.allow_worse = bool(allow_worse)
+        self.beam_width = validate_positive_int(beam_width, name="beam_width")
+        self.allow_worse = validate_bool(allow_worse, name="allow_worse")
 
     def fit(
         self,
@@ -418,6 +432,7 @@ class BeamCrossValBackwardSelection(ForwardSelection):
                 "BeamCrossValBackwardSelection does not support warm starts."
             )
 
+        max_steps = validate_optional_non_negative_int(max_steps, name="max_steps")
         criterion = self._init_criterion(data.make_full_data())
         full_active = list(range(data.gram_total.shape[0]))
         fold_states = [
@@ -467,7 +482,7 @@ class BeamCrossValMixedSelection(ForwardSelection):
 
     def __init__(self, *, beam_width: int = 1, **kwargs):
         super().__init__(**kwargs)
-        self.beam_width = max(1, int(beam_width))
+        self.beam_width = validate_positive_int(beam_width, name="beam_width")
 
     def fit(
         self,
@@ -485,6 +500,12 @@ class BeamCrossValMixedSelection(ForwardSelection):
                 "BeamCrossValMixedSelection does not support warm starts."
             )
 
+        max_forward_steps = validate_optional_non_negative_int(
+            max_forward_steps, name="max_forward_steps"
+        )
+        max_total_steps = validate_optional_non_negative_int(
+            max_total_steps, name="max_total_steps"
+        )
         criterion = self._init_criterion(data.make_full_data())
         fold_states = [
             ForwardState.create(data.train_data_for_fold(k), self.tol)

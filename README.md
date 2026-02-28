@@ -24,7 +24,7 @@ Lightweight linear-model selection routines built on precomputed Gram statistics
 - Cross-val routines: `CrossValForwardSelection`, `CrossValBackwardSelection`, `CrossValMixedSelection`
 - Beam + cross-val: `BeamCrossValForwardSelection`, `BeamCrossValBackwardSelection`, `BeamCrossValMixedSelection`
 - Grouped routines: `GroupForwardSelection`, `GroupBackwardSelection`
-- Criteria: `AICCriterion`, `BestRSSCriterion`
+- Criteria: `AICCriterion`, `BestRSSCriterion`, `CriterionProtocol`
 
 ## Quick start
 1) Install deps (Python 3.12+; minimal requirements: `numpy`, `pytest`). In conda:
@@ -72,10 +72,13 @@ print(gstate.active_groups, gstate.active_set, gstate.beta, gstate.rss)
 - The code operates on Gram statistics (`X.T @ X`, `X.T @ y`, `y.T @ y`) and does not depend on raw design matrices.
 - `selection.routines` and `selection.grouped_routines` expose the default implementations.
 - For cross-validation, provide per-fold `GramData` via `CrossValGramData`.
+- `GramData` accepts array-like inputs for `gram` and `cov` and stores contiguous NumPy arrays internally.
 - CV output states expose `beta` as a post-selection refit on full-data Gram statistics at the selected support.
 - Single-dataset selectors default to `AICCriterion`; CV selectors default to `BestRSSCriterion`.
-- CV selectors reject IC/GCV-style criteria to avoid double regularization on top of held-out RSS.
+- Selector constructors accept `criterion` (class, instance, or factory) in addition to legacy `criterion_cls`; custom criteria should satisfy `CriterionProtocol`.
+- CV selectors reject criteria with `cv_compatible=False` to avoid double regularization on top of held-out RSS.
 - Backward beam selectors are improvement-only by default; set `allow_worse=True` to force removals under a step budget.
+- Selector hyperparameters are validated strictly (fail-fast): no implicit coercion for `beam_width`, `allow_worse`, step budgets, or `tol`.
 
 ## Assumptions And Limitations (Research Use)
 - The package does **not** fit an intercept automatically. If your model needs one, include a constant feature before building Gram statistics, or center `X`/`y` and fit a no-intercept model.
