@@ -1,7 +1,6 @@
 import copy
 import numpy as np
 import pytest
-from scipy import linalg as la
 
 from selection.definitions import CrossValGramData, GramData
 from selection.state import CrossValSelectionState, SelectionState
@@ -48,7 +47,7 @@ def test_forward_update_matches_direct_inverse():
         applied = state.apply_forward_step(cache, idx)
         assert applied == j
         idx_arr = np.array(state.active_set, dtype=int)
-        K_expected = la.inv(state.data.gram[np.ix_(idx_arr, idx_arr)])
+        K_expected = np.linalg.inv(state.data.gram[np.ix_(idx_arr, idx_arr)])
         np.testing.assert_allclose(state.K, K_expected, atol=1e-10)
         rss_expected = state.data.y_norm - state.data.cov[idx_arr] @ (
             K_expected @ state.data.cov[idx_arr]
@@ -62,7 +61,7 @@ def test_backward_update_matches_direct_inverse():
     state.apply_backward_step(1)
     idx = np.array(state.active_set, dtype=int)
     if len(idx):
-        K_expected = la.inv(state.data.gram[np.ix_(idx, idx)])
+        K_expected = np.linalg.inv(state.data.gram[np.ix_(idx, idx)])
         np.testing.assert_allclose(state.K, K_expected, atol=1e-10)
     else:
         assert state.K is None
