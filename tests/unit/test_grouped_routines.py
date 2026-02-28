@@ -6,6 +6,20 @@ from selection.grouped_routines import GroupBackwardSelection, GroupForwardSelec
 from selection.state import GroupedSelectionState
 
 
+class GroupRecordingCriterion(BestRSSCriterion):
+    calls: list[tuple[int | None, int | None]] = []
+
+    def __init__(self, *, n_samples: int | None = None, p: int | None = None, **kwargs):
+        super().__init__(**kwargs)
+        type(self).calls.append((n_samples, p))
+
+
+def group_recording_criterion_factory(
+    *, n_samples: int, p: int
+) -> GroupRecordingCriterion:
+    return GroupRecordingCriterion(n_samples=n_samples, p=p)
+
+
 def make_group_problem():
     """
     Simple diagonal Gram with two groups:
@@ -96,3 +110,12 @@ def test_group_selection_rejects_out_of_range_index_at_fit():
     selector = GroupForwardSelection([[0, 4], [1, 2]])
     with pytest.raises(ValueError, match="out of range"):
         selector.fit(data=data, max_steps=1)
+
+
+def test_group_forward_accepts_criterion_factory_with_auto_params():
+    data, groups = make_group_problem()
+    GroupRecordingCriterion.calls.clear()
+    selector = GroupForwardSelection(groups, criterion=group_recording_criterion_factory)
+    selector.fit(data=data, max_steps=1)
+    assert GroupRecordingCriterion.calls
+    assert GroupRecordingCriterion.calls[-1] == (data.n_samples, data.gram.shape[0])

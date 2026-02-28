@@ -15,6 +15,20 @@ from selection.state import SelectionState
 from tests.helpers import make_regression_gram
 
 
+class RecordingRSSCriterion(BestRSSCriterion):
+    init_history: list[tuple[int | None, int | None]] = []
+
+    def __init__(self, *, n_samples: int | None = None, p: int | None = None, **kwargs):
+        super().__init__(**kwargs)
+        self.n_samples = n_samples
+        self.p = p
+        type(self).init_history.append((n_samples, p))
+
+
+def recording_criterion_factory(*, n_samples: int, p: int) -> RecordingRSSCriterion:
+    return RecordingRSSCriterion(n_samples=n_samples, p=p)
+
+
 NON_CV_SELECTOR_CASES = [
     pytest.param(
         ForwardSelection,
@@ -113,3 +127,38 @@ def test_mixed_selectors_respect_zero_forward_budget(selector_cls, selector_kwar
         data=data, max_forward_steps=0, max_total_steps=10
     )
     assert state.active_set == []
+
+
+def test_forward_selection_accepts_criterion_instance():
+    data = make_regression_gram(444, n=100, p=10)
+    selector = ForwardSelection(criterion=BestRSSCriterion())
+    result = selector.fit(data=data, max_steps=3)
+    assert isinstance(result, SelectionState)
+    assert len(result.active_set) <= 3
+
+
+def test_forward_selection_accepts_criterion_factory_with_auto_params():
+    data = make_regression_gram(445, n=90, p=9)
+    RecordingRSSCriterion.init_history.clear()
+    selector = ForwardSelection(criterion=recording_criterion_factory)
+    selector.fit(data=data, max_steps=2)
+    assert RecordingRSSCriterion.init_history
+    assert RecordingRSSCriterion.init_history[-1] == (data.n_samples, data.gram.shape[0])
+
+
+def test_forward_selection_rejects_criterion_and_criterion_cls_together():
+    with pytest.raises(ValueError, match="either `criterion` or `criterion_cls`"):
+        ForwardSelection(
+            criterion=BestRSSCriterion(),
+            criterion_cls=BestRSSCriterion,
+        )
+
+
+def test_forward_selection_rejects_kwargs_with_criterion_instance():
+    data = make_regression_gram(446, n=80, p=8)
+    selector = ForwardSelection(
+        criterion=BestRSSCriterion(),
+        criterion_kwargs={"abs_tol": 1e-6},
+    )
+    with pytest.raises(ValueError, match="criterion_kwargs"):
+        selector.fit(data=data, max_steps=2)

@@ -1,12 +1,33 @@
 import math
+from typing import Any, Protocol, runtime_checkable
 
 import numpy as np
 
 from .constants import ABS_TOL
 
 
+@runtime_checkable
+class CriterionProtocol(Protocol):
+    """Structural contract expected by selector routines."""
+
+    minimize: bool
+    current_value: float
+
+    def evaluate(self, rss: Any, k: int): ...
+
+    def is_improvement(self, candidate: float, incumbent: float | None = None) -> bool: ...
+
+    def update_current(self, value: float) -> None: ...
+
+    def clone(self) -> "CriterionProtocol": ...
+
+    def best_candidate(self, rss: Any, k: int) -> tuple[int, float]: ...
+
+
 class SelectionCriterion:
     """Pure criterion evaluator with optional score tracking."""
+
+    cv_compatible: bool = True
 
     def __init__(
         self,
@@ -56,6 +77,8 @@ class SelectionCriterion:
 class AICCriterion(SelectionCriterion):
     """Akaike information criterion."""
 
+    cv_compatible = False
+
     def __init__(self, *, n_samples: int, **kwargs):
         super().__init__(minimize=True, **kwargs)
         self.n_samples = int(n_samples)
@@ -81,6 +104,8 @@ class AICCriterion(SelectionCriterion):
 class BICCriterion(SelectionCriterion):
     """Bayesian information criterion."""
 
+    cv_compatible = False
+
     def __init__(self, *, n_samples: int, **kwargs):
         super().__init__(minimize=True, **kwargs)
         self.n_samples = int(n_samples)
@@ -97,6 +122,8 @@ class BICCriterion(SelectionCriterion):
 
 class AICcCriterion(SelectionCriterion):
     """Small-sample corrected Akaike information criterion."""
+
+    cv_compatible = False
 
     def __init__(self, *, n_samples: int, **kwargs):
         super().__init__(minimize=True, **kwargs)
@@ -120,6 +147,8 @@ class AICcCriterion(SelectionCriterion):
 class HQICCriterion(SelectionCriterion):
     """Hannan-Quinn information criterion."""
 
+    cv_compatible = False
+
     def __init__(self, *, n_samples: int, **kwargs):
         super().__init__(minimize=True, **kwargs)
         self.n_samples = int(n_samples)
@@ -141,6 +170,8 @@ class HQICCriterion(SelectionCriterion):
 
 class EBICCriterion(SelectionCriterion):
     """Extended BIC with a combinatorial penalty term."""
+
+    cv_compatible = False
 
     def __init__(self, *, n_samples: int, p: int, gamma: float = 0.5, **kwargs):
         super().__init__(minimize=True, **kwargs)
@@ -174,6 +205,8 @@ class EBICCriterion(SelectionCriterion):
 
 class GCVCriterion(SelectionCriterion):
     """Generalized cross-validation score."""
+
+    cv_compatible = False
 
     def __init__(self, *, n_samples: int, **kwargs):
         super().__init__(minimize=True, **kwargs)

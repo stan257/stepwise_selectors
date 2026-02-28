@@ -2,25 +2,95 @@
 
 from __future__ import annotations
 
+import inspect
+from typing import Any
+
 from .criteria import (
-    AICCriterion,
-    AICcCriterion,
-    BICCriterion,
-    EBICCriterion,
-    GCVCriterion,
-    HQICCriterion,
+    BestRSSCriterion,
+    CriterionProtocol,
 )
 from .definitions import CrossValGramData, GramData
 from .state import CrossValSelectionState, SelectionState
 
-_DISALLOWED_CV_CRITERIA = (
-    AICCriterion,
-    BICCriterion,
-    AICcCriterion,
-    HQICCriterion,
-    EBICCriterion,
-    GCVCriterion,
-)
+
+def _validate_criterion_protocol(
+    criterion: Any, *, selector_name: str
+) -> CriterionProtocol:
+    if isinstance(criterion, CriterionProtocol):
+        return criterion
+    raise TypeError(
+        f"{selector_name} requires a criterion implementing "
+        "`CriterionProtocol` (evaluate, best_candidate, is_improvement, "
+        "update_current, clone, minimize, current_value)."
+    )
+
+
+def _inject_default_criterion_params(
+    provider: Any, params: dict[str, Any], data: GramData
+) -> dict[str, Any]:
+    resolved = dict(params)
+    try:
+        sig = inspect.signature(provider)
+    except (TypeError, ValueError):
+        return resolved
+    if "n_samples" in sig.parameters and "n_samples" not in resolved:
+        resolved["n_samples"] = data.n_samples
+    if "p" in sig.parameters and "p" not in resolved:
+        resolved["p"] = data.gram.shape[0]
+    return resolved
+
+
+def _resolve_criterion(
+    *,
+    selector_name: str,
+    data: GramData,
+    criterion: Any,
+    criterion_cls: Any,
+    default_criterion_cls: Any,
+    criterion_kwargs: dict[str, Any] | None,
+) -> CriterionProtocol:
+    if criterion is not None and criterion_cls is not None:
+        raise ValueError(
+            f"{selector_name} accepts either `criterion` or `criterion_cls`, not both."
+        )
+    provider = criterion if criterion is not None else (criterion_cls or default_criterion_cls)
+    params = dict(criterion_kwargs or {})
+
+    if not inspect.isclass(provider) and isinstance(provider, CriterionProtocol):
+        if params:
+            raise ValueError(
+                f"{selector_name} does not accept `criterion_kwargs` when `criterion` "
+                "is an instantiated object."
+            )
+        resolved = provider.clone()
+    else:
+        if not callable(provider):
+            raise TypeError(
+                f"{selector_name} requires `criterion`/`criterion_cls` to be callable "
+                "or a criterion instance."
+            )
+        call_params = _inject_default_criterion_params(provider, params, data)
+        try:
+            resolved = provider(**call_params)
+        except TypeError as err:
+            raise TypeError(
+                f"{selector_name} could not construct criterion from "
+                f"{getattr(provider, '__name__', type(provider).__name__)}."
+            ) from err
+
+    return _validate_criterion_protocol(resolved, selector_name=selector_name)
+
+
+def _validate_cv_criterion(
+    criterion: CriterionProtocol, *, selector_name: str
+) -> None:
+    if bool(getattr(criterion, "cv_compatible", True)):
+        return
+    raise ValueError(
+        f"{selector_name} uses cross-validation for regularisation; "
+        f"{type(criterion).__name__} is not supported for CV selection routines. "
+        f"Use {BestRSSCriterion.__name__} (the default) instead."
+    )
 
 
 def _validate_state_target(
@@ -53,7 +123,10 @@ def _validate_cv_state_target(
 
 
 __all__ = [
-    "_DISALLOWED_CV_CRITERIA",
+    "_inject_default_criterion_params",
+    "_resolve_criterion",
+    "_validate_criterion_protocol",
+    "_validate_cv_criterion",
     "_validate_state_target",
     "_validate_cv_state_target",
 ]

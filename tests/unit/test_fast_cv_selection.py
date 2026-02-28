@@ -23,6 +23,15 @@ from selection.state import CrossValSelectionState
 from tests.helpers import explicit_beta_from_active, explicit_cv_rss, make_cv_problem
 
 
+class IncompatibleCriterion(BestRSSCriterion):
+    cv_compatible = False
+
+
+def incompatible_criterion_factory(*, n_samples: int, p: int) -> IncompatibleCriterion:
+    _ = (n_samples, p)
+    return IncompatibleCriterion()
+
+
 def test_crossvalgramdata_requires_at_least_two_folds():
     rng = np.random.default_rng(42)
     X = rng.standard_normal((20, 4))
@@ -206,3 +215,51 @@ def test_cv_selectors_reject_disallowed_criteria(selector_cls, criterion_cls):
         match=rf"{criterion_cls.__name__} is not supported for CV selection routines",
     ):
         selector_cls(criterion_cls=criterion_cls)
+
+
+@pytest.mark.parametrize(
+    "selector_cls",
+    [
+        CrossValForwardSelection,
+        CrossValBackwardSelection,
+        CrossValMixedSelection,
+        BeamCrossValForwardSelection,
+        BeamCrossValBackwardSelection,
+        BeamCrossValMixedSelection,
+    ],
+)
+def test_cv_selectors_reject_cv_incompatible_custom_criterion(selector_cls):
+    with pytest.raises(
+        ValueError,
+        match=r"IncompatibleCriterion is not supported for CV selection routines",
+    ):
+        selector_cls(criterion_cls=IncompatibleCriterion)
+
+
+@pytest.mark.parametrize(
+    "selector_cls,fit_kwargs",
+    [
+        pytest.param(CrossValForwardSelection, {"max_steps": 2}, id="cv_forward"),
+        pytest.param(CrossValBackwardSelection, {"max_steps": 2}, id="cv_backward"),
+        pytest.param(
+            CrossValMixedSelection,
+            {"max_forward_steps": 2, "max_total_steps": 3},
+            id="cv_mixed",
+        ),
+        pytest.param(BeamCrossValForwardSelection, {"max_steps": 2}, id="cv_beam_forward"),
+        pytest.param(BeamCrossValBackwardSelection, {"max_steps": 2}, id="cv_beam_backward"),
+        pytest.param(
+            BeamCrossValMixedSelection,
+            {"max_forward_steps": 2, "max_total_steps": 3},
+            id="cv_beam_mixed",
+        ),
+    ],
+)
+def test_cv_selectors_reject_cv_incompatible_factory_on_fit(selector_cls, fit_kwargs):
+    cv_data = make_cv_problem(seed=447, folds=3, n=60, p=6, support=2)
+    selector = selector_cls(criterion=incompatible_criterion_factory)
+    with pytest.raises(
+        ValueError,
+        match=r"IncompatibleCriterion is not supported for CV selection routines",
+    ):
+        selector.fit(data=cv_data, **fit_kwargs)
