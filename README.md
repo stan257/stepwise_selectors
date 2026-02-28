@@ -76,3 +76,18 @@ print(gstate.active_groups, gstate.active_set, gstate.beta, gstate.rss)
 - Single-dataset selectors default to `AICCriterion`; CV selectors default to `BestRSSCriterion`.
 - CV selectors reject IC/GCV-style criteria to avoid double regularization on top of held-out RSS.
 - Backward beam selectors are improvement-only by default; set `allow_worse=True` to force removals under a step budget.
+
+## Assumptions And Limitations (Research Use)
+- The package does **not** fit an intercept automatically. If your model needs one, include a constant feature before building Gram statistics, or center `X`/`y` and fit a no-intercept model.
+- Input statistics are assumed to be coherent summaries of the same data matrix/target vector. `GramData` validates shape, symmetry, finiteness, and basic positivity constraints, but it does not prove full PSD correctness.
+- Active-set solves rely on Cholesky factorization. Singular or ill-conditioned supports may raise `np.linalg.LinAlgError` during refits or state initialization.
+- Criterion values (AIC/BIC/AICc/HQIC/EBIC/GCV) are optimization targets. Their statistical interpretation depends on standard linear-model assumptions (e.g., iid noise, comparable sample definitions).
+- CV selectors optimize **summed fold validation RSS** and return `CrossValSelectionState.rss_cv` on that same scale. `CrossValSelectionState.beta` is a post-selection refit on full aggregated data, not a fold-averaged coefficient.
+- Improvement checks use absolute+relative tolerances. Very small numerical differences can intentionally stop additional steps.
+- Grouped routines require disjoint groups with integer feature indices; selected support is the union of complete groups (`GroupedSelectionState.active_set`).
+
+## Reproducibility Guidance
+- Keep preprocessing fixed and deterministic before building Gram statistics (including centering, scaling, and feature ordering).
+- Use explicit seeds when generating synthetic data for experiments.
+- Treat near-tie selections as potentially unstable across tiny floating-point perturbations; report support sets and objective values, not only one metric.
+- For critical claims, validate selected supports against explicit OLS recomputation on the same support (as done in the test suite).
