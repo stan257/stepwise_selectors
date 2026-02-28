@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from selection.criteria import BestRSSCriterion
+from selection.definitions import GramData
 from selection.routines_core import (
     BackwardSelection,
     BeamBackwardSelection,
@@ -83,3 +84,32 @@ def test_non_cv_selector_reuses_matching_state(
     assert result.active_set == expected.active_set
     np.testing.assert_allclose(result.beta, expected.beta, atol=1e-8, rtol=1e-8)
     assert result.rss == pytest.approx(expected.rss, rel=1e-8, abs=1e-8)
+
+
+@pytest.mark.parametrize(
+    "selector_cls,selector_kwargs",
+    [
+        pytest.param(
+            MixedSelection,
+            {"criterion_cls": BestRSSCriterion},
+            id="mixed",
+        ),
+        pytest.param(
+            BeamMixedSelection,
+            {"criterion_cls": BestRSSCriterion, "beam_width": 2},
+            id="beam_mixed",
+        ),
+    ],
+)
+def test_mixed_selectors_respect_zero_forward_budget(selector_cls, selector_kwargs):
+    data = GramData(
+        gram=np.eye(4),
+        cov=np.array([4.0, 3.0, 2.0, 1.0]),
+        y_norm=40.0,
+        n_samples=100,
+    )
+
+    state = selector_cls(**selector_kwargs).fit(
+        data=data, max_forward_steps=0, max_total_steps=10
+    )
+    assert state.active_set == []

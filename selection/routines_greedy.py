@@ -162,6 +162,8 @@ class MixedSelection(ForwardSelection):
         while True:
             if max_total_steps is not None and total_steps >= max_total_steps:
                 break
+            if max_forward_steps is not None and forward_steps >= max_forward_steps:
+                break
             scored = work_state.candidate_scores()
             if scored is None:
                 break
@@ -176,9 +178,6 @@ class MixedSelection(ForwardSelection):
             criterion.update_current(best_score)
             forward_steps += 1
             total_steps += 1
-
-            if max_forward_steps is not None and forward_steps >= max_forward_steps:
-                break
 
             while True:
                 if max_total_steps is not None and total_steps >= max_total_steps:

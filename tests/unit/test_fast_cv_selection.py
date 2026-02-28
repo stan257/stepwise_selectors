@@ -76,6 +76,30 @@ def test_fast_cv_state_exposes_full_data_postselection_beta():
     np.testing.assert_allclose(empty.beta, np.zeros_like(empty.beta), atol=0.0, rtol=0.0)
 
 
+@pytest.mark.parametrize(
+    "selector_cls,selector_kwargs",
+    [
+        pytest.param(
+            CrossValMixedSelection,
+            {"criterion_cls": BestRSSCriterion},
+            id="cv_mixed",
+        ),
+        pytest.param(
+            BeamCrossValMixedSelection,
+            {"criterion_cls": BestRSSCriterion, "beam_width": 2},
+            id="cv_beam_mixed",
+        ),
+    ],
+)
+def test_cv_mixed_selectors_respect_zero_forward_budget(selector_cls, selector_kwargs):
+    cv_data = make_cv_problem(seed=2027, folds=3, n=80, p=8, support=3)
+
+    state = selector_cls(**selector_kwargs).fit(
+        data=cv_data, max_forward_steps=0, max_total_steps=10
+    )
+    assert state.active_set == []
+
+
 CV_SELECTOR_CASES = [
     pytest.param(
         CrossValForwardSelection,

@@ -285,6 +285,8 @@ class CrossValMixedSelection(ForwardSelection):
         while True:
             if max_total_steps is not None and total_steps >= max_total_steps:
                 break
+            if max_forward_steps is not None and forward_steps >= max_forward_steps:
+                break
             scored = _cv_forward_scores(fold_states, data, self.tol)
             if scored is None:
                 break
@@ -303,9 +305,6 @@ class CrossValMixedSelection(ForwardSelection):
             criterion.update_current(best_score)
             forward_steps += 1
             total_steps += 1
-
-            if max_forward_steps is not None and forward_steps >= max_forward_steps:
-                break
 
             while True:
                 if max_total_steps is not None and total_steps >= max_total_steps:
@@ -505,6 +504,8 @@ class BeamCrossValMixedSelection(ForwardSelection):
         while True:
             if max_total_steps is not None and total_ops >= max_total_steps:
                 break
+            if max_forward_steps is not None and forward_steps >= max_forward_steps:
+                break
             candidates: list[CVBeam] = []
             for beam in beams:
                 candidates.extend(
@@ -518,8 +519,6 @@ class BeamCrossValMixedSelection(ForwardSelection):
             best = sel(beams, key=lambda b: b.score)
             forward_steps += 1
             total_ops += len(beams)
-            if max_forward_steps is not None and forward_steps >= max_forward_steps:
-                break
 
             new_beams: list[CVBeam] = []
             for beam in beams:
