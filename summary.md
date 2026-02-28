@@ -1,6 +1,6 @@
 # useful codebase – detailed walkthrough
 
-This document summarizes the current `selection` package after migration to a fast-only implementation. It is intended as a technical map for researchers who need to validate assumptions, extend algorithms, or trace behavior in tests.
+This document summarizes the current `selection` package architecture. It is intended as a technical map for researchers who need to validate assumptions, extend algorithms, or trace behavior in tests.
 
 ---
 
@@ -119,8 +119,8 @@ The implementation is split by responsibility:
     - `_cv_beam_*`
 
 - `selection/routines_core.py`
-  - Facade that re-exports the core selector surface.
-  - Keeps monkeypatchable private helper hooks used by tests.
+  - Compatibility facade that re-exports the core selector classes.
+  - Internal scoring/beam helpers live in dedicated modules and are not part of the stable public surface.
 
 Important behavior:
 - CV candidate scoring uses summed fold validation RSS (same scale as `rss_cv`).
@@ -171,9 +171,11 @@ Major coverage themes:
 
 Notable files:
 - `tests/unit/test_state.py`
+- `tests/unit/test_fast_cv_selection.py`
+- `tests/unit/test_interface_contracts.py`
 - `tests/integration/test_selection_routines.py`
-- `tests/regression/test_fast_cv_explicit_oos.py`
 - `tests/unit/test_fast_cv_beam_selection.py`
+- `tests/property/test_behavioral_properties.py`
 - `tests/property/test_fast_equivalence_sweeps.py`
 - `tests/regression/test_fast_oracle_exhaustive.py`
 - `tests/regression/test_golden_outputs.py`
@@ -182,7 +184,7 @@ Notable files:
 
 ## Data-flow summary
 1. Build `GramData` / `CrossValGramData`.
-2. Run a selector from `selection.routines` (alias) or `selection.routines_core` (explicit).
+2. Run a selector from `selection.routines` (default public entrypoint). `selection.routines_core` remains a compatibility facade for class re-exports.
 3. Internal optimization runs on Gram-only states.
 4. Final result is materialized as `SelectionState` or `CrossValSelectionState` with `active_set` and RSS metrics; CV `beta` is a full-data post-selection refit.
 

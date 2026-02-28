@@ -9,8 +9,22 @@ from .forward_state import ForwardState
 from .state import CrossValSelectionState
 
 
+def _assert_synced_active_sets(fold_states: list[ForwardState]) -> None:
+    """Require identical active sets across all fold states."""
+    if not fold_states:
+        return
+    reference = list(fold_states[0].active_set)
+    for fold_idx, state in enumerate(fold_states[1:], start=1):
+        if list(state.active_set) != reference:
+            raise ValueError(
+                "CV fold states must share identical active_set across folds; "
+                f"fold 0 has {reference}, fold {fold_idx} has {state.active_set}."
+            )
+
+
 def _cv_rss(fold_states: list[ForwardState], data: CrossValGramData) -> float:
     """Compute summed validation RSS for the shared active set across folds."""
+    _assert_synced_active_sets(fold_states)
     if not fold_states or not fold_states[0].active_set:
         return float(np.sum(data.y_norm_folds))
     idx = np.array(fold_states[0].active_set, dtype=int)
@@ -64,6 +78,10 @@ def _cv_forward_scores(
     Uses Gram-only formulas to score candidates per fold without materializing
     design matrices, then sums fold RSS to match rss_cv scale.
     """
+    _assert_synced_active_sets(fold_states)
+    if not fold_states:
+        return None
+
     candidate_lists = []
     for state in fold_states:
         scored = state.candidate_scores()
@@ -121,6 +139,7 @@ def _cv_backward_scores(
     fold_states: list[ForwardState], data: CrossValGramData, tol: float
 ) -> np.ndarray | None:
     """Compute aggregated CV backward scores using Gram-only downdates."""
+    _assert_synced_active_sets(fold_states)
     if not fold_states or not fold_states[0].active_set:
         return None
     idx_full = np.array(fold_states[0].active_set, dtype=int)
@@ -136,7 +155,7 @@ def _cv_backward_scores(
 
         for local_idx in range(k):
             k_22 = Kk[local_idx, local_idx]
-            if k_22 <= tol:
+            if not np.isfinite(k_22) or k_22 <= tol:
                 rss_matrix[fold_idx, local_idx] = np.inf
                 continue
             idx_keep = np.delete(np.arange(k), local_idx)

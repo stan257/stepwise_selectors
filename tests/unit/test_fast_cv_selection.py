@@ -3,6 +3,7 @@ import pytest
 
 from selection.criteria import AICCriterion, BestRSSCriterion, GCVCriterion
 from selection.definitions import CrossValGramData, GramData
+from selection.forward_state import ForwardState
 from selection.routines_core import (
     BeamCrossValBackwardSelection,
     BeamCrossValForwardSelection,
@@ -10,6 +11,11 @@ from selection.routines_core import (
     CrossValBackwardSelection,
     CrossValForwardSelection,
     CrossValMixedSelection,
+)
+from selection.routines_cv_scoring import (
+    _cv_backward_scores,
+    _cv_forward_scores,
+    _cv_rss,
 )
 from selection.routines import (
     BeamCrossValBackwardSelection,
@@ -32,6 +38,18 @@ def incompatible_criterion_factory(*, n_samples: int, p: int) -> IncompatibleCri
     return IncompatibleCriterion()
 
 
+def _make_desynced_fold_states(cv_data: CrossValGramData) -> list[ForwardState]:
+    states = []
+    for fold_idx in range(cv_data.n_folds):
+        active = [0] if fold_idx != 1 else [1]
+        states.append(
+            ForwardState.from_active_set(
+                cv_data.train_data_for_fold(fold_idx), active, tol=1e-12
+            )
+        )
+    return states
+
+
 def test_crossvalgramdata_requires_at_least_two_folds():
     rng = np.random.default_rng(42)
     X = rng.standard_normal((20, 4))
@@ -41,6 +59,30 @@ def test_crossvalgramdata_requires_at_least_two_folds():
         ValueError, match="requires at least two folds"
     ):
         CrossValGramData([fold])
+
+
+def test_cv_scoring_rejects_desynced_fold_active_sets_for_rss():
+    cv_data = make_cv_problem(seed=910, folds=3, n=60, p=6, support=2)
+    states = _make_desynced_fold_states(cv_data)
+
+    with pytest.raises(ValueError, match="identical active_set"):
+        _cv_rss(states, cv_data)
+
+
+def test_cv_scoring_rejects_desynced_fold_active_sets_for_forward_scores():
+    cv_data = make_cv_problem(seed=911, folds=3, n=60, p=6, support=2)
+    states = _make_desynced_fold_states(cv_data)
+
+    with pytest.raises(ValueError, match="identical active_set"):
+        _cv_forward_scores(states, cv_data, tol=1e-12)
+
+
+def test_cv_scoring_rejects_desynced_fold_active_sets_for_backward_scores():
+    cv_data = make_cv_problem(seed=912, folds=3, n=60, p=6, support=2)
+    states = _make_desynced_fold_states(cv_data)
+
+    with pytest.raises(ValueError, match="identical active_set"):
+        _cv_backward_scores(states, cv_data, tol=1e-12)
 
 
 def test_fast_cv_forward_matches_explicit_rss():

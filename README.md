@@ -71,6 +71,7 @@ print(gstate.active_groups, gstate.active_set, gstate.beta, gstate.rss)
 ## Notes
 - The code operates on Gram statistics (`X.T @ X`, `X.T @ y`, `y.T @ y`) and does not depend on raw design matrices.
 - `selection.routines` and `selection.grouped_routines` expose the default implementations.
+- `selection.routines_core` is a compatibility facade for selector class re-exports; prefer `selection.routines` for the stable public entrypoint.
 - For cross-validation, provide per-fold `GramData` via `CrossValGramData`.
 - `GramData` accepts array-like inputs for `gram` and `cov` and stores contiguous NumPy arrays internally.
 - CV output states expose `beta` as a post-selection refit on full-data Gram statistics at the selected support.
