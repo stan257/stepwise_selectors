@@ -41,6 +41,18 @@ class ForwardDeltaCache:
     active_rk: int  # current active-set size k
 
 
+@dataclass
+class GroupedSelectionState:
+    """Output state for grouped selection routines."""
+
+    data: GramData
+    groups: tuple[tuple[int, ...], ...]
+    active_groups: list[int]
+    active_set: list[int]
+    beta: np.ndarray
+    rss: float
+
+
 def _build_forward_cache(
     state: "SelectionState", tol: float
 ) -> ForwardDeltaCache | None:

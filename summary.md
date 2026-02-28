@@ -68,6 +68,10 @@ This document summarizes the current `selection` package after migration to a fa
     - `validation_rss_for_backward_candidate()`
     - `clone()`
 
+- `GroupedSelectionState`
+  - Typed output container for grouped selectors.
+  - Stores `active_groups`, derived `active_set` (union of selected groups), `beta`, and `rss`.
+
 These classes remain the output interface for `.fit(...)` results and some validation/test logic.
 
 ---

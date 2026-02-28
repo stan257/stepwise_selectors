@@ -18,6 +18,7 @@ Lightweight linear-model selection routines built on precomputed Gram statistics
 
 ## API overview
 - Data containers: `GramData`, `CrossValGramData`
+- Output states: `SelectionState`, `CrossValSelectionState`, `GroupedSelectionState`
 - Greedy routines: `ForwardSelection`, `BackwardSelection`, `MixedSelection`
 - Beam routines: `BeamForwardSelection`, `BeamBackwardSelection`, `BeamMixedSelection`
 - Cross-val routines: `CrossValForwardSelection`, `CrossValBackwardSelection`, `CrossValMixedSelection`
@@ -63,7 +64,7 @@ from selection.grouped_routines import GroupForwardSelection
 
 groups = [[0, 1], [2, 3]]  # add/remove as units
 gstate = GroupForwardSelection(groups).fit(data=data)
-print(gstate.active_groups, gstate.beta, gstate.rss)
+print(gstate.active_groups, gstate.active_set, gstate.beta, gstate.rss)
 ```
 
 

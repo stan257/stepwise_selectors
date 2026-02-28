@@ -7,6 +7,7 @@ from selection.grouped_routines import (
     FastGroupBackwardSelection,
     FastGroupForwardSelection,
 )
+from selection.state import GroupedSelectionState
 from tests.helpers import explicit_beta_rss
 
 
@@ -31,7 +32,11 @@ def test_fast_group_forward_matches_explicit_solution():
     state = FastGroupForwardSelection(groups, criterion_cls=BestRSSCriterion).fit(
         data=data, max_steps=2
     )
+    assert isinstance(state, GroupedSelectionState)
+    assert state.data is data
+    assert state.groups == tuple(tuple(g) for g in groups)
     active_idx = _active_features(state.active_groups, groups)
+    assert state.active_set == active_idx
     beta_expected, rss_expected = explicit_beta_rss(data, active_idx)
 
     np.testing.assert_allclose(state.beta, beta_expected, atol=1e-8, rtol=1e-8)
@@ -43,7 +48,11 @@ def test_fast_group_backward_matches_explicit_solution():
     state = FastGroupBackwardSelection(groups, criterion_cls=AICCriterion).fit(
         data=data, max_steps=1
     )
+    assert isinstance(state, GroupedSelectionState)
+    assert state.data is data
+    assert state.groups == tuple(tuple(g) for g in groups)
     active_idx = _active_features(state.active_groups, groups)
+    assert state.active_set == active_idx
     beta_expected, rss_expected = explicit_beta_rss(data, active_idx)
 
     np.testing.assert_allclose(state.beta, beta_expected, atol=1e-8, rtol=1e-8)

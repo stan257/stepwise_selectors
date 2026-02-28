@@ -45,6 +45,7 @@ from .routines import (
     ForwardSelection,
     MixedSelection,
 )
+from .state import CrossValSelectionState, GroupedSelectionState, SelectionState
 
 __all__ = [
     "AICCriterion",
@@ -57,6 +58,9 @@ __all__ = [
     "SelectionCriterion",
     "CrossValGramData",
     "GramData",
+    "SelectionState",
+    "CrossValSelectionState",
+    "GroupedSelectionState",
     "GroupBackwardSelection",
     "GroupForwardSelection",
     "FastGroupForwardSelection",

@@ -3,6 +3,7 @@ import pytest
 from selection.criteria import AICCriterion, BestRSSCriterion
 from selection.definitions import GramData
 from selection.grouped_routines import GroupBackwardSelection, GroupForwardSelection
+from selection.state import GroupedSelectionState
 
 
 def make_group_problem():
@@ -19,12 +20,23 @@ def make_group_problem():
     return GramData(gram, cov, y_norm, n_samples), groups
 
 
+def _active_features(active_groups: list[int], groups: list[list[int]]) -> list[int]:
+    active = []
+    for group_idx in active_groups:
+        active.extend(groups[group_idx])
+    return sorted(active)
+
+
 def test_group_forward_selects_strong_group_first():
     data, groups = make_group_problem()
     selector = GroupForwardSelection(groups, criterion_cls=BestRSSCriterion)
     state = selector.fit(data=data, max_steps=1)
 
+    assert isinstance(state, GroupedSelectionState)
+    assert state.data is data
+    assert state.groups == tuple(tuple(g) for g in groups)
     assert state.active_groups == [0]
+    assert state.active_set == _active_features(state.active_groups, groups)
     np.testing.assert_allclose(state.beta[:2], data.cov[:2])
     np.testing.assert_allclose(state.beta[2:], 0.0)
     assert state.rss < data.y_norm
@@ -35,7 +47,11 @@ def test_group_forward_adds_all_when_budget_allows():
     selector = GroupForwardSelection(groups, criterion_cls=BestRSSCriterion)
     state = selector.fit(data=data, max_steps=2)
 
+    assert isinstance(state, GroupedSelectionState)
+    assert state.data is data
+    assert state.groups == tuple(tuple(g) for g in groups)
     assert set(state.active_groups) == {0, 1}
+    assert state.active_set == _active_features(state.active_groups, groups)
     np.testing.assert_allclose(state.beta, data.cov)
     assert state.rss < data.y_norm
 
@@ -45,7 +61,11 @@ def test_group_backward_drops_weak_group():
     selector = GroupBackwardSelection(groups, criterion_cls=AICCriterion)
     state = selector.fit(data=data, max_steps=1)
 
+    assert isinstance(state, GroupedSelectionState)
+    assert state.data is data
+    assert state.groups == tuple(tuple(g) for g in groups)
     assert state.active_groups == [0]
+    assert state.active_set == _active_features(state.active_groups, groups)
     np.testing.assert_allclose(state.beta[:2], data.cov[:2])
     np.testing.assert_allclose(state.beta[2:], 0.0)
     assert state.rss < data.y_norm

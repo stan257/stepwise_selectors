@@ -12,6 +12,7 @@ from .constants import ABS_TOL
 from .criteria import AICCriterion, SelectionCriterion
 from .definitions import GramData
 from .fast_routines import FastForwardState
+from .state import GroupedSelectionState
 
 
 def _normalize_group_feature_index(feat: int) -> int:
@@ -45,6 +46,25 @@ def _beta_from_fast_state(state: FastForwardState, p: int) -> np.ndarray:
         idx = np.array(state.active_set, dtype=int)
         beta[idx] = state.beta_S[: state.k]
     return beta
+
+
+def _build_grouped_state(
+    *,
+    data: GramData,
+    groups: Sequence[Sequence[int]],
+    active_groups: list[int],
+    fast_state: FastForwardState,
+) -> GroupedSelectionState:
+    active_group_list = list(active_groups)
+    active_set = _flatten_group_indices(active_group_list, groups)
+    return GroupedSelectionState(
+        data=data,
+        groups=tuple(tuple(int(feat) for feat in group) for group in groups),
+        active_groups=active_group_list,
+        active_set=active_set,
+        beta=_beta_from_fast_state(fast_state, data.gram.shape[0]),
+        rss=float(fast_state.rss),
+    )
 
 
 def _apply_group_forward(state: FastForwardState, group: Sequence[int]) -> None:
@@ -114,7 +134,9 @@ class BaseGroupedSelection:
 class FastGroupForwardSelection(BaseGroupedSelection):
     """Greedy forward selection over groups using fast Gram-only updates."""
 
-    def fit(self, *, data: GramData, max_steps: int | None = None):
+    def fit(
+        self, *, data: GramData, max_steps: int | None = None
+    ) -> GroupedSelectionState:
         _validate_group_feature_bounds(self.groups, data.gram.shape[0])
         criterion = self._init_criterion(data)
         active: list[int] = []
@@ -156,17 +178,20 @@ class FastGroupForwardSelection(BaseGroupedSelection):
             criterion.update_current(best_candidate_score)
             steps += 1
 
-        result = type("GroupedState", (), {})()
-        result.active_groups = list(active)
-        result.beta = _beta_from_fast_state(fast_state, data.gram.shape[0])
-        result.rss = float(fast_state.rss)
-        return result
+        return _build_grouped_state(
+            data=data,
+            groups=self.groups,
+            active_groups=active,
+            fast_state=fast_state,
+        )
 
 
 class FastGroupBackwardSelection(BaseGroupedSelection):
     """Greedy backward selection over groups using fast Gram-only updates."""
 
-    def fit(self, *, data: GramData, max_steps: int | None = None):
+    def fit(
+        self, *, data: GramData, max_steps: int | None = None
+    ) -> GroupedSelectionState:
         _validate_group_feature_bounds(self.groups, data.gram.shape[0])
         criterion = self._init_criterion(data)
         active = list(range(self.num_groups))
@@ -209,11 +234,12 @@ class FastGroupBackwardSelection(BaseGroupedSelection):
             criterion.update_current(best_candidate_score)
             steps += 1
 
-        result = type("GroupedState", (), {})()
-        result.active_groups = list(active)
-        result.beta = _beta_from_fast_state(fast_state, data.gram.shape[0])
-        result.rss = float(fast_state.rss)
-        return result
+        return _build_grouped_state(
+            data=data,
+            groups=self.groups,
+            active_groups=active,
+            fast_state=fast_state,
+        )
 
 
 # Default grouped API now points to the fast implementations.
@@ -222,6 +248,7 @@ GroupBackwardSelection = FastGroupBackwardSelection
 
 
 __all__ = [
+    "GroupedSelectionState",
     "FastGroupForwardSelection",
     "FastGroupBackwardSelection",
     "GroupForwardSelection",
