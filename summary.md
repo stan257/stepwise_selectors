@@ -76,51 +76,51 @@ These classes remain the output interface for `.fit(...)` results and some valid
 
 ---
 
-## `selection/fast_routines.py` – core fast implementation
-This module is now the single source of algorithmic behavior for all public selection routines.
+## Fast module layout
+The fast implementation is now split by responsibility:
 
-- `FastForwardState`
-  - Gram-only incremental state:
-    - active support (`active_set`, `active_mask`)
-    - residual correlation/variance (`r`, `v`)
-    - QR-like factors (`Z`, `R`, `qy`)
-    - inverse-Gram/cache terms (`K`, `beta_S`)
-    - current `rss`
-  - Methods:
-    - `create(...)`
-    - `from_active_set(...)`
-    - `candidate_scores()`
-    - `apply_forward(...)`
-    - `backward_scores()`
-    - `apply_backward(...)`
+- `selection/fast_state.py`
+  - `FastForwardState` and its QR/Gram rank-one update and downdate machinery.
 
-- Fast greedy selectors:
-  - `FastForwardSelection`
-  - `FastBackwardSelection`
-  - `FastMixedSelection`
+- `selection/fast_single.py`
+  - Single-dataset greedy selectors:
+    - `FastForwardSelection`
+    - `FastBackwardSelection`
+    - `FastMixedSelection`
 
-- Fast beam selectors (single dataset):
-  - `FastBeamForwardSelection`
-  - `FastBeamBackwardSelection`
-  - `FastBeamMixedSelection`
-  - Helper node/state types: `FastBeam`, plus internal helpers `_fast_beam_*`.
+- `selection/fast_beam_single.py`
+  - Single-dataset beam selectors:
+    - `FastBeamForwardSelection`
+    - `FastBeamBackwardSelection`
+    - `FastBeamMixedSelection`
+  - Beam helper type/functions:
+    - `FastBeam`
+    - `_fast_beam_*`
 
-- Fast CV selectors:
-  - `FastCrossValForwardSelection`
-  - `FastCrossValBackwardSelection`
-  - `FastCrossValMixedSelection`
-  - CV scoring helpers:
+- `selection/fast_cv_core.py`
+  - Shared CV scoring/rebuild helpers:
     - `_fast_cv_rss`
     - `_fast_cv_forward_scores`
     - `_fast_cv_backward_scores`
     - `_rebuild_fast_states`
     - `_build_cv_state_from_active_set`
 
-- Fast CV beam selectors:
-  - `FastBeamCrossValForwardSelection`
-  - `FastBeamCrossValBackwardSelection`
-  - `FastBeamCrossValMixedSelection`
-  - Helper node/type: `FastCVBeam`, with internal helpers `_fast_cv_beam_*`.
+- `selection/fast_beam_cv.py`
+  - CV greedy selectors:
+    - `FastCrossValForwardSelection`
+    - `FastCrossValBackwardSelection`
+    - `FastCrossValMixedSelection`
+  - CV beam selectors:
+    - `FastBeamCrossValForwardSelection`
+    - `FastBeamCrossValBackwardSelection`
+    - `FastBeamCrossValMixedSelection`
+  - CV beam helper type/functions:
+    - `FastCVBeam`
+    - `_fast_cv_beam_*`
+
+- `selection/fast_routines.py`
+  - Compatibility facade that re-exports the historical `selection.fast_routines` symbols.
+  - Keeps monkeypatchable private helper hooks used by tests.
 
 Important behavior:
 - CV candidate scoring uses summed fold validation RSS (same scale as `rss_cv`).
