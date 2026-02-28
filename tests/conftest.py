@@ -18,5 +18,3 @@ def pytest_collection_modifyitems(config, items):
             if category in path_parts:
                 item.add_marker(marker)
                 break
-        if "test_smoke_pipeline.py" in path_parts:
-            item.add_marker(pytest.mark.smoke)

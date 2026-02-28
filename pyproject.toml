@@ -23,5 +23,4 @@ markers = [
     "integration: cross-module and workflow tests",
     "property: randomized/property-based behavioral checks",
     "regression: golden/oracle and previously failing-case coverage",
-    "smoke: lightweight end-to-end sanity checks",
 ]
