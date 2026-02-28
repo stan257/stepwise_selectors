@@ -34,7 +34,8 @@ def test_fast_downdate_matches_rebuild():
     np.testing.assert_allclose(state.beta_S[: state.k], rebuilt.beta_S[: state.k], atol=1e-8, rtol=1e-8)
 
 
-def test_fast_backward_failure_does_not_mutate_active_set():
+@pytest.mark.parametrize("pivot_mode", ["negative", "nan"])
+def test_fast_backward_failure_does_not_mutate_active_set(pivot_mode):
     rng = np.random.default_rng(246)
     n, p = 50, 4
     X = rng.standard_normal((n, p))
@@ -42,7 +43,10 @@ def test_fast_backward_failure_does_not_mutate_active_set():
     data = GramData(X.T @ X, X.T @ y, y @ y, n)
 
     state = ForwardState.from_active_set(data, [0], tol=1e-12)
-    state.K[0, 0] = -abs(state.K[0, 0])
+    if pivot_mode == "negative":
+        state.K[0, 0] = -abs(state.K[0, 0])
+    else:
+        state.K[0, 0] = np.nan
     active_before = list(state.active_set)
     mask_before = state.active_mask.copy()
     k_before = state.k

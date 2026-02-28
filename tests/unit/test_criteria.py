@@ -93,3 +93,36 @@ def test_best_rss_criterion_rejects_negative_rss():
 def test_criteria_require_positive_n_samples(criterion_cls, kwargs):
     with pytest.raises(ValueError, match="n_samples must be positive"):
         criterion_cls(n_samples=0, **kwargs)
+
+
+@pytest.mark.parametrize(
+    ("criterion_cls", "kwargs"),
+    [
+        (AICCriterion, {}),
+        (BICCriterion, {}),
+        (AICcCriterion, {}),
+        (HQICCriterion, {}),
+        (EBICCriterion, {"p": 5}),
+        (GCVCriterion, {}),
+    ],
+)
+def test_criteria_reject_boolean_n_samples(criterion_cls, kwargs):
+    with pytest.raises(TypeError, match="n_samples must be an integer"):
+        criterion_cls(n_samples=True, **kwargs)
+
+
+def test_ebic_rejects_boolean_p():
+    with pytest.raises(TypeError, match="p must be an integer"):
+        EBICCriterion(n_samples=10, p=True)
+
+
+@pytest.mark.parametrize("tol_name", ["abs_tol", "rel_tol"])
+def test_criteria_reject_negative_tolerances(tol_name):
+    with pytest.raises(ValueError, match=rf"{tol_name} must be >= 0"):
+        AICCriterion(n_samples=10, **{tol_name: -1e-9})
+
+
+@pytest.mark.parametrize("tol_name", ["abs_tol", "rel_tol"])
+def test_criteria_reject_non_finite_tolerances(tol_name):
+    with pytest.raises(ValueError, match=rf"{tol_name} must be finite"):
+        AICCriterion(n_samples=10, **{tol_name: np.inf})

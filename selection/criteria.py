@@ -1,4 +1,5 @@
 import math
+from numbers import Integral, Real
 from typing import Any, Protocol, runtime_checkable
 
 import numpy as np
@@ -36,9 +37,11 @@ class SelectionCriterion:
         abs_tol: float = ABS_TOL,
         rel_tol: float = 1e-8,
     ):
+        if not isinstance(minimize, bool):
+            raise TypeError("minimize must be a bool.")
         self.minimize = minimize
-        self.abs_tol = abs_tol
-        self.rel_tol = rel_tol
+        self.abs_tol = _validate_non_negative_finite_float(abs_tol, name="abs_tol")
+        self.rel_tol = _validate_non_negative_finite_float(rel_tol, name="rel_tol")
         self.current_value: float = float("inf") if minimize else float("-inf")
 
     def evaluate(self, rss, k: int):
@@ -81,7 +84,7 @@ class AICCriterion(SelectionCriterion):
 
     def __init__(self, *, n_samples: int, **kwargs):
         super().__init__(minimize=True, **kwargs)
-        self.n_samples = int(n_samples)
+        self.n_samples = _validate_integral_param(n_samples, name="n_samples")
         if self.n_samples <= 0:
             raise ValueError("n_samples must be positive for AIC.")
 
@@ -108,7 +111,7 @@ class BICCriterion(SelectionCriterion):
 
     def __init__(self, *, n_samples: int, **kwargs):
         super().__init__(minimize=True, **kwargs)
-        self.n_samples = int(n_samples)
+        self.n_samples = _validate_integral_param(n_samples, name="n_samples")
         if self.n_samples <= 0:
             raise ValueError("n_samples must be positive for BIC.")
 
@@ -127,7 +130,7 @@ class AICcCriterion(SelectionCriterion):
 
     def __init__(self, *, n_samples: int, **kwargs):
         super().__init__(minimize=True, **kwargs)
-        self.n_samples = int(n_samples)
+        self.n_samples = _validate_integral_param(n_samples, name="n_samples")
         if self.n_samples <= 0:
             raise ValueError("n_samples must be positive for AICc.")
 
@@ -151,7 +154,7 @@ class HQICCriterion(SelectionCriterion):
 
     def __init__(self, *, n_samples: int, **kwargs):
         super().__init__(minimize=True, **kwargs)
-        self.n_samples = int(n_samples)
+        self.n_samples = _validate_integral_param(n_samples, name="n_samples")
         if self.n_samples <= 0:
             raise ValueError("n_samples must be positive for HQIC.")
         if self.n_samples < 3:
@@ -175,11 +178,11 @@ class EBICCriterion(SelectionCriterion):
 
     def __init__(self, *, n_samples: int, p: int, gamma: float = 0.5, **kwargs):
         super().__init__(minimize=True, **kwargs)
-        self.n_samples = int(n_samples)
+        self.n_samples = _validate_integral_param(n_samples, name="n_samples")
         if self.n_samples <= 0:
             raise ValueError("n_samples must be positive for EBIC.")
-        self.p = int(p)
-        self.gamma = float(gamma)
+        self.p = _validate_integral_param(p, name="p")
+        self.gamma = _validate_finite_float(gamma, name="gamma")
         if not 0.0 <= self.gamma <= 1.0:
             raise ValueError("gamma must be between 0 and 1 for EBIC.")
         if self.p <= 0:
@@ -210,7 +213,7 @@ class GCVCriterion(SelectionCriterion):
 
     def __init__(self, *, n_samples: int, **kwargs):
         super().__init__(minimize=True, **kwargs)
-        self.n_samples = int(n_samples)
+        self.n_samples = _validate_integral_param(n_samples, name="n_samples")
         if self.n_samples <= 0:
             raise ValueError("n_samples must be positive for GCV.")
 
@@ -243,3 +246,25 @@ class BestRSSCriterion(SelectionCriterion):
             raise ValueError("No candidate RSS values provided.")
         idx = int(np.argmin(rss_arr))
         return idx, float(rss_arr[idx])
+
+
+def _validate_integral_param(value: int, *, name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, Integral):
+        raise TypeError(f"{name} must be an integer.")
+    return int(value)
+
+
+def _validate_finite_float(value: float, *, name: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, Real):
+        raise TypeError(f"{name} must be a real number.")
+    value_float = float(value)
+    if not np.isfinite(value_float):
+        raise ValueError(f"{name} must be finite.")
+    return value_float
+
+
+def _validate_non_negative_finite_float(value: float, *, name: str) -> float:
+    value_float = _validate_finite_float(value, name=name)
+    if value_float < 0.0:
+        raise ValueError(f"{name} must be >= 0.")
+    return value_float

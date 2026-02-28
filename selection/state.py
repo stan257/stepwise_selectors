@@ -197,7 +197,7 @@ def _backward_components(
     k_12 = K_inv[idx_to_keep, active_pos]
     k_22 = K_inv[active_pos, active_pos]
 
-    if k_22 <= tol:
+    if not np.isfinite(k_22) or k_22 <= tol:
         return None
 
     K_new = K_11 - np.outer(k_12, k_12) / k_22
@@ -242,6 +242,9 @@ class SelectionState:
         self.p = self.data.gram.shape[0]
         self.gram_diag = np.diag(self.data.gram)
         self.beta = np.zeros(self.p)
+        # TODO: Lazily allocate O(p^2) scratch buffers for large-p workloads.
+        # Eager allocation is fine for current scale but can dominate memory
+        # when many SelectionState objects are materialized (e.g., CV folds).
         self.K_buf = np.empty((self.p, self.p))
         self.beta_buf = np.empty(self.p)
         self.outer_buf = np.empty((self.p, self.p))

@@ -113,10 +113,14 @@ def test_backward_scores_match_individual_updates():
         assert pytest.approx(scores[i]) == clone.rss
 
 
-def test_backward_rejects_nonpositive_pivot():
+@pytest.mark.parametrize("pivot_mode", ["negative", "nan"])
+def test_backward_rejects_unstable_pivot(pivot_mode):
     state = make_random_state(p=3)
     state.init_from_active_set([0])
-    state.K[0, 0] = -abs(state.K[0, 0])
+    if pivot_mode == "negative":
+        state.K[0, 0] = -abs(state.K[0, 0])
+    else:
+        state.K[0, 0] = np.nan
 
     scores = state.compute_backward_scores()
     assert scores is not None
@@ -126,7 +130,8 @@ def test_backward_rejects_nonpositive_pivot():
         state.apply_backward_step(0)
 
 
-def test_cv_validation_backward_rejects_nonpositive_pivot():
+@pytest.mark.parametrize("pivot_mode", ["negative", "nan"])
+def test_cv_validation_backward_rejects_unstable_pivot(pivot_mode):
     rng = np.random.default_rng(987)
     fold_data = []
     for _ in range(2):
@@ -137,7 +142,10 @@ def test_cv_validation_backward_rejects_nonpositive_pivot():
     cv_state = CrossValSelectionState(CrossValGramData(fold_data))
     for train_state in cv_state.train_states:
         train_state.init_from_active_set([0])
-        train_state.K[0, 0] = -abs(train_state.K[0, 0])
+        if pivot_mode == "negative":
+            train_state.K[0, 0] = -abs(train_state.K[0, 0])
+        else:
+            train_state.K[0, 0] = np.nan
     cv_state._sync_active_set()
 
     rss = cv_state.validation_rss_for_backward_candidate(0, 0, tol=1e-12)

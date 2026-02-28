@@ -233,7 +233,7 @@ class ForwardState:
         Kk = self.K[: self.k, : self.k]
         beta_k = self.beta_S[: self.k]
         k_22 = Kk[idx, idx]
-        if k_22 <= self.tol:
+        if not np.isfinite(k_22) or k_22 <= self.tol:
             raise ValueError("Backward update failed due to near-singular pivot.")
         removed = self.active_set.pop(idx)
         self.active_mask[removed] = False
