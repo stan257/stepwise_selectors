@@ -3,10 +3,26 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from numbers import Integral
 
 import numpy as np
 
 from .definitions import GramData
+
+
+def _validate_active_set_indices(active_set: list[int], p: int) -> list[int]:
+    """Validate and normalize active-set indices."""
+    normalized: list[int] = []
+    for idx in active_set:
+        if isinstance(idx, bool) or not isinstance(idx, Integral):
+            raise TypeError("active_set indices must be integers.")
+        idx_int = int(idx)
+        if idx_int < 0 or idx_int >= p:
+            raise ValueError(f"active_set index {idx_int} is out of range for p={p}.")
+        normalized.append(idx_int)
+    if len(set(normalized)) != len(normalized):
+        raise ValueError("active_set contains duplicate feature indices.")
+    return normalized
 
 
 @dataclass
@@ -49,18 +65,19 @@ class ForwardState:
     def from_active_set(
         cls, data: GramData, active_set: list[int], tol: float
     ) -> "ForwardState":
-        if not active_set:
-            return cls.create(data, tol)
         p = data.gram.shape[0]
-        k = len(active_set)
+        normalized_active = _validate_active_set_indices(list(active_set), p)
+        if not normalized_active:
+            return cls.create(data, tol)
+        k = len(normalized_active)
         state = cls.create(data, tol)
         state._ensure_capacity(k - 1)
-        state.active_set = list(active_set)
+        state.active_set = normalized_active
         state.active_mask[:] = False
-        state.active_mask[np.array(active_set, dtype=int)] = True
+        state.active_mask[np.array(normalized_active, dtype=int)] = True
         state.k = k
 
-        idx = np.array(active_set, dtype=int)
+        idx = np.array(normalized_active, dtype=int)
         G_S = data.gram[np.ix_(idx, idx)]
         # Use Cholesky to build the QR factor (R) for the active set.
         L = np.linalg.cholesky(G_S)

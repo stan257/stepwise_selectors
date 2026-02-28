@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from selection.definitions import GramData
 from selection.routines_core import ForwardState
@@ -100,3 +101,26 @@ def test_fast_state_long_horizon_stability():
         assert np.isfinite(state.K[: state.k, : state.k]).all()
         assert np.isfinite(state.r).all()
         assert np.isfinite(state.v).all()
+
+
+@pytest.mark.parametrize(
+    "active_set,error_type,match",
+    [
+        ([-1], ValueError, "out of range"),
+        ([4], ValueError, "out of range"),
+        ([1, 1], ValueError, "duplicate"),
+        ([0, 1.5], TypeError, "integers"),
+    ],
+)
+def test_forward_state_from_active_set_rejects_invalid_indices(
+    active_set, error_type, match
+):
+    data = GramData(
+        gram=np.eye(4),
+        cov=np.array([2.0, 1.0, 0.5, 0.25]),
+        y_norm=10.0,
+        n_samples=40,
+    )
+
+    with pytest.raises(error_type, match=match):
+        ForwardState.from_active_set(data, active_set, tol=1e-12)
