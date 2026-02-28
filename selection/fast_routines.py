@@ -33,6 +33,35 @@ from .state import CrossValSelectionState, SelectionState
 from .topk import topk_indices
 
 
+def _validate_state_target(
+    state: SelectionState | None, data: GramData, *, selector_name: str
+) -> SelectionState | None:
+    if state is None:
+        return None
+    if not isinstance(state, SelectionState):
+        raise TypeError(f"{selector_name} expects `state` to be a SelectionState.")
+    if state.data is not data:
+        raise ValueError(f"{selector_name} requires `state.data` to match `data`.")
+    return state
+
+
+def _validate_cv_state_target(
+    state: CrossValSelectionState | None,
+    data: CrossValGramData,
+    *,
+    selector_name: str,
+) -> CrossValSelectionState | None:
+    if state is None:
+        return None
+    if not isinstance(state, CrossValSelectionState):
+        raise TypeError(
+            f"{selector_name} expects `state` to be a CrossValSelectionState."
+        )
+    if state.data is not data:
+        raise ValueError(f"{selector_name} requires `state.data` to match `data`.")
+    return state
+
+
 @dataclass
 class FastForwardState:
     data: GramData
@@ -348,7 +377,10 @@ class FastForwardSelection:
         data: GramData,
         max_steps: int | None = None,
     ) -> SelectionState:
-        if state is not None and state.active_set:
+        result_state = _validate_state_target(
+            state, data, selector_name=type(self).__name__
+        )
+        if result_state is not None and result_state.active_set:
             raise ValueError("FastForwardSelection does not support warm starts.")
 
         criterion = self._init_criterion(data)
@@ -368,7 +400,7 @@ class FastForwardSelection:
             fast_state.apply_forward(feat_idx)
             criterion.update_current(best_score)
 
-        result = state if state is not None else SelectionState(data)
+        result = result_state if result_state is not None else SelectionState(data)
         result.init_from_active_set(fast_state.active_set)
         return result
 
@@ -387,7 +419,10 @@ class FastBackwardSelection(FastForwardSelection):
         data: GramData,
         max_steps: int | None = None,
     ) -> SelectionState:
-        if state is not None and state.active_set:
+        result_state = _validate_state_target(
+            state, data, selector_name=type(self).__name__
+        )
+        if result_state is not None and result_state.active_set:
             raise ValueError("FastBackwardSelection does not support warm starts.")
 
         criterion = self._init_criterion(data)
@@ -412,7 +447,7 @@ class FastBackwardSelection(FastForwardSelection):
             criterion.update_current(best_score)
             steps += 1
 
-        result = state if state is not None else SelectionState(data)
+        result = result_state if result_state is not None else SelectionState(data)
         result.init_from_active_set(fast_state.active_set)
         return result
 
@@ -428,7 +463,10 @@ class FastMixedSelection(FastForwardSelection):
         max_forward_steps: int | None = None,
         max_total_steps: int | None = None,
     ) -> SelectionState:
-        if state is not None and state.active_set:
+        result_state = _validate_state_target(
+            state, data, selector_name=type(self).__name__
+        )
+        if result_state is not None and result_state.active_set:
             raise ValueError("FastMixedSelection does not support warm starts.")
 
         criterion = self._init_criterion(data)
@@ -472,7 +510,7 @@ class FastMixedSelection(FastForwardSelection):
                 criterion.update_current(best_score)
                 total_steps += 1
 
-        result = state if state is not None else SelectionState(data)
+        result = result_state if result_state is not None else SelectionState(data)
         result.init_from_active_set(fast_state.active_set)
         return result
 
@@ -582,7 +620,10 @@ class FastBeamForwardSelection(FastForwardSelection):
         data: GramData,
         max_steps: int | None = None,
     ) -> SelectionState:
-        if state is not None and state.active_set:
+        result_state = _validate_state_target(
+            state, data, selector_name=type(self).__name__
+        )
+        if result_state is not None and result_state.active_set:
             raise ValueError("FastBeamForwardSelection does not support warm starts.")
 
         criterion = self._init_criterion(data)
@@ -602,7 +643,7 @@ class FastBeamForwardSelection(FastForwardSelection):
 
         sel = min if criterion.minimize else max
         best = sel(beams, key=lambda b: b.score)
-        result = state if state is not None else SelectionState(data)
+        result = result_state if result_state is not None else SelectionState(data)
         result.init_from_active_set(best.state.active_set)
         return result
 
@@ -622,7 +663,10 @@ class FastBeamBackwardSelection(FastForwardSelection):
         data: GramData,
         max_steps: int | None = None,
     ) -> SelectionState:
-        if state is not None and state.active_set:
+        result_state = _validate_state_target(
+            state, data, selector_name=type(self).__name__
+        )
+        if result_state is not None and result_state.active_set:
             raise ValueError("FastBeamBackwardSelection does not support warm starts.")
 
         criterion = self._init_criterion(data)
@@ -650,7 +694,7 @@ class FastBeamBackwardSelection(FastForwardSelection):
 
         sel = min if criterion.minimize else max
         best = sel(beams, key=lambda b: b.score)
-        result = state if state is not None else SelectionState(data)
+        result = result_state if result_state is not None else SelectionState(data)
         result.init_from_active_set(best.state.active_set)
         return result
 
@@ -670,7 +714,10 @@ class FastBeamMixedSelection(FastForwardSelection):
         max_forward_steps: int | None = None,
         max_total_steps: int | None = None,
     ) -> SelectionState:
-        if state is not None and state.active_set:
+        result_state = _validate_state_target(
+            state, data, selector_name=type(self).__name__
+        )
+        if result_state is not None and result_state.active_set:
             raise ValueError("FastBeamMixedSelection does not support warm starts.")
 
         criterion = self._init_criterion(data)
@@ -710,7 +757,7 @@ class FastBeamMixedSelection(FastForwardSelection):
                 new_beams.append(beam)
             beams = new_beams
 
-        result = state if state is not None else SelectionState(data)
+        result = result_state if result_state is not None else SelectionState(data)
         result.init_from_active_set(best.state.active_set)
         return result
 
@@ -863,11 +910,14 @@ def _rebuild_fast_states(
 
 
 def _build_cv_state_from_active_set(
-    data: CrossValGramData, active_set: list[int]
+    data: CrossValGramData,
+    active_set: list[int],
+    *,
+    state: CrossValSelectionState | None = None,
 ) -> CrossValSelectionState:
     """Materialize a CrossValSelectionState from an active set."""
-    cv_state = CrossValSelectionState(data)
-    for fold_idx, fold_state in enumerate(cv_state.train_states):
+    cv_state = state if state is not None else CrossValSelectionState(data)
+    for fold_state in cv_state.train_states:
         fold_state.init_from_active_set(active_set)
     cv_state._sync_active_set()
     cv_state.recompute_oos_rss()
@@ -991,12 +1041,15 @@ class FastCrossValForwardSelection(FastForwardSelection):
 
     def fit(
         self,
-        state: SelectionState | None = None,
+        state: CrossValSelectionState | None = None,
         *,
         data: CrossValGramData,
         max_steps: int | None = None,
-    ) -> SelectionState:
-        if state is not None and state.active_set:
+    ) -> CrossValSelectionState:
+        result_state = _validate_cv_state_target(
+            state, data, selector_name=type(self).__name__
+        )
+        if result_state is not None and result_state.active_set:
             raise ValueError("FastCrossValForwardSelection does not support warm starts.")
 
         criterion = self._init_criterion(data.make_full_data())
@@ -1028,7 +1081,9 @@ class FastCrossValForwardSelection(FastForwardSelection):
             criterion.update_current(best_score)
             steps += 1
 
-        return _build_cv_state_from_active_set(data, fast_states[0].active_set)
+        return _build_cv_state_from_active_set(
+            data, fast_states[0].active_set, state=result_state
+        )
 
 
 class FastCrossValBackwardSelection(FastForwardSelection):
@@ -1039,12 +1094,15 @@ class FastCrossValBackwardSelection(FastForwardSelection):
 
     def fit(
         self,
-        state: SelectionState | None = None,
+        state: CrossValSelectionState | None = None,
         *,
         data: CrossValGramData,
         max_steps: int | None = None,
-    ) -> SelectionState:
-        if state is not None and state.active_set:
+    ) -> CrossValSelectionState:
+        result_state = _validate_cv_state_target(
+            state, data, selector_name=type(self).__name__
+        )
+        if result_state is not None and result_state.active_set:
             raise ValueError("FastCrossValBackwardSelection does not support warm starts.")
 
         criterion = self._init_criterion(data.make_full_data())
@@ -1082,7 +1140,9 @@ class FastCrossValBackwardSelection(FastForwardSelection):
             criterion.update_current(best_score)
             steps += 1
 
-        return _build_cv_state_from_active_set(data, fast_states[0].active_set)
+        return _build_cv_state_from_active_set(
+            data, fast_states[0].active_set, state=result_state
+        )
 
 
 class FastCrossValMixedSelection(FastForwardSelection):
@@ -1093,13 +1153,16 @@ class FastCrossValMixedSelection(FastForwardSelection):
 
     def fit(
         self,
-        state: SelectionState | None = None,
+        state: CrossValSelectionState | None = None,
         *,
         data: CrossValGramData,
         max_forward_steps: int | None = None,
         max_total_steps: int | None = None,
-    ) -> SelectionState:
-        if state is not None and state.active_set:
+    ) -> CrossValSelectionState:
+        result_state = _validate_cv_state_target(
+            state, data, selector_name=type(self).__name__
+        )
+        if result_state is not None and result_state.active_set:
             raise ValueError("FastCrossValMixedSelection does not support warm starts.")
 
         criterion = self._init_criterion(data.make_full_data())
@@ -1160,7 +1223,9 @@ class FastCrossValMixedSelection(FastForwardSelection):
                 criterion.update_current(best_score)
                 total_steps += 1
 
-        return _build_cv_state_from_active_set(data, fast_states[0].active_set)
+        return _build_cv_state_from_active_set(
+            data, fast_states[0].active_set, state=result_state
+        )
 
 
 class FastBeamCrossValForwardSelection(FastForwardSelection):
@@ -1175,12 +1240,15 @@ class FastBeamCrossValForwardSelection(FastForwardSelection):
 
     def fit(
         self,
-        state: SelectionState | None = None,
+        state: CrossValSelectionState | None = None,
         *,
         data: CrossValGramData,
         max_steps: int | None = None,
-    ) -> SelectionState:
-        if state is not None and state.active_set:
+    ) -> CrossValSelectionState:
+        result_state = _validate_cv_state_target(
+            state, data, selector_name=type(self).__name__
+        )
+        if result_state is not None and result_state.active_set:
             raise ValueError(
                 "FastBeamCrossValForwardSelection does not support warm starts."
             )
@@ -1212,7 +1280,9 @@ class FastBeamCrossValForwardSelection(FastForwardSelection):
 
         sel = min if criterion.minimize else max
         best = sel(beams, key=lambda b: b.score)
-        return _build_cv_state_from_active_set(data, best.states[0].active_set)
+        return _build_cv_state_from_active_set(
+            data, best.states[0].active_set, state=result_state
+        )
 
 
 class FastBeamCrossValBackwardSelection(FastForwardSelection):
@@ -1230,12 +1300,15 @@ class FastBeamCrossValBackwardSelection(FastForwardSelection):
 
     def fit(
         self,
-        state: SelectionState | None = None,
+        state: CrossValSelectionState | None = None,
         *,
         data: CrossValGramData,
         max_steps: int | None = None,
-    ) -> SelectionState:
-        if state is not None and state.active_set:
+    ) -> CrossValSelectionState:
+        result_state = _validate_cv_state_target(
+            state, data, selector_name=type(self).__name__
+        )
+        if result_state is not None and result_state.active_set:
             raise ValueError(
                 "FastBeamCrossValBackwardSelection does not support warm starts."
             )
@@ -1274,7 +1347,9 @@ class FastBeamCrossValBackwardSelection(FastForwardSelection):
 
         sel = min if criterion.minimize else max
         best = sel(beams, key=lambda b: b.score)
-        return _build_cv_state_from_active_set(data, best.states[0].active_set)
+        return _build_cv_state_from_active_set(
+            data, best.states[0].active_set, state=result_state
+        )
 
 
 class FastBeamCrossValMixedSelection(FastForwardSelection):
@@ -1289,13 +1364,16 @@ class FastBeamCrossValMixedSelection(FastForwardSelection):
 
     def fit(
         self,
-        state: SelectionState | None = None,
+        state: CrossValSelectionState | None = None,
         *,
         data: CrossValGramData,
         max_forward_steps: int | None = None,
         max_total_steps: int | None = None,
-    ) -> SelectionState:
-        if state is not None and state.active_set:
+    ) -> CrossValSelectionState:
+        result_state = _validate_cv_state_target(
+            state, data, selector_name=type(self).__name__
+        )
+        if result_state is not None and result_state.active_set:
             raise ValueError(
                 "FastBeamCrossValMixedSelection does not support warm starts."
             )
@@ -1349,4 +1427,6 @@ class FastBeamCrossValMixedSelection(FastForwardSelection):
                 new_beams.append(beam)
             beams = new_beams
 
-        return _build_cv_state_from_active_set(data, best.states[0].active_set)
+        return _build_cv_state_from_active_set(
+            data, best.states[0].active_set, state=result_state
+        )

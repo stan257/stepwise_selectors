@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+from numbers import Integral
 from typing import Iterable, Sequence
 
 import numpy as np
@@ -11,6 +12,24 @@ from .constants import ABS_TOL
 from .criteria import AICCriterion, SelectionCriterion
 from .definitions import GramData
 from .fast_routines import FastForwardState
+
+
+def _normalize_group_feature_index(feat: int) -> int:
+    if isinstance(feat, bool) or not isinstance(feat, Integral):
+        raise TypeError("Group feature indices must be integers.")
+    idx = int(feat)
+    if idx < 0:
+        raise ValueError("Group feature indices must be non-negative.")
+    return idx
+
+
+def _validate_group_feature_bounds(groups: Sequence[Sequence[int]], p: int) -> None:
+    for group_idx, group in enumerate(groups):
+        for feat in group:
+            if feat >= p:
+                raise ValueError(
+                    f"Group {group_idx} feature index {feat} is out of range for p={p}."
+                )
 
 
 def _flatten_group_indices(groups: Iterable[int], group_map: Sequence[Sequence[int]]):
@@ -55,7 +74,10 @@ class BaseGroupedSelection:
         criterion_cls=None,
         criterion_kwargs=None,
     ):
-        self.groups = [tuple(g) for g in groups]
+        normalized_groups = []
+        for group in groups:
+            normalized_groups.append(tuple(_normalize_group_feature_index(f) for f in group))
+        self.groups = normalized_groups
         seen = set()
         for g in self.groups:
             current = set()
@@ -93,6 +115,7 @@ class FastGroupForwardSelection(BaseGroupedSelection):
     """Greedy forward selection over groups using fast Gram-only updates."""
 
     def fit(self, *, data: GramData, max_steps: int | None = None):
+        _validate_group_feature_bounds(self.groups, data.gram.shape[0])
         criterion = self._init_criterion(data)
         active: list[int] = []
         fast_state = FastForwardState.create(data, self.tol)
@@ -144,6 +167,7 @@ class FastGroupBackwardSelection(BaseGroupedSelection):
     """Greedy backward selection over groups using fast Gram-only updates."""
 
     def fit(self, *, data: GramData, max_steps: int | None = None):
+        _validate_group_feature_bounds(self.groups, data.gram.shape[0])
         criterion = self._init_criterion(data)
         active = list(range(self.num_groups))
         full_idx = _flatten_group_indices(active, self.groups)

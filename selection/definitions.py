@@ -25,6 +25,12 @@ class GramData:
             raise TypeError("y_norm must be a real number.")
         if not isinstance(self.n_samples, Integral):
             raise TypeError("n_samples must be an integer.")
+        if not np.all(np.isfinite(self.gram)):
+            raise ValueError("Gram matrix must contain only finite values.")
+        if not np.all(np.isfinite(self.cov)):
+            raise ValueError("cov vector must contain only finite values.")
+        if not np.isfinite(self.y_norm):
+            raise ValueError("y_norm must be finite.")
         if self.gram.ndim != 2 or self.gram.shape[0] != self.gram.shape[1]:
             raise ValueError("Gram matrix must be square.")
         if not np.allclose(self.gram, self.gram.T, atol=1e-10, rtol=0.0):

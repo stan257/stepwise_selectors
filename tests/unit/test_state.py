@@ -143,3 +143,23 @@ def test_cv_validation_backward_rejects_nonpositive_pivot():
 
     rss = cv_state.validation_rss_for_backward_candidate(0, 0, tol=1e-12)
     assert np.isinf(rss)
+
+
+@pytest.mark.parametrize(
+    "active_set,match",
+    [
+        ([-1], "out of range"),
+        ([4], "out of range"),
+        ([1, 1], "duplicate"),
+    ],
+)
+def test_init_from_active_set_rejects_invalid_indices(active_set, match):
+    state = make_random_state(p=4)
+    with pytest.raises(ValueError, match=match):
+        state.init_from_active_set(active_set)
+
+
+def test_init_from_active_set_rejects_non_integer_indices():
+    state = make_random_state(p=4)
+    with pytest.raises(TypeError, match="integers"):
+        state.init_from_active_set([0, 1.5])

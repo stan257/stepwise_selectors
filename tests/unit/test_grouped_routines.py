@@ -59,3 +59,20 @@ def test_group_selection_rejects_overlapping_groups():
 def test_group_selection_rejects_duplicate_feature_within_group():
     with pytest.raises(ValueError, match="unique features"):
         GroupForwardSelection([[0, 0], [1, 2]])
+
+
+def test_group_selection_rejects_negative_feature_index():
+    with pytest.raises(ValueError, match="non-negative"):
+        GroupForwardSelection([[0, -1], [1, 2]])
+
+
+def test_group_selection_rejects_non_integer_feature_index():
+    with pytest.raises(TypeError, match="integers"):
+        GroupForwardSelection([[0, 1.5], [1, 2]])
+
+
+def test_group_selection_rejects_out_of_range_index_at_fit():
+    data, _ = make_group_problem()
+    selector = GroupForwardSelection([[0, 4], [1, 2]])
+    with pytest.raises(ValueError, match="out of range"):
+        selector.fit(data=data, max_steps=1)

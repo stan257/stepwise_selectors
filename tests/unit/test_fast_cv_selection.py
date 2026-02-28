@@ -4,6 +4,9 @@ import pytest
 from selection.criteria import AICCriterion, BestRSSCriterion, GCVCriterion
 from selection.definitions import CrossValGramData, GramData
 from selection.fast_routines import (
+    FastBeamCrossValBackwardSelection,
+    FastBeamCrossValForwardSelection,
+    FastBeamCrossValMixedSelection,
     FastCrossValBackwardSelection,
     FastCrossValForwardSelection,
     FastCrossValMixedSelection,
@@ -16,6 +19,7 @@ from selection.routines import (
     CrossValForwardSelection,
     CrossValMixedSelection,
 )
+from selection.state import CrossValSelectionState
 from tests.helpers import explicit_beta_from_active, explicit_cv_rss, make_cv_problem
 
 
@@ -70,6 +74,78 @@ def test_fast_cv_state_exposes_full_data_postselection_beta():
         data=cv_data, max_steps=0
     )
     np.testing.assert_allclose(empty.beta, np.zeros_like(empty.beta), atol=0.0, rtol=0.0)
+
+
+CV_SELECTOR_CASES = [
+    pytest.param(
+        FastCrossValForwardSelection,
+        {"criterion_cls": BestRSSCriterion},
+        {"max_steps": 3},
+        id="cv_forward",
+    ),
+    pytest.param(
+        FastCrossValBackwardSelection,
+        {"criterion_cls": BestRSSCriterion},
+        {"max_steps": 3},
+        id="cv_backward",
+    ),
+    pytest.param(
+        FastCrossValMixedSelection,
+        {"criterion_cls": BestRSSCriterion},
+        {"max_forward_steps": 3, "max_total_steps": 5},
+        id="cv_mixed",
+    ),
+    pytest.param(
+        FastBeamCrossValForwardSelection,
+        {"criterion_cls": BestRSSCriterion, "beam_width": 2},
+        {"max_steps": 3},
+        id="cv_beam_forward",
+    ),
+    pytest.param(
+        FastBeamCrossValBackwardSelection,
+        {"criterion_cls": BestRSSCriterion, "beam_width": 2, "allow_worse": True},
+        {"max_steps": 3},
+        id="cv_beam_backward",
+    ),
+    pytest.param(
+        FastBeamCrossValMixedSelection,
+        {"criterion_cls": BestRSSCriterion, "beam_width": 2},
+        {"max_forward_steps": 3, "max_total_steps": 5},
+        id="cv_beam_mixed",
+    ),
+]
+
+
+@pytest.mark.parametrize("selector_cls,selector_kwargs,fit_kwargs", CV_SELECTOR_CASES)
+def test_cv_selector_rejects_mismatched_state_data(
+    selector_cls, selector_kwargs, fit_kwargs
+):
+    cv_data = make_cv_problem(seed=111)
+    other_data = make_cv_problem(seed=222)
+    state = CrossValSelectionState(other_data)
+
+    selector = selector_cls(**selector_kwargs)
+    with pytest.raises(ValueError, match="state.data"):
+        selector.fit(state=state, data=cv_data, **fit_kwargs)
+
+
+@pytest.mark.parametrize("selector_cls,selector_kwargs,fit_kwargs", CV_SELECTOR_CASES)
+def test_cv_selector_reuses_matching_state(
+    selector_cls, selector_kwargs, fit_kwargs
+):
+    cv_data = make_cv_problem(seed=333)
+
+    expected = selector_cls(**selector_kwargs).fit(data=cv_data, **fit_kwargs)
+    target = CrossValSelectionState(cv_data)
+    result = selector_cls(**selector_kwargs).fit(
+        state=target, data=cv_data, **fit_kwargs
+    )
+
+    assert isinstance(result, CrossValSelectionState)
+    assert result is target
+    assert result.active_set == expected.active_set
+    np.testing.assert_allclose(result.beta, expected.beta, atol=1e-8, rtol=1e-8)
+    assert result.rss_cv == pytest.approx(expected.rss_cv, rel=1e-8, abs=1e-8)
 
 
 @pytest.mark.parametrize(
