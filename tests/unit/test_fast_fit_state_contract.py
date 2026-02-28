@@ -29,6 +29,10 @@ def recording_criterion_factory(*, n_samples: int, p: int) -> RecordingRSSCriter
     return RecordingRSSCriterion(n_samples=n_samples, p=p)
 
 
+def recording_criterion_kwargs_factory(**kwargs) -> RecordingRSSCriterion:
+    return RecordingRSSCriterion(**kwargs)
+
+
 NON_CV_SELECTOR_CASES = [
     pytest.param(
         ForwardSelection,
@@ -141,6 +145,15 @@ def test_forward_selection_accepts_criterion_factory_with_auto_params():
     data = make_regression_gram(445, n=90, p=9)
     RecordingRSSCriterion.init_history.clear()
     selector = ForwardSelection(criterion=recording_criterion_factory)
+    selector.fit(data=data, max_steps=2)
+    assert RecordingRSSCriterion.init_history
+    assert RecordingRSSCriterion.init_history[-1] == (data.n_samples, data.gram.shape[0])
+
+
+def test_forward_selection_accepts_kwargs_only_criterion_factory():
+    data = make_regression_gram(4451, n=95, p=11)
+    RecordingRSSCriterion.init_history.clear()
+    selector = ForwardSelection(criterion=recording_criterion_kwargs_factory)
     selector.fit(data=data, max_steps=2)
     assert RecordingRSSCriterion.init_history
     assert RecordingRSSCriterion.init_history[-1] == (data.n_samples, data.gram.shape[0])

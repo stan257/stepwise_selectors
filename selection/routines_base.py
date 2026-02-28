@@ -33,9 +33,20 @@ def _inject_default_criterion_params(
         sig = inspect.signature(provider)
     except (TypeError, ValueError):
         return resolved
-    if "n_samples" in sig.parameters and "n_samples" not in resolved:
+    has_var_kwargs = any(
+        param.kind is inspect.Parameter.VAR_KEYWORD
+        for param in sig.parameters.values()
+    )
+    # Inject defaults for kwargs-only factories/callables, but not for classes.
+    # Many criterion classes expose **kwargs for tolerance knobs and should not
+    # receive n_samples/p unless they declare those names explicitly.
+    accepts_kwargs = (not inspect.isclass(provider)) and has_var_kwargs
+    if (
+        ("n_samples" in sig.parameters or accepts_kwargs)
+        and "n_samples" not in resolved
+    ):
         resolved["n_samples"] = data.n_samples
-    if "p" in sig.parameters and "p" not in resolved:
+    if ("p" in sig.parameters or accepts_kwargs) and "p" not in resolved:
         resolved["p"] = data.gram.shape[0]
     return resolved
 
