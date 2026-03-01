@@ -22,10 +22,42 @@ Run higher-confidence full profile (more seeds on hard scenarios):
 python3 benchmarks/stability.py --profile full
 ```
 
+Run a reproducible "evidence" job with explicit artifact names:
+
+```bash
+python3 benchmarks/stability.py --profile full --seed-start 202600 --rows-output benchmarks/results/stability_rows_full.jsonl --summary-output benchmarks/results/stability_summary_full.json --report-output benchmarks/results/stability_report_full.md
+```
+
 Re-render stability markdown report from saved summary JSON:
 
 ```bash
 python3 benchmarks/stability_report.py --summary benchmarks/results/stability_summary.json --output benchmarks/results/stability_report.md
+```
+
+## Validating Repo Claims
+
+To validate method-strength claims in a reproducible way:
+
+1. Run the full-profile stability benchmark:
+
+```bash
+python3 benchmarks/stability.py --profile full --seed-start 202600 --rows-output benchmarks/results/stability_rows_full.jsonl --summary-output benchmarks/results/stability_summary_full.json --report-output benchmarks/results/stability_report_full.md
+```
+
+2. Read `benchmarks/results/stability_report_full.md` for scenario-wise comparison.
+3. Use `benchmarks/results/stability_summary_full.json` for programmatic checks.
+
+Recommended interpretation rules:
+
+- Effectiveness: selector methods should outperform `topk_abs_cov` on `mean_test_mse` in most hard scenarios (`delta_test_mse_vs_topk < 0`).
+- Consistency: top methods should have reasonably tight `test_mse_95ci` and higher `mean_pairwise_jaccard` than weak baselines on correlated scenarios.
+- Search quality: in `oracle_small_p`, strong methods should have near-zero `mean_oracle_gap_test_mse`.
+- Pairwise robustness: `win_rate_vs_topk` should usually be above `50%` for competitive selectors.
+
+Optional fast sanity run:
+
+```bash
+python3 benchmarks/stability.py --profile quick
 ```
 
 Equivalent manual steps are still available:
