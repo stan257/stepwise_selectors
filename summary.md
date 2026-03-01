@@ -171,13 +171,13 @@ Major coverage themes:
 
 Notable files:
 - `tests/unit/test_state.py`
-- `tests/unit/test_fast_cv_selection.py`
+- `tests/unit/test_cv_selection.py`
 - `tests/unit/test_interface_contracts.py`
 - `tests/integration/test_selection_routines.py`
-- `tests/unit/test_fast_cv_beam_selection.py`
+- `tests/unit/test_cv_beam_selection.py`
 - `tests/property/test_behavioral_properties.py`
-- `tests/property/test_fast_equivalence_sweeps.py`
-- `tests/regression/test_fast_oracle_exhaustive.py`
+- `tests/property/test_equivalence_sweeps.py`
+- `tests/regression/test_oracle_exhaustive.py`
 - `tests/regression/test_golden_outputs.py`
 
 ---
@@ -189,3 +189,25 @@ Notable files:
 4. Final result is materialized as `SelectionState` or `CrossValSelectionState` with `active_set` and RSS metrics; CV `beta` is a full-data post-selection refit.
 
 This is the current architecture baseline: no separate legacy `beam_search.py`, `beam_utils.py`, or `cv_utils.py` modules remain.
+
+---
+
+## Extension points
+- Custom criteria:
+  - implement `CriterionProtocol` (`evaluate`, `best_candidate`, `is_improvement`, `update_current`, `clone`, `minimize`, `current_value`);
+  - pass as `criterion` (instance/class/factory) to selector constructors.
+- Custom grouped search policies:
+  - grouped routines currently expose greedy add/drop policies only;
+  - extension work should preserve complete-group support semantics.
+- Alternate frontends:
+  - maintain `selection.routines` as primary user-facing import path;
+  - treat `selection.routines_core` as compatibility surface, not long-term extension target.
+
+---
+
+## Porting notes
+- Core algorithmic behavior lives in:
+  - `selection/forward_state.py` (QR/inverse-Gram state updates),
+  - `selection/state.py` (reference state and CV state materialization),
+  - `selection/routines_cv_scoring.py` (fold-aggregated scoring formulas).
+- The package is intentionally light on dependencies; porting effort is mostly linear-algebra API translation plus state-management semantics.

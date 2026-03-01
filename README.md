@@ -26,6 +26,13 @@ Lightweight linear-model selection routines built on precomputed Gram statistics
 - Grouped routines: `GroupForwardSelection`, `GroupBackwardSelection`
 - Criteria: `AICCriterion`, `BestRSSCriterion`, `CriterionProtocol`
 
+## Selector guide
+- Use `ForwardSelection` when you want a fast, deterministic baseline and a single support path.
+- Use `BackwardSelection` when starting from full support is meaningful and feature removal cost is acceptable.
+- Use `MixedSelection` when greedy forward may over-select and periodic backward cleanup is desirable.
+- Use beam variants when local greedy choices are likely brittle and you can spend extra compute.
+- Use CV variants when model-size regularization should be driven by held-out error instead of IC penalties.
+
 ## Quick start
 1) Install deps (Python 3.12+; minimal requirements: `numpy`, `pytest`). In conda:
 ```bash
@@ -80,6 +87,22 @@ print(gstate.active_groups, gstate.active_set, gstate.beta, gstate.rss)
 - CV selectors reject criteria with `cv_compatible=False` to avoid double regularization on top of held-out RSS.
 - Backward beam selectors are improvement-only by default; set `allow_worse=True` to force removals under a step budget.
 - Selector hyperparameters are validated strictly (fail-fast): no implicit coercion for `beam_width`, `allow_worse`, step budgets, or `tol`.
+
+## Portability And Embedding
+- The package is NumPy-only and operates on Gram statistics, so it ports cleanly into most scientific Python codebases.
+- Minimal integration contract:
+  - construct `GramData` (or `CrossValGramData`) from your preprocessing pipeline;
+  - call selectors from `selection.routines`;
+  - consume output state fields (`active_set`, `beta`, `rss` or `rss_cv`).
+- Recommended adapter boundary:
+  - keep feature engineering and scaling outside this package;
+  - treat this package as a pure model-selection engine over fixed sufficient statistics.
+- For non-Python ports, `selection/routines_*`, `selection/state.py`, and `selection/forward_state.py` define the core algebraic behavior to mirror.
+
+## Failure Semantics
+- Input schema/type violations raise `TypeError`/`ValueError` at construction time where possible.
+- Numerically unstable active-set operations raise `np.linalg.LinAlgError` or return `inf` candidate scores (for screened candidates).
+- CV routines require synchronized fold supports internally; desync now fails fast with a `ValueError`.
 
 ## Assumptions And Limitations (Research Use)
 - The package does **not** fit an intercept automatically. If your model needs one, include a constant feature before building Gram statistics, or center `X`/`y` and fit a no-intercept model.
