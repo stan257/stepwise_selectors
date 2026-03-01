@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -26,16 +26,13 @@ class Beam:
     state: IncrementalSolver
     criterion: CriterionProtocol
     score: float
-    _signature: int = 0
+    _signature: frozenset[int] = field(default_factory=frozenset)
 
     def __post_init__(self) -> None:
-        sig = 0
-        for idx in self.state.active_set:
-            sig |= 1 << int(idx)
-        self._signature = sig
+        self._signature = frozenset(int(idx) for idx in self.state.active_set)
 
     @property
-    def signature(self) -> int:
+    def signature(self) -> frozenset[int]:
         return self._signature
 
 def _beam_forward_children(beam: Beam, beam_width: int) -> list[Beam]:

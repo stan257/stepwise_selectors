@@ -4,17 +4,14 @@ from __future__ import annotations
 
 import numpy as np
 
+from .solvers import normalize_solver_policy
+
 
 def validate_solver_params(
     solver_policy: str, ridge_alpha: float, pinv_rcond: float
 ) -> tuple[str, float, float]:
     """Normalize and validate solver policy hyperparameters."""
-    policy = str(solver_policy).strip().lower()
-    match policy:
-        case "strict" | "ridge" | "pinv":
-            pass
-        case _:
-            raise ValueError("solver_policy must be one of: pinv, ridge, strict.")
+    policy = normalize_solver_policy(solver_policy)
     ridge = float(ridge_alpha)
     if not np.isfinite(ridge) or ridge < 0.0:
         raise ValueError("ridge_alpha must be finite and >= 0.")

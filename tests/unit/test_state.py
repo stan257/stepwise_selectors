@@ -96,5 +96,5 @@ def test_cv_state_rejects_desynced_fold_active_sets():
     cv_state.train_states[0].init_from_active_set([0])
     cv_state.train_states[1].init_from_active_set([1])
 
-    with pytest.raises(ValueError, match="identical active_set across folds"):
+    with pytest.raises(RuntimeError, match="identical active_set across folds"):
         cv_state._sync_active_set()

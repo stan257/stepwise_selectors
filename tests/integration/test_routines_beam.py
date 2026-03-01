@@ -1,8 +1,11 @@
 import numpy as np
 
 from selection.criteria import BestRSSCriterion
+from selection.core.incremental_solver import IncrementalSolver
 from selection.definitions import GramData
 from selection.routines import BeamBackwardSelection, BeamForwardSelection, BeamMixedSelection
+from selection.selectors.beam_pruning import prune_unique_beams
+from selection.selectors.routines_beam import Beam
 from selection.state_single import SelectionState
 from tests.integration._selection_routines_helpers import (
     expected_indices,
@@ -45,6 +48,37 @@ def test_beam_search_deduplicates_active_sets():
     state = selector.fit(data=GramData(gram, cov, y_norm, 20), max_steps=1)
     assert len(state.active_set) == 1
     assert len(set(state.active_set)) == 1
+
+
+def test_beam_pruning_deduplicates_large_index_signatures():
+    p = 130
+    data = GramData(np.eye(p), np.zeros(p), y_norm=1.0, n_samples=30)
+    tol = 1e-12
+    criterion = BestRSSCriterion()
+    better_duplicate = Beam(
+        IncrementalSolver.from_active_set(data, [2, 64, 129], tol),
+        criterion.clone(),
+        1.0,
+    )
+    worse_duplicate = Beam(
+        IncrementalSolver.from_active_set(data, [2, 64, 129], tol),
+        criterion.clone(),
+        3.0,
+    )
+    unique = Beam(
+        IncrementalSolver.from_active_set(data, [3, 64, 129], tol),
+        criterion.clone(),
+        2.0,
+    )
+
+    pruned = prune_unique_beams(
+        [worse_duplicate, unique, better_duplicate],
+        beam_limit=3,
+    )
+
+    assert len(pruned) == 2
+    assert pruned[0].signature == frozenset({2, 64, 129})
+    assert pruned[1].signature == frozenset({3, 64, 129})
 
 
 def test_beam_pruning_is_deterministic_and_non_worsening():

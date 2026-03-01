@@ -89,21 +89,47 @@ class SelectionCriterion:
         return np.clip(rss_arr, 0.0, None)
 
 
-class AICCriterion(SelectionCriterion):
-    """Akaike information criterion."""
+class _BaseCriterion(SelectionCriterion):
+    """Internal shared helpers for concrete criterion subclasses."""
 
-    cv_compatible = False
+    def _positive_rss(self, rss, *, criterion_name: str) -> np.ndarray:
+        return self._coerce_positive_rss(
+            rss,
+            error_message=f"RSS must be positive to compute {criterion_name}.",
+        )
+
+    def _non_negative_rss(
+        self, rss, *, criterion_name: str | None = None
+    ) -> np.ndarray:
+        if criterion_name is None:
+            message = "RSS must be non-negative."
+        else:
+            message = f"RSS must be non-negative to compute {criterion_name}."
+        return self._coerce_non_negative_rss(rss, error_message=message)
+
+
+class _SampleSizeCriterion(_BaseCriterion):
+    """Internal base for criteria that require `n_samples`."""
+
+    _criterion_name = "criterion"
 
     def __init__(self, *, n_samples: int, **kwargs):
         super().__init__(minimize=True, **kwargs)
         self.n_samples = _validate_integral_param(n_samples, name="n_samples")
         if self.n_samples <= 0:
-            raise ValueError("n_samples must be positive for AIC.")
+            raise ValueError(
+                f"n_samples must be positive for {self._criterion_name}."
+            )
+
+
+class AICCriterion(_SampleSizeCriterion):
+    """Akaike information criterion."""
+
+    cv_compatible = False
+    _criterion_name = "AIC"
 
     def evaluate(self, rss, k: int):
-        rss_arr = self._coerce_positive_rss(
-            rss, error_message="RSS must be positive to compute AIC."
-        )
+        rss_arr = self._positive_rss(rss, criterion_name="AIC")
         return self.n_samples * np.log(rss_arr / self.n_samples) + 2 * k
 
     def best_candidate(self, rss, k: int):
@@ -116,40 +142,26 @@ class AICCriterion(SelectionCriterion):
         return idx, best_value
 
 
-class BICCriterion(SelectionCriterion):
+class BICCriterion(_SampleSizeCriterion):
     """Bayesian information criterion."""
 
     cv_compatible = False
-
-    def __init__(self, *, n_samples: int, **kwargs):
-        super().__init__(minimize=True, **kwargs)
-        self.n_samples = _validate_integral_param(n_samples, name="n_samples")
-        if self.n_samples <= 0:
-            raise ValueError("n_samples must be positive for BIC.")
+    _criterion_name = "BIC"
 
     def evaluate(self, rss, k: int):
-        rss_arr = self._coerce_positive_rss(
-            rss, error_message="RSS must be positive to compute BIC."
-        )
+        rss_arr = self._positive_rss(rss, criterion_name="BIC")
         n = self.n_samples
         return n * np.log(rss_arr / n) + k * np.log(n)
 
 
-class AICcCriterion(SelectionCriterion):
+class AICcCriterion(_SampleSizeCriterion):
     """Small-sample corrected Akaike information criterion."""
 
     cv_compatible = False
-
-    def __init__(self, *, n_samples: int, **kwargs):
-        super().__init__(minimize=True, **kwargs)
-        self.n_samples = _validate_integral_param(n_samples, name="n_samples")
-        if self.n_samples <= 0:
-            raise ValueError("n_samples must be positive for AICc.")
+    _criterion_name = "AICc"
 
     def evaluate(self, rss, k: int):
-        rss_arr = self._coerce_positive_rss(
-            rss, error_message="RSS must be positive to compute AICc."
-        )
+        rss_arr = self._positive_rss(rss, criterion_name="AICc")
         n = self.n_samples
         aic = n * np.log(rss_arr / n) + 2 * k
         denom = n - k - 1
@@ -159,40 +171,34 @@ class AICcCriterion(SelectionCriterion):
         return aic + correction
 
 
-class HQICCriterion(SelectionCriterion):
+class HQICCriterion(_SampleSizeCriterion):
     """Hannan-Quinn information criterion."""
 
     cv_compatible = False
+    _criterion_name = "HQIC"
 
     def __init__(self, *, n_samples: int, **kwargs):
-        super().__init__(minimize=True, **kwargs)
-        self.n_samples = _validate_integral_param(n_samples, name="n_samples")
-        if self.n_samples <= 0:
-            raise ValueError("n_samples must be positive for HQIC.")
+        super().__init__(n_samples=n_samples, **kwargs)
         if self.n_samples < 3:
             raise ValueError(
                 "HQIC requires n_samples >= 3 (log(log(n)) must be positive)."
             )
 
     def evaluate(self, rss, k: int):
-        rss_arr = self._coerce_positive_rss(
-            rss, error_message="RSS must be positive to compute HQIC."
-        )
+        rss_arr = self._positive_rss(rss, criterion_name="HQIC")
         n = self.n_samples
         penalty = 2.0 * k * np.log(np.log(n))
         return n * np.log(rss_arr / n) + penalty
 
 
-class EBICCriterion(SelectionCriterion):
+class EBICCriterion(_SampleSizeCriterion):
     """Extended BIC with a combinatorial penalty term."""
 
     cv_compatible = False
+    _criterion_name = "EBIC"
 
     def __init__(self, *, n_samples: int, p: int, gamma: float = 0.5, **kwargs):
-        super().__init__(minimize=True, **kwargs)
-        self.n_samples = _validate_integral_param(n_samples, name="n_samples")
-        if self.n_samples <= 0:
-            raise ValueError("n_samples must be positive for EBIC.")
+        super().__init__(n_samples=n_samples, **kwargs)
         self.p = _validate_integral_param(p, name="p")
         self.gamma = _validate_finite_float(gamma, name="gamma")
         if not 0.0 <= self.gamma <= 1.0:
@@ -201,9 +207,7 @@ class EBICCriterion(SelectionCriterion):
             raise ValueError("p must be positive for EBIC.")
 
     def evaluate(self, rss, k: int):
-        rss_arr = self._coerce_positive_rss(
-            rss, error_message="RSS must be positive to compute EBIC."
-        )
+        rss_arr = self._positive_rss(rss, criterion_name="EBIC")
         if k < 0 or k > self.p:
             raise ValueError("k must be between 0 and p for EBIC.")
         n = self.n_samples
@@ -218,21 +222,14 @@ class EBICCriterion(SelectionCriterion):
         return base + 2.0 * self.gamma * log_choose
 
 
-class GCVCriterion(SelectionCriterion):
+class GCVCriterion(_SampleSizeCriterion):
     """Generalized cross-validation score."""
 
     cv_compatible = False
-
-    def __init__(self, *, n_samples: int, **kwargs):
-        super().__init__(minimize=True, **kwargs)
-        self.n_samples = _validate_integral_param(n_samples, name="n_samples")
-        if self.n_samples <= 0:
-            raise ValueError("n_samples must be positive for GCV.")
+    _criterion_name = "GCV"
 
     def evaluate(self, rss, k: int):
-        rss_arr = self._coerce_non_negative_rss(
-            rss, error_message="RSS must be non-negative to compute GCV."
-        )
+        rss_arr = self._non_negative_rss(rss, criterion_name="GCV")
         denom = self.n_samples - k
         if denom <= 0:
             return np.full_like(rss_arr, np.inf, dtype=float)
@@ -240,16 +237,11 @@ class GCVCriterion(SelectionCriterion):
         return (rss_arr / self.n_samples) / scale
 
 
-class BestRSSCriterion(SelectionCriterion):
+class BestRSSCriterion(_BaseCriterion):
     """Criterion that greedily minimizes RSS without explicit complexity penalty."""
 
-    def __init__(self, **kwargs):
-        super().__init__(minimize=True, **kwargs)
-
     def evaluate(self, rss, k: int):
-        rss_arr = self._coerce_non_negative_rss(
-            rss, error_message="RSS must be non-negative."
-        )
+        rss_arr = self._non_negative_rss(rss)
         return rss_arr
 
     def best_candidate(self, rss, k: int):

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Protocol, TypeVar
+from typing import Hashable, Protocol, TypeVar
 
 
 class _CriterionLike(Protocol):
@@ -11,7 +11,7 @@ class _CriterionLike(Protocol):
 
 class BeamLike(Protocol):
     score: float
-    signature: int
+    signature: Hashable
     criterion: _CriterionLike
 
 

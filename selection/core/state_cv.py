@@ -36,7 +36,7 @@ class CrossValSelectionState:
         reference = list(self.train_states[0].active_set)
         for fold_idx, fold_state in enumerate(self.train_states[1:], start=1):
             if list(fold_state.active_set) != reference:
-                raise ValueError(
+                raise RuntimeError(
                     "CV fold states must share identical active_set across folds; "
                     f"fold 0 has {reference}, fold {fold_idx} has {fold_state.active_set}."
                 )
