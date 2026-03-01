@@ -60,10 +60,6 @@ def _resolve_criterion(
     default_criterion_cls: Any,
     criterion_kwargs: dict[str, Any] | None,
 ) -> CriterionProtocol:
-    if criterion is not None and criterion_cls is not None:
-        raise ValueError(
-            f"{selector_name} accepts either `criterion` or `criterion_cls`, not both."
-        )
     provider = criterion if criterion is not None else (criterion_cls or default_criterion_cls)
     params = dict(criterion_kwargs or {})
 

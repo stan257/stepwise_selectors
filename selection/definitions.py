@@ -106,11 +106,8 @@ class CrossValGramData:
         return p
 
     def __post_init__(self):
-        if len(self.folds) < 2:
-            raise ValueError("CrossValGramData requires at least two folds.")
-
-        self.n_folds = len(self.folds)
         self.p = self.check_data_validity()
+        self.n_folds = len(self.folds)
 
         gram_sum = np.zeros_like(self.folds[0].gram)
         cov_sum = np.zeros_like(self.folds[0].cov)
