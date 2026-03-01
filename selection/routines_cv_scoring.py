@@ -10,16 +10,35 @@ from .state import CrossValSelectionState
 
 
 def _build_fold_states(
-    data: CrossValGramData, *, tol: float, active_set: list[int] | None = None
+    data: CrossValGramData,
+    *,
+    tol: float,
+    active_set: list[int] | None = None,
+    solver_policy: str = "strict",
+    ridge_alpha: float = 1e-8,
+    pinv_rcond: float = 1e-12,
 ) -> list[ForwardState]:
     """Build per-fold ForwardState objects for a shared active set."""
     if active_set is None:
         return [
-            ForwardState.create(data.train_data_for_fold(k), tol)
+            ForwardState.create(
+                data.train_data_for_fold(k),
+                tol,
+                solver_policy=solver_policy,
+                ridge_alpha=ridge_alpha,
+                pinv_rcond=pinv_rcond,
+            )
             for k in range(data.n_folds)
         ]
     return [
-        ForwardState.from_active_set(data.train_data_for_fold(k), active_set, tol)
+        ForwardState.from_active_set(
+            data.train_data_for_fold(k),
+            active_set,
+            tol,
+            solver_policy=solver_policy,
+            ridge_alpha=ridge_alpha,
+            pinv_rcond=pinv_rcond,
+        )
         for k in range(data.n_folds)
     ]
 
@@ -61,10 +80,23 @@ def _cv_rss(fold_states: list[ForwardState], data: CrossValGramData) -> float:
 
 
 def _rebuild_states(
-    data: CrossValGramData, active_set: list[int], tol: float
+    data: CrossValGramData,
+    active_set: list[int],
+    tol: float,
+    *,
+    solver_policy: str = "strict",
+    ridge_alpha: float = 1e-8,
+    pinv_rcond: float = 1e-12,
 ) -> list[ForwardState]:
     """Rebuild fold states from scratch to limit numerical drift."""
-    return _build_fold_states(data, tol=tol, active_set=active_set)
+    return _build_fold_states(
+        data,
+        tol=tol,
+        active_set=active_set,
+        solver_policy=solver_policy,
+        ridge_alpha=ridge_alpha,
+        pinv_rcond=pinv_rcond,
+    )
 
 
 def _build_cv_state_from_active_set(
@@ -72,9 +104,21 @@ def _build_cv_state_from_active_set(
     active_set: list[int],
     *,
     state: CrossValSelectionState | None = None,
+    solver_policy: str = "strict",
+    ridge_alpha: float = 1e-8,
+    pinv_rcond: float = 1e-12,
 ) -> CrossValSelectionState:
     """Materialize a CrossValSelectionState from an active set."""
-    cv_state = state if state is not None else CrossValSelectionState(data)
+    cv_state = (
+        state
+        if state is not None
+        else CrossValSelectionState(
+            data,
+            solver_policy=solver_policy,
+            ridge_alpha=ridge_alpha,
+            pinv_rcond=pinv_rcond,
+        )
+    )
     for fold_state in cv_state.train_states:
         fold_state.init_from_active_set(active_set)
     cv_state._sync_active_set()

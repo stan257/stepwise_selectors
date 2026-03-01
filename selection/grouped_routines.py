@@ -12,6 +12,8 @@ from .criteria import AICCriterion, CriterionProtocol
 from .definitions import GramData
 from .forward_state import ForwardState
 from .interface_validation import (
+    validate_choice,
+    validate_non_negative_finite_float,
     validate_optional_non_negative_int,
     validate_positive_finite_float,
 )
@@ -129,6 +131,9 @@ class BaseGroupedSelection:
         groups: Sequence[Sequence[int]],
         *,
         tol: float = ABS_TOL,
+        solver_policy: str = "strict",
+        ridge_alpha: float = 1e-8,
+        pinv_rcond: float = 1e-12,
         criterion=None,
         criterion_cls=None,
         criterion_kwargs=None,
@@ -161,6 +166,17 @@ class BaseGroupedSelection:
             seen.update(current)
         self.num_groups = len(self.groups)
         self.tol = validate_positive_finite_float(tol, name="tol")
+        self.solver_policy = validate_choice(
+            solver_policy,
+            name="solver_policy",
+            choices={"strict", "ridge", "pinv"},
+        )
+        self.ridge_alpha = validate_non_negative_finite_float(
+            ridge_alpha, name="ridge_alpha"
+        )
+        self.pinv_rcond = validate_positive_finite_float(
+            pinv_rcond, name="pinv_rcond"
+        )
         self.criterion = criterion
         if criterion is None:
             self.criterion_cls = criterion_cls or AICCriterion
@@ -189,7 +205,13 @@ class GroupForwardSelection(BaseGroupedSelection):
         _validate_group_feature_bounds(self.groups, data.gram.shape[0])
         criterion = self._init_criterion(data)
         active: list[int] = []
-        state = ForwardState.create(data, self.tol)
+        state = ForwardState.create(
+            data,
+            self.tol,
+            solver_policy=self.solver_policy,
+            ridge_alpha=self.ridge_alpha,
+            pinv_rcond=self.pinv_rcond,
+        )
         initial = float(np.asarray(criterion.evaluate(state.rss, state.k)))
         criterion.update_current(initial)
 
@@ -233,7 +255,14 @@ class GroupBackwardSelection(BaseGroupedSelection):
         criterion = self._init_criterion(data)
         active = list(range(self.num_groups))
         full_idx = _flatten_group_indices(active, self.groups)
-        state = ForwardState.from_active_set(data, full_idx, self.tol)
+        state = ForwardState.from_active_set(
+            data,
+            full_idx,
+            self.tol,
+            solver_policy=self.solver_policy,
+            ridge_alpha=self.ridge_alpha,
+            pinv_rcond=self.pinv_rcond,
+        )
         initial = float(
             np.asarray(criterion.evaluate(state.rss, state.k))
         )

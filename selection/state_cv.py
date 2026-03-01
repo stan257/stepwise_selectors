@@ -5,10 +5,14 @@ import numpy as np
 from .constants import ABS_TOL
 from .definitions import CrossValGramData
 from .state_single import ForwardDeltaCache, SelectionState, _backward_components
+from .solvers import solve_active_system
 
 @dataclass
 class CrossValSelectionState:
     data: CrossValGramData
+    solver_policy: str = "strict"
+    ridge_alpha: float = 1e-8
+    pinv_rcond: float = 1e-12
     p: int = field(init=False)
     n_folds: int = field(init=False)
     train_states: list[SelectionState] = field(init=False)
@@ -50,20 +54,26 @@ class CrossValSelectionState:
         idx_S = np.array(self.active_set, dtype=int)
         gram_ss = self.data.gram_total[np.ix_(idx_S, idx_S)]
         cov_s = self.data.cov_total[idx_S]
-        try:
-            L = np.linalg.cholesky(gram_ss)
-            beta_s = np.linalg.solve(L.T, np.linalg.solve(L, cov_s))
-        except np.linalg.LinAlgError as err:
-            raise np.linalg.LinAlgError(
-                "Selected support is singular on full data; cannot compute post-selection coefficients."
-            ) from err
+        beta_s, _ = solve_active_system(
+            gram_ss,
+            cov_s,
+            solver_policy=self.solver_policy,
+            ridge_alpha=self.ridge_alpha,
+            pinv_rcond=self.pinv_rcond,
+            context="Selected support on full data",
+        )
         self.beta[idx_S] = beta_s
 
     def _init_train_states_empty(self) -> None:
         self.train_states = []
         for k in range(self.n_folds):
             train_data_k = self.data.train_data_for_fold(k)
-            state_k = SelectionState(train_data_k)
+            state_k = SelectionState(
+                train_data_k,
+                solver_policy=self.solver_policy,
+                ridge_alpha=self.ridge_alpha,
+                pinv_rcond=self.pinv_rcond,
+            )
             self.train_states.append(state_k)
         self._sync_active_set()
 
@@ -77,7 +87,12 @@ class CrossValSelectionState:
         self.train_states = []
         for k in range(self.n_folds):
             train_data_k = self.data.train_data_for_fold(k)
-            state_k = SelectionState(train_data_k)
+            state_k = SelectionState(
+                train_data_k,
+                solver_policy=self.solver_policy,
+                ridge_alpha=self.ridge_alpha,
+                pinv_rcond=self.pinv_rcond,
+            )
             state_k.init_full()
             self.train_states.append(state_k)
         self._sync_active_set()
@@ -186,6 +201,9 @@ class CrossValSelectionState:
         """Clone mutable per-fold state while reusing shared read-only data."""
         clone = object.__new__(CrossValSelectionState)
         clone.data = self.data
+        clone.solver_policy = self.solver_policy
+        clone.ridge_alpha = self.ridge_alpha
+        clone.pinv_rcond = self.pinv_rcond
         clone.p = self.p
         clone.n_folds = self.n_folds
         clone.train_states = [s.clone() for s in self.train_states]

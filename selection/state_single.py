@@ -8,6 +8,25 @@ from .constants import ABS_TOL
 FORWARD_BLOCK_SIZE = 4096
 from .definitions import GramData
 from .index_validation import validate_feature_indices
+from .solvers import solve_active_system
+
+
+def _validate_solver_params(
+    solver_policy: str, ridge_alpha: float, pinv_rcond: float
+) -> tuple[str, float, float]:
+    policy = str(solver_policy).strip().lower()
+    match policy:
+        case "strict" | "ridge" | "pinv":
+            pass
+        case _:
+            raise ValueError("solver_policy must be one of: pinv, ridge, strict.")
+    ridge = float(ridge_alpha)
+    if not np.isfinite(ridge) or ridge < 0.0:
+        raise ValueError("ridge_alpha must be finite and >= 0.")
+    rcond = float(pinv_rcond)
+    if not np.isfinite(rcond) or rcond <= 0.0:
+        raise ValueError("pinv_rcond must be finite and > 0.")
+    return policy, ridge, rcond
 
 
 @dataclass
@@ -202,6 +221,9 @@ def _backward_components(
 class SelectionState:
     # Fixed sufficient statistics
     data: GramData
+    solver_policy: str = "strict"
+    ridge_alpha: float = 1e-8
+    pinv_rcond: float = 1e-12
     p: int = field(init=False)
     gram_diag: np.ndarray = field(init=False)
 
@@ -224,6 +246,12 @@ class SelectionState:
     active_len: int = field(init=False, default=0)
 
     def __post_init__(self):
+        policy, ridge, rcond = _validate_solver_params(
+            self.solver_policy, self.ridge_alpha, self.pinv_rcond
+        )
+        self.solver_policy = policy
+        self.ridge_alpha = ridge
+        self.pinv_rcond = rcond
         self.p = self.data.gram.shape[0]
         self.gram_diag = np.diag(self.data.gram)
         self.beta = np.zeros(self.p)
@@ -270,17 +298,15 @@ class SelectionState:
         self._refresh_active_cache()
         idx_S = self.active_idx
         G_S = self.data.gram[np.ix_(idx_S, idx_S)]
-        try:
-            L = np.linalg.cholesky(G_S)
-            rhs = self.data.cov[idx_S]
-            # Solve G_S beta = cov via Cholesky: L L^T beta = rhs.
-            beta_S_val = np.linalg.solve(L.T, np.linalg.solve(L, rhs))
-            # Invert G_S using the same factorization to keep symmetry.
-            K_val = np.linalg.solve(L.T, np.linalg.solve(L, np.eye(len(idx_S))))
-        except np.linalg.LinAlgError as err:
-            raise np.linalg.LinAlgError(
-                "Active Gram matrix is singular or ill-conditioned during init_full."
-            ) from err
+        rhs = self.data.cov[idx_S]
+        beta_S_val, K_val = solve_active_system(
+            G_S,
+            rhs,
+            solver_policy=self.solver_policy,
+            ridge_alpha=self.ridge_alpha,
+            pinv_rcond=self.pinv_rcond,
+            context="Active Gram matrix during init_full",
+        )
 
         self.beta[:] = 0.0
         self.beta[idx_S] = beta_S_val
@@ -308,16 +334,15 @@ class SelectionState:
             return
         idx_S = self.active_idx
         G_S = self.data.gram[np.ix_(idx_S, idx_S)]
-        try:
-            L = np.linalg.cholesky(G_S)
-            rhs = self.data.cov[idx_S]
-            beta_S_val = np.linalg.solve(L.T, np.linalg.solve(L, rhs))
-            # Invert G_S using the same factorization to keep symmetry.
-            K_val = np.linalg.solve(L.T, np.linalg.solve(L, np.eye(len(idx_S))))
-        except np.linalg.LinAlgError as err:
-            raise np.linalg.LinAlgError(
-                "Active Gram matrix is singular or ill-conditioned."
-            ) from err
+        rhs = self.data.cov[idx_S]
+        beta_S_val, K_val = solve_active_system(
+            G_S,
+            rhs,
+            solver_policy=self.solver_policy,
+            ridge_alpha=self.ridge_alpha,
+            pinv_rcond=self.pinv_rcond,
+            context="Active Gram matrix",
+        )
 
         self.beta[:] = 0.0
         self.beta[idx_S] = beta_S_val
@@ -342,6 +367,9 @@ class SelectionState:
         """Clone mutable state while reusing shared read-only data."""
         clone = object.__new__(SelectionState)
         clone.data = self.data
+        clone.solver_policy = self.solver_policy
+        clone.ridge_alpha = self.ridge_alpha
+        clone.pinv_rcond = self.pinv_rcond
         clone.p = self.p
         clone.gram_diag = self.gram_diag
         clone.beta = self.beta.copy()

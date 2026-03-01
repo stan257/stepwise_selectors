@@ -123,7 +123,15 @@ class BeamForwardSelection(ForwardSelection):
         max_steps = validate_optional_non_negative_int(max_steps, name="max_steps")
         criterion = self._init_criterion(data)
         initial = Beam(
-            ForwardState.create(data, self.tol), criterion, criterion.current_value
+            ForwardState.create(
+                data,
+                self.tol,
+                solver_policy=self.solver_policy,
+                ridge_alpha=self.ridge_alpha,
+                pinv_rcond=self.pinv_rcond,
+            ),
+            criterion,
+            criterion.current_value,
         )
         beams = [initial]
 
@@ -140,7 +148,16 @@ class BeamForwardSelection(ForwardSelection):
 
         sel = min if criterion.minimize else max
         best = sel(beams, key=lambda b: b.score)
-        result = result_state if result_state is not None else SelectionState(data)
+        result = (
+            result_state
+            if result_state is not None
+            else SelectionState(
+                data,
+                solver_policy=self.solver_policy,
+                ridge_alpha=self.ridge_alpha,
+                pinv_rcond=self.pinv_rcond,
+            )
+        )
         result.init_from_active_set(best.state.active_set)
         return result
 
@@ -169,7 +186,14 @@ class BeamBackwardSelection(ForwardSelection):
         max_steps = validate_optional_non_negative_int(max_steps, name="max_steps")
         criterion = self._init_criterion(data)
         full_active = list(range(data.gram.shape[0]))
-        initial_state = ForwardState.from_active_set(data, full_active, self.tol)
+        initial_state = ForwardState.from_active_set(
+            data,
+            full_active,
+            self.tol,
+            solver_policy=self.solver_policy,
+            ridge_alpha=self.ridge_alpha,
+            pinv_rcond=self.pinv_rcond,
+        )
         initial_score = float(
             np.asarray(criterion.evaluate(initial_state.rss, initial_state.k))
         )
@@ -192,7 +216,16 @@ class BeamBackwardSelection(ForwardSelection):
 
         sel = min if criterion.minimize else max
         best = sel(beams, key=lambda b: b.score)
-        result = result_state if result_state is not None else SelectionState(data)
+        result = (
+            result_state
+            if result_state is not None
+            else SelectionState(
+                data,
+                solver_policy=self.solver_policy,
+                ridge_alpha=self.ridge_alpha,
+                pinv_rcond=self.pinv_rcond,
+            )
+        )
         result.init_from_active_set(best.state.active_set)
         return result
 
@@ -226,7 +259,15 @@ class BeamMixedSelection(ForwardSelection):
         )
         criterion = self._init_criterion(data)
         initial = Beam(
-            ForwardState.create(data, self.tol), criterion, criterion.current_value
+            ForwardState.create(
+                data,
+                self.tol,
+                solver_policy=self.solver_policy,
+                ridge_alpha=self.ridge_alpha,
+                pinv_rcond=self.pinv_rcond,
+            ),
+            criterion,
+            criterion.current_value,
         )
         beams = [initial]
         best = initial
@@ -263,7 +304,16 @@ class BeamMixedSelection(ForwardSelection):
                 new_beams.append(beam)
             beams = new_beams
 
-        result = result_state if result_state is not None else SelectionState(data)
+        result = (
+            result_state
+            if result_state is not None
+            else SelectionState(
+                data,
+                solver_policy=self.solver_policy,
+                ridge_alpha=self.ridge_alpha,
+                pinv_rcond=self.pinv_rcond,
+            )
+        )
         result.init_from_active_set(best.state.active_set)
         return result
 

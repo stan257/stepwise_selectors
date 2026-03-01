@@ -6,7 +6,9 @@ import numpy as np
 
 from .constants import ABS_TOL
 from .interface_validation import (
+    validate_choice,
     validate_bool,
+    validate_non_negative_finite_float,
     validate_optional_non_negative_int,
     validate_positive_finite_float,
 )
@@ -36,11 +38,25 @@ class ForwardSelection:
         self,
         *,
         tol: float = ABS_TOL,
+        solver_policy: str = "strict",
+        ridge_alpha: float = 1e-8,
+        pinv_rcond: float = 1e-12,
         criterion=None,
         criterion_cls=None,
         criterion_kwargs=None,
     ):
         self.tol = validate_positive_finite_float(tol, name="tol")
+        self.solver_policy = validate_choice(
+            solver_policy,
+            name="solver_policy",
+            choices={"strict", "ridge", "pinv"},
+        )
+        self.ridge_alpha = validate_non_negative_finite_float(
+            ridge_alpha, name="ridge_alpha"
+        )
+        self.pinv_rcond = validate_positive_finite_float(
+            pinv_rcond, name="pinv_rcond"
+        )
         if criterion is not None and criterion_cls is not None:
             raise ValueError(
                 f"{type(self).__name__} accepts either `criterion` or `criterion_cls`, not both."
@@ -95,7 +111,13 @@ class ForwardSelection:
 
         max_steps = validate_optional_non_negative_int(max_steps, name="max_steps")
         criterion = self._init_criterion(data)
-        work_state = ForwardState.create(data, self.tol)
+        work_state = ForwardState.create(
+            data,
+            self.tol,
+            solver_policy=self.solver_policy,
+            ridge_alpha=self.ridge_alpha,
+            pinv_rcond=self.pinv_rcond,
+        )
 
         while max_steps is None or work_state.k < max_steps:
             scored = work_state.candidate_scores()
@@ -111,7 +133,16 @@ class ForwardSelection:
             work_state.apply_forward(feat_idx)
             criterion.update_current(best_score)
 
-        result = result_state if result_state is not None else SelectionState(data)
+        result = (
+            result_state
+            if result_state is not None
+            else SelectionState(
+                data,
+                solver_policy=self.solver_policy,
+                ridge_alpha=self.ridge_alpha,
+                pinv_rcond=self.pinv_rcond,
+            )
+        )
         result.init_from_active_set(work_state.active_set)
         return result
 
@@ -139,7 +170,14 @@ class BackwardSelection(ForwardSelection):
         max_steps = validate_optional_non_negative_int(max_steps, name="max_steps")
         criterion = self._init_criterion(data)
         full_active = list(range(data.gram.shape[0]))
-        work_state = ForwardState.from_active_set(data, full_active, self.tol)
+        work_state = ForwardState.from_active_set(
+            data,
+            full_active,
+            self.tol,
+            solver_policy=self.solver_policy,
+            ridge_alpha=self.ridge_alpha,
+            pinv_rcond=self.pinv_rcond,
+        )
         initial = float(
             np.asarray(criterion.evaluate(work_state.rss, len(work_state.active_set)))
         )
@@ -159,7 +197,16 @@ class BackwardSelection(ForwardSelection):
             criterion.update_current(best_score)
             steps += 1
 
-        result = result_state if result_state is not None else SelectionState(data)
+        result = (
+            result_state
+            if result_state is not None
+            else SelectionState(
+                data,
+                solver_policy=self.solver_policy,
+                ridge_alpha=self.ridge_alpha,
+                pinv_rcond=self.pinv_rcond,
+            )
+        )
         result.init_from_active_set(work_state.active_set)
         return result
 
@@ -188,7 +235,13 @@ class MixedSelection(ForwardSelection):
             max_total_steps, name="max_total_steps"
         )
         criterion = self._init_criterion(data)
-        work_state = ForwardState.create(data, self.tol)
+        work_state = ForwardState.create(
+            data,
+            self.tol,
+            solver_policy=self.solver_policy,
+            ridge_alpha=self.ridge_alpha,
+            pinv_rcond=self.pinv_rcond,
+        )
 
         forward_steps = 0
         total_steps = 0
@@ -227,7 +280,16 @@ class MixedSelection(ForwardSelection):
                 criterion.update_current(best_score)
                 total_steps += 1
 
-        result = result_state if result_state is not None else SelectionState(data)
+        result = (
+            result_state
+            if result_state is not None
+            else SelectionState(
+                data,
+                solver_policy=self.solver_policy,
+                ridge_alpha=self.ridge_alpha,
+                pinv_rcond=self.pinv_rcond,
+            )
+        )
         result.init_from_active_set(work_state.active_set)
         return result
 

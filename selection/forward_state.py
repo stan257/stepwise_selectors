@@ -8,12 +8,34 @@ import numpy as np
 
 from .definitions import GramData
 from .index_validation import validate_feature_indices
+from .solvers import build_forward_factorization
+
+
+def _normalize_solver_params(
+    solver_policy: str, ridge_alpha: float, pinv_rcond: float
+) -> tuple[str, float, float]:
+    policy = str(solver_policy).strip().lower()
+    match policy:
+        case "strict" | "ridge" | "pinv":
+            pass
+        case _:
+            raise ValueError("solver_policy must be one of: pinv, ridge, strict.")
+    ridge = float(ridge_alpha)
+    if not np.isfinite(ridge) or ridge < 0.0:
+        raise ValueError("ridge_alpha must be finite and >= 0.")
+    rcond = float(pinv_rcond)
+    if not np.isfinite(rcond) or rcond <= 0.0:
+        raise ValueError("pinv_rcond must be finite and > 0.")
+    return policy, ridge, rcond
 
 
 @dataclass
 class ForwardState:
     data: GramData
     tol: float
+    solver_policy: str
+    ridge_alpha: float
+    pinv_rcond: float
     active_set: list[int]
     active_mask: np.ndarray
     r: np.ndarray
@@ -27,12 +49,26 @@ class ForwardState:
     k: int
 
     @classmethod
-    def create(cls, data: GramData, tol: float) -> "ForwardState":
+    def create(
+        cls,
+        data: GramData,
+        tol: float,
+        *,
+        solver_policy: str = "strict",
+        ridge_alpha: float = 1e-8,
+        pinv_rcond: float = 1e-12,
+    ) -> "ForwardState":
+        policy, ridge, rcond = _normalize_solver_params(
+            solver_policy, ridge_alpha, pinv_rcond
+        )
         p = data.gram.shape[0]
         cap = min(64, p)
         return cls(
             data=data,
             tol=tol,
+            solver_policy=policy,
+            ridge_alpha=ridge,
+            pinv_rcond=rcond,
             active_set=[],
             active_mask=np.zeros(p, dtype=bool),
             r=data.cov.astype(float, copy=True),
@@ -48,16 +84,38 @@ class ForwardState:
 
     @classmethod
     def from_active_set(
-        cls, data: GramData, active_set: list[int], tol: float
+        cls,
+        data: GramData,
+        active_set: list[int],
+        tol: float,
+        *,
+        solver_policy: str = "strict",
+        ridge_alpha: float = 1e-8,
+        pinv_rcond: float = 1e-12,
     ) -> "ForwardState":
+        policy, ridge, rcond = _normalize_solver_params(
+            solver_policy, ridge_alpha, pinv_rcond
+        )
         p = data.gram.shape[0]
         normalized_active = validate_feature_indices(
             list(active_set), p, context="active_set"
         )
         if not normalized_active:
-            return cls.create(data, tol)
+            return cls.create(
+                data,
+                tol,
+                solver_policy=policy,
+                ridge_alpha=ridge,
+                pinv_rcond=rcond,
+            )
         k = len(normalized_active)
-        state = cls.create(data, tol)
+        state = cls.create(
+            data,
+            tol,
+            solver_policy=policy,
+            ridge_alpha=ridge,
+            pinv_rcond=rcond,
+        )
         state._ensure_capacity(k - 1)
         state.active_set = normalized_active
         state.active_mask[:] = False
@@ -66,30 +124,36 @@ class ForwardState:
 
         idx = np.array(normalized_active, dtype=int)
         G_S = data.gram[np.ix_(idx, idx)]
-        # Use Cholesky to build the QR factor (R) for the active set.
-        L = np.linalg.cholesky(G_S)
-        R = L.T
-        state.R[:k, :k] = R
-
         G_Sfull = data.gram[np.ix_(idx, np.arange(p))]
-        # Z = Q^T X = R^{-T} G_Sfull
-        state.Z[:k, :] = np.linalg.solve(R.T, G_Sfull)
         cov_S = data.cov[idx]
-        state.qy[:k] = np.linalg.solve(R.T, cov_S)
+        factors = build_forward_factorization(
+            G_S,
+            cov_S,
+            G_Sfull,
+            solver_policy=policy,
+            ridge_alpha=ridge,
+            pinv_rcond=rcond,
+            context="Active Gram matrix",
+        )
+        state.R[:k, :k] = factors.R
+        state.Z[:k, :] = factors.Z
+        state.qy[:k] = factors.qy
 
         state.r = data.cov - state.Z[:k, :].T @ state.qy[:k]
         state.v = np.diag(data.gram) - np.sum(state.Z[:k, :] ** 2, axis=0)
         state.rss = float(data.y_norm - np.dot(state.qy[:k], state.qy[:k]))
 
-        invR = np.linalg.solve(R, np.eye(k))
-        state.K[:k, :k] = invR @ invR.T
-        state.beta_S[:k] = np.linalg.solve(R, state.qy[:k])
+        state.K[:k, :k] = factors.K
+        state.beta_S[:k] = factors.beta
         return state
 
     def clone(self) -> "ForwardState":
         return ForwardState(
             data=self.data,
             tol=self.tol,
+            solver_policy=self.solver_policy,
+            ridge_alpha=self.ridge_alpha,
+            pinv_rcond=self.pinv_rcond,
             active_set=list(self.active_set),
             active_mask=self.active_mask.copy(),
             r=self.r.copy(),

@@ -78,7 +78,14 @@ def _cv_beam_forward_children(
         for state_k in child_states:
             state_k.apply_forward(feat_idx)
         # Rebuild per-fold states to keep QR/K updates numerically stable.
-        child_states = _rebuild_states(data, child_states[0].active_set, tol)
+        child_states = _rebuild_states(
+            data,
+            child_states[0].active_set,
+            tol,
+            solver_policy=child_states[0].solver_policy,
+            ridge_alpha=child_states[0].ridge_alpha,
+            pinv_rcond=child_states[0].pinv_rcond,
+        )
         child_criterion = beam.criterion.clone()
         child_criterion.update_current(candidate_score)
         children.append(CVBeam(child_states, child_criterion, candidate_score))
@@ -112,7 +119,14 @@ def _cv_beam_backward_children(
             for state_k in child_states:
                 state_k.apply_backward(idx)
             # Rebuild per-fold states to keep QR/K updates numerically stable.
-            child_states = _rebuild_states(data, child_states[0].active_set, tol)
+            child_states = _rebuild_states(
+                data,
+                child_states[0].active_set,
+                tol,
+                solver_policy=child_states[0].solver_policy,
+                ridge_alpha=child_states[0].ridge_alpha,
+                pinv_rcond=child_states[0].pinv_rcond,
+            )
         except ValueError:
             continue
         child_criterion = beam.criterion.clone()
@@ -153,7 +167,13 @@ class CrossValForwardSelection(ForwardSelection):
 
         max_steps = validate_optional_non_negative_int(max_steps, name="max_steps")
         criterion = self._init_criterion(data.make_full_data())
-        fold_states = _build_fold_states(data, tol=self.tol)
+        fold_states = _build_fold_states(
+            data,
+            tol=self.tol,
+            solver_policy=self.solver_policy,
+            ridge_alpha=self.ridge_alpha,
+            pinv_rcond=self.pinv_rcond,
+        )
         criterion.update_current(
             float(np.asarray(criterion.evaluate(_cv_rss(fold_states, data), 0)))
         )
@@ -173,13 +193,23 @@ class CrossValForwardSelection(ForwardSelection):
             for state_k in fold_states:
                 state_k.apply_forward(feat_idx)
             fold_states = _rebuild_states(
-                data, fold_states[0].active_set, self.tol
+                data,
+                fold_states[0].active_set,
+                self.tol,
+                solver_policy=self.solver_policy,
+                ridge_alpha=self.ridge_alpha,
+                pinv_rcond=self.pinv_rcond,
             )
             criterion.update_current(best_score)
             steps += 1
 
         return _build_cv_state_from_active_set(
-            data, fold_states[0].active_set, state=result_state
+            data,
+            fold_states[0].active_set,
+            state=result_state,
+            solver_policy=self.solver_policy,
+            ridge_alpha=self.ridge_alpha,
+            pinv_rcond=self.pinv_rcond,
         )
 
 
@@ -205,7 +235,14 @@ class CrossValBackwardSelection(ForwardSelection):
         max_steps = validate_optional_non_negative_int(max_steps, name="max_steps")
         criterion = self._init_criterion(data.make_full_data())
         full_active = list(range(data.p))
-        fold_states = _build_fold_states(data, tol=self.tol, active_set=full_active)
+        fold_states = _build_fold_states(
+            data,
+            tol=self.tol,
+            active_set=full_active,
+            solver_policy=self.solver_policy,
+            ridge_alpha=self.ridge_alpha,
+            pinv_rcond=self.pinv_rcond,
+        )
         criterion.update_current(
             float(
                 np.asarray(
@@ -228,7 +265,12 @@ class CrossValBackwardSelection(ForwardSelection):
                 for state_k in fold_states:
                     state_k.apply_backward(best_idx)
                 fold_states = _rebuild_states(
-                    data, fold_states[0].active_set, self.tol
+                    data,
+                    fold_states[0].active_set,
+                    self.tol,
+                    solver_policy=self.solver_policy,
+                    ridge_alpha=self.ridge_alpha,
+                    pinv_rcond=self.pinv_rcond,
                 )
             except ValueError:
                 break
@@ -236,7 +278,12 @@ class CrossValBackwardSelection(ForwardSelection):
             steps += 1
 
         return _build_cv_state_from_active_set(
-            data, fold_states[0].active_set, state=result_state
+            data,
+            fold_states[0].active_set,
+            state=result_state,
+            solver_policy=self.solver_policy,
+            ridge_alpha=self.ridge_alpha,
+            pinv_rcond=self.pinv_rcond,
         )
 
 
@@ -267,7 +314,13 @@ class CrossValMixedSelection(ForwardSelection):
             max_total_steps, name="max_total_steps"
         )
         criterion = self._init_criterion(data.make_full_data())
-        fold_states = _build_fold_states(data, tol=self.tol)
+        fold_states = _build_fold_states(
+            data,
+            tol=self.tol,
+            solver_policy=self.solver_policy,
+            ridge_alpha=self.ridge_alpha,
+            pinv_rcond=self.pinv_rcond,
+        )
         criterion.update_current(
             float(np.asarray(criterion.evaluate(_cv_rss(fold_states, data), 0)))
         )
@@ -292,7 +345,12 @@ class CrossValMixedSelection(ForwardSelection):
             for state_k in fold_states:
                 state_k.apply_forward(feat_idx)
             fold_states = _rebuild_states(
-                data, fold_states[0].active_set, self.tol
+                data,
+                fold_states[0].active_set,
+                self.tol,
+                solver_policy=self.solver_policy,
+                ridge_alpha=self.ridge_alpha,
+                pinv_rcond=self.pinv_rcond,
             )
             criterion.update_current(best_score)
             forward_steps += 1
@@ -313,7 +371,12 @@ class CrossValMixedSelection(ForwardSelection):
                     for state_k in fold_states:
                         state_k.apply_backward(best_idx)
                     fold_states = _rebuild_states(
-                        data, fold_states[0].active_set, self.tol
+                        data,
+                        fold_states[0].active_set,
+                        self.tol,
+                        solver_policy=self.solver_policy,
+                        ridge_alpha=self.ridge_alpha,
+                        pinv_rcond=self.pinv_rcond,
                     )
                 except ValueError:
                     break
@@ -321,7 +384,12 @@ class CrossValMixedSelection(ForwardSelection):
                 total_steps += 1
 
         return _build_cv_state_from_active_set(
-            data, fold_states[0].active_set, state=result_state
+            data,
+            fold_states[0].active_set,
+            state=result_state,
+            solver_policy=self.solver_policy,
+            ridge_alpha=self.ridge_alpha,
+            pinv_rcond=self.pinv_rcond,
         )
 
 
@@ -352,7 +420,13 @@ class BeamCrossValForwardSelection(ForwardSelection):
 
         max_steps = validate_optional_non_negative_int(max_steps, name="max_steps")
         criterion = self._init_criterion(data.make_full_data())
-        fold_states = _build_fold_states(data, tol=self.tol)
+        fold_states = _build_fold_states(
+            data,
+            tol=self.tol,
+            solver_policy=self.solver_policy,
+            ridge_alpha=self.ridge_alpha,
+            pinv_rcond=self.pinv_rcond,
+        )
         initial_score = float(
             np.asarray(criterion.evaluate(_cv_rss(fold_states, data), 0))
         )
@@ -376,7 +450,12 @@ class BeamCrossValForwardSelection(ForwardSelection):
         sel = min if criterion.minimize else max
         best = sel(beams, key=lambda b: b.score)
         return _build_cv_state_from_active_set(
-            data, best.states[0].active_set, state=result_state
+            data,
+            best.states[0].active_set,
+            state=result_state,
+            solver_policy=self.solver_policy,
+            ridge_alpha=self.ridge_alpha,
+            pinv_rcond=self.pinv_rcond,
         )
 
 
@@ -411,7 +490,14 @@ class BeamCrossValBackwardSelection(ForwardSelection):
         max_steps = validate_optional_non_negative_int(max_steps, name="max_steps")
         criterion = self._init_criterion(data.make_full_data())
         full_active = list(range(data.p))
-        fold_states = _build_fold_states(data, tol=self.tol, active_set=full_active)
+        fold_states = _build_fold_states(
+            data,
+            tol=self.tol,
+            active_set=full_active,
+            solver_policy=self.solver_policy,
+            ridge_alpha=self.ridge_alpha,
+            pinv_rcond=self.pinv_rcond,
+        )
         initial_score = float(
             np.asarray(
                 criterion.evaluate(_cv_rss(fold_states, data), len(full_active))
@@ -441,7 +527,12 @@ class BeamCrossValBackwardSelection(ForwardSelection):
         sel = min if criterion.minimize else max
         best = sel(beams, key=lambda b: b.score)
         return _build_cv_state_from_active_set(
-            data, best.states[0].active_set, state=result_state
+            data,
+            best.states[0].active_set,
+            state=result_state,
+            solver_policy=self.solver_policy,
+            ridge_alpha=self.ridge_alpha,
+            pinv_rcond=self.pinv_rcond,
         )
 
 
@@ -478,7 +569,13 @@ class BeamCrossValMixedSelection(ForwardSelection):
             max_total_steps, name="max_total_steps"
         )
         criterion = self._init_criterion(data.make_full_data())
-        fold_states = _build_fold_states(data, tol=self.tol)
+        fold_states = _build_fold_states(
+            data,
+            tol=self.tol,
+            solver_policy=self.solver_policy,
+            ridge_alpha=self.ridge_alpha,
+            pinv_rcond=self.pinv_rcond,
+        )
         initial_score = float(
             np.asarray(criterion.evaluate(_cv_rss(fold_states, data), 0))
         )
@@ -524,7 +621,12 @@ class BeamCrossValMixedSelection(ForwardSelection):
             beams = new_beams
 
         return _build_cv_state_from_active_set(
-            data, best.states[0].active_set, state=result_state
+            data,
+            best.states[0].active_set,
+            state=result_state,
+            solver_policy=self.solver_policy,
+            ridge_alpha=self.ridge_alpha,
+            pinv_rcond=self.pinv_rcond,
         )
 
 
