@@ -49,16 +49,29 @@ Test fraction is `1 - train_fraction - val_fraction`.
 ### Method config
 
 - `name`: method label in output rows.
-- `selector`: selector class name from `selection.routines`.
+- exactly one of:
+  - `selector`: selector class name from `selection.routines`
+  - `baseline`: baseline name from `benchmarks.baselines`
+
+For selectors:
+
 - `selector_params`: constructor kwargs.
 - `fit_params`: kwargs passed to `.fit(...)`.
 - `cv_folds`: optional, used only for CV selectors.
 - `cv_seed`: optional, used only for CV selectors.
 
+For baselines:
+
+- `baseline_params`: constructor kwargs.
+
 For criteria, pass class names as strings in `selector_params`:
 
 - `criterion_cls`: e.g. `"AICCriterion"`, `"BestRSSCriterion"`
 - `criterion`: also accepted
+
+Current built-in baseline:
+
+- `TopKAbsCovBaseline`: selects top-k features by absolute train covariance (`|X^T y|`) and refits OLS on that support.
 
 ## Output Format
 

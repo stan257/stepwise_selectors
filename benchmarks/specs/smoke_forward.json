@@ -55,6 +55,13 @@
       "fit_params": {
         "max_steps": 12
       }
+    },
+    {
+      "name": "topk_abs_cov_k6",
+      "baseline": "TopKAbsCovBaseline",
+      "baseline_params": {
+        "k": 6
+      }
     }
   ]
 }

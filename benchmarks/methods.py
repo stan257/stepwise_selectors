@@ -31,6 +31,7 @@ from selection.routines import (
     MixedSelection,
 )
 
+from .baselines import BASELINE_MAP
 from .datasets import BenchmarkDataset
 
 
@@ -117,32 +118,58 @@ def _resolve_criterion_refs(selector_params: dict) -> dict:
 
 def run_method(method_config: dict, dataset: BenchmarkDataset) -> MethodRunResult:
     method_name = str(method_config["name"])
-    selector_name = str(method_config["selector"])
+    has_selector = "selector" in method_config
+    has_baseline = "baseline" in method_config
+    if has_selector == has_baseline:
+        raise ValueError("Each method config must define exactly one of 'selector' or 'baseline'.")
 
-    selector_cls = SELECTOR_MAP.get(selector_name)
-    if selector_cls is None:
-        raise ValueError(
-            f"Unknown selector {selector_name!r}. Supported: {sorted(SELECTOR_MAP)}"
+    if has_selector:
+        selector_name = str(method_config["selector"])
+        selector_cls = SELECTOR_MAP.get(selector_name)
+        if selector_cls is None:
+            raise ValueError(
+                f"Unknown selector {selector_name!r}. Supported: {sorted(SELECTOR_MAP)}"
+            )
+
+        selector_params = _resolve_criterion_refs(method_config.get("selector_params", {}))
+        fit_params = dict(method_config.get("fit_params", {}))
+
+        selector = selector_cls(**selector_params)
+
+        if selector_name in CV_SELECTORS:
+            n_folds = int(method_config.get("cv_folds", 5))
+            cv_seed = int(method_config.get("cv_seed", dataset.seed + 17))
+            data_for_fit = _build_cv_data(
+                dataset.X_train, dataset.y_train, n_folds, cv_seed
+            )
+        else:
+            data_for_fit = dataset.train_data
+
+        state = selector.fit(data=data_for_fit, **fit_params)
+        active_set = [int(i) for i in state.active_set]
+
+        return MethodRunResult(
+            method_name=method_name,
+            selector_name=selector_name,
+            active_set=active_set,
+            state=state,
         )
 
-    selector_params = _resolve_criterion_refs(method_config.get("selector_params", {}))
-    fit_params = dict(method_config.get("fit_params", {}))
+    baseline_name = str(method_config["baseline"])
+    baseline_cls = BASELINE_MAP.get(baseline_name)
+    if baseline_cls is None:
+        raise ValueError(
+            f"Unknown baseline {baseline_name!r}. Supported: {sorted(BASELINE_MAP)}"
+        )
 
-    selector = selector_cls(**selector_params)
-
-    if selector_name in CV_SELECTORS:
-        n_folds = int(method_config.get("cv_folds", 5))
-        cv_seed = int(method_config.get("cv_seed", dataset.seed + 17))
-        data_for_fit = _build_cv_data(dataset.X_train, dataset.y_train, n_folds, cv_seed)
-    else:
-        data_for_fit = dataset.train_data
-
-    state = selector.fit(data=data_for_fit, **fit_params)
+    baseline_params = dict(method_config.get("baseline_params", {}))
+    baseline = baseline_cls(**baseline_params)
+    state = baseline.fit(X_train=dataset.X_train, y_train=dataset.y_train)
     active_set = [int(i) for i in state.active_set]
 
     return MethodRunResult(
         method_name=method_name,
-        selector_name=selector_name,
+        selector_name=baseline_name,
         active_set=active_set,
         state=state,
     )
