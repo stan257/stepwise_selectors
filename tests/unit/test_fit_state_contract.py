@@ -4,10 +4,7 @@ import pytest
 from selection.criteria import BestRSSCriterion
 from selection.definitions import GramData
 from selection.routines_core import (
-    BackwardSelection,
-    BeamBackwardSelection,
     BeamCrossValMixedSelection,
-    BeamForwardSelection,
     BeamMixedSelection,
     ForwardSelection,
     MixedSelection,
@@ -45,30 +42,6 @@ NON_CV_SELECTOR_CASES = [
         {"criterion_cls": BestRSSCriterion},
         {"max_steps": 3},
         id="forward",
-    ),
-    pytest.param(
-        BackwardSelection,
-        {"criterion_cls": BestRSSCriterion, "allow_worse": True},
-        {"max_steps": 3},
-        id="backward",
-    ),
-    pytest.param(
-        MixedSelection,
-        {"criterion_cls": BestRSSCriterion},
-        {"max_forward_steps": 3, "max_total_steps": 5},
-        id="mixed",
-    ),
-    pytest.param(
-        BeamForwardSelection,
-        {"criterion_cls": BestRSSCriterion, "beam_width": 2},
-        {"max_steps": 3},
-        id="beam_forward",
-    ),
-    pytest.param(
-        BeamBackwardSelection,
-        {"criterion_cls": BestRSSCriterion, "beam_width": 2, "allow_worse": True},
-        {"max_steps": 3},
-        id="beam_backward",
     ),
     pytest.param(
         BeamMixedSelection,

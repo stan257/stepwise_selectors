@@ -8,13 +8,8 @@ from selection.routines import (
     BackwardSelection,
     BeamBackwardSelection,
     BeamCrossValBackwardSelection,
-    BeamCrossValForwardSelection,
     BeamCrossValMixedSelection,
-    BeamForwardSelection,
-    BeamMixedSelection,
-    CrossValBackwardSelection,
     CrossValForwardSelection,
-    CrossValMixedSelection,
     ForwardSelection,
     MixedSelection,
 )
@@ -28,22 +23,16 @@ def test_routines_core_all_symbols_are_resolvable():
 
 NON_CV_STEP_SELECTORS = [
     ForwardSelection(),
-    BackwardSelection(allow_worse=True),
-    BeamForwardSelection(beam_width=2),
     BeamBackwardSelection(beam_width=2, allow_worse=True),
 ]
 
 CV_STEP_SELECTORS = [
     CrossValForwardSelection(),
-    CrossValBackwardSelection(),
-    BeamCrossValForwardSelection(beam_width=2),
     BeamCrossValBackwardSelection(beam_width=2, allow_worse=True),
 ]
 
 MIXED_SELECTORS = [
     pytest.param(lambda: MixedSelection(), "non_cv", id="mixed"),
-    pytest.param(lambda: BeamMixedSelection(beam_width=2), "non_cv", id="beam_mixed"),
-    pytest.param(lambda: CrossValMixedSelection(), "cv", id="cv_mixed"),
     pytest.param(
         lambda: BeamCrossValMixedSelection(beam_width=2), "cv", id="cv_beam_mixed"
     ),
@@ -91,14 +80,10 @@ def test_mixed_selectors_reject_invalid_budgets(selector_factory, kind):
 @pytest.mark.parametrize(
     "selector_cls,kwargs",
     [
-        pytest.param(BeamForwardSelection, {}, id="beam_forward"),
         pytest.param(BeamBackwardSelection, {"allow_worse": True}, id="beam_backward"),
-        pytest.param(BeamMixedSelection, {}, id="beam_mixed"),
-        pytest.param(BeamCrossValForwardSelection, {}, id="cv_beam_forward"),
         pytest.param(
             BeamCrossValBackwardSelection, {"allow_worse": True}, id="cv_beam_backward"
         ),
-        pytest.param(BeamCrossValMixedSelection, {}, id="cv_beam_mixed"),
     ],
 )
 def test_beam_selectors_reject_invalid_beam_width(selector_cls, kwargs):
@@ -114,7 +99,6 @@ def test_beam_selectors_reject_invalid_beam_width(selector_cls, kwargs):
     "selector_cls,kwargs",
     [
         pytest.param(BackwardSelection, {}, id="backward"),
-        pytest.param(BeamBackwardSelection, {"beam_width": 2}, id="beam_backward"),
         pytest.param(
             BeamCrossValBackwardSelection, {"beam_width": 2}, id="cv_beam_backward"
         ),

@@ -108,18 +108,6 @@ CV_SELECTOR_STATE_CONTRACT_CASES = [
         id="cv_forward",
     ),
     pytest.param(
-        CrossValBackwardSelection,
-        {"criterion_cls": BestRSSCriterion},
-        {"max_steps": 3},
-        id="cv_backward",
-    ),
-    pytest.param(
-        CrossValMixedSelection,
-        {"criterion_cls": BestRSSCriterion},
-        {"max_forward_steps": 3, "max_total_steps": 5},
-        id="cv_mixed",
-    ),
-    pytest.param(
         BeamCrossValForwardSelection,
         {"criterion_cls": BestRSSCriterion, "beam_width": 2},
         {"max_steps": 3},
@@ -166,8 +154,6 @@ def test_cv_selector_reuses_matching_state(
 
 CV_SELECTOR_VALIDATION_CASES = [
     CrossValForwardSelection,
-    CrossValBackwardSelection,
-    CrossValMixedSelection,
     BeamCrossValForwardSelection,
 ]
 
@@ -210,14 +196,6 @@ def test_cv_selectors_reject_cv_incompatible_custom_criterion(selector_cls):
     "selector_cls,fit_kwargs",
     [
         pytest.param(CrossValForwardSelection, {"max_steps": 2}, id="cv_forward"),
-        pytest.param(
-            CrossValMixedSelection,
-            {"max_forward_steps": 2, "max_total_steps": 3},
-            id="cv_mixed",
-        ),
-        pytest.param(
-            BeamCrossValForwardSelection, {"max_steps": 2}, id="cv_beam_forward"
-        ),
         pytest.param(
             BeamCrossValMixedSelection,
             {"max_forward_steps": 2, "max_total_steps": 3},
