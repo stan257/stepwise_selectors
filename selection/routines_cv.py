@@ -46,14 +46,6 @@ class CVBeam:
     def signature(self) -> int:
         return self._signature
 
-
-def _cv_beam_prune(
-    beams: list[CVBeam], beam_limit: int
-) -> list[CVBeam]:
-    """Compatibility wrapper around shared beam-pruning logic."""
-    return prune_unique_beams(beams, beam_limit)
-
-
 def _cv_beam_forward_children(
     beam: CVBeam,
     beam_width: int,
@@ -444,7 +436,7 @@ class BeamCrossValForwardSelection(ForwardSelection):
                 )
             if not candidates:
                 break
-            beams = _cv_beam_prune(candidates, self.beam_width)
+            beams = prune_unique_beams(candidates, self.beam_width)
             steps += 1
 
         sel = min if criterion.minimize else max
@@ -521,7 +513,7 @@ class BeamCrossValBackwardSelection(ForwardSelection):
                 )
             if not candidates:
                 break
-            beams = _cv_beam_prune(candidates, self.beam_width)
+            beams = prune_unique_beams(candidates, self.beam_width)
             steps += 1
 
         sel = min if criterion.minimize else max
@@ -601,7 +593,7 @@ class BeamCrossValMixedSelection(ForwardSelection):
                 )
             if not candidates:
                 break
-            beams = _cv_beam_prune(candidates, self.beam_width)
+            beams = prune_unique_beams(candidates, self.beam_width)
             best = sel(beams, key=lambda b: b.score)
             forward_steps += 1
             total_ops += len(beams)
@@ -632,7 +624,6 @@ class BeamCrossValMixedSelection(ForwardSelection):
 
 __all__ = [
     "CVBeam",
-    "_cv_beam_prune",
     "_cv_beam_forward_children",
     "_cv_beam_backward_children",
     "_cv_beam_best_backward_child",

@@ -13,7 +13,7 @@ from selection.criteria import (
     HQICCriterion,
 )
 from selection.definitions import GramData
-from selection.routines_core import BeamForwardSelection, ForwardSelection
+from selection.routines import BeamForwardSelection, ForwardSelection
 
 
 def _explicit_rss(X: np.ndarray, y: np.ndarray, subset: tuple[int, ...]) -> tuple[float, np.ndarray]:

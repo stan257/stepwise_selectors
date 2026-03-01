@@ -1,7 +1,7 @@
 import numpy as np
 
 from selection.definitions import GramData
-from selection.routines_core import ForwardState
+from selection.forward_state import ForwardState
 
 
 def test_backward_step_matches_direct_rss_for_active_set():

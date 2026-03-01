@@ -13,17 +13,17 @@ import pytest
 
 from selection.criteria import AICCriterion, BestRSSCriterion
 from selection.definitions import CrossValGramData, GramData
-from selection.routines_core import (
+from selection.forward_state import ForwardState
+from selection.routines import (
     BackwardSelection,
     CrossValForwardSelection,
-    ForwardState,
+    ForwardSelection,
     MixedSelection,
 )
 from selection.grouped_routines import (
     GroupBackwardSelection,
     GroupForwardSelection,
 )
-from selection.routines import ForwardSelection
 from selection.state import SelectionState
 from tests.helpers import explicit_beta_rss, explicit_cv_rss, make_regression_gram
 

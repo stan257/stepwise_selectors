@@ -3,7 +3,7 @@ import pytest
 
 from selection.criteria import BestRSSCriterion
 from selection.definitions import GramData
-from selection.routines_core import (
+from selection.routines import (
     BackwardSelection,
     BeamBackwardSelection,
     BeamCrossValBackwardSelection,

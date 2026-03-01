@@ -118,10 +118,6 @@ The implementation is split by responsibility:
     - `CVBeam`
     - `_cv_beam_*`
 
-- `selection/routines_core.py`
-  - Compatibility facade that re-exports the core selector classes.
-  - Internal scoring/beam helpers live in dedicated modules and are not part of the stable public surface.
-
 Important behavior:
 - CV candidate scoring uses summed fold validation RSS (same scale as `rss_cv`).
 - `BeamCrossValBackwardSelection` is improvement-only by default; `allow_worse=True` enables forced removals.
@@ -184,7 +180,7 @@ Notable files:
 
 ## Data-flow summary
 1. Build `GramData` / `CrossValGramData`.
-2. Run a selector from `selection.routines` (default public entrypoint). `selection.routines_core` remains a compatibility facade for class re-exports.
+2. Run a selector from `selection.routines` (default public entrypoint).
 3. Internal optimization runs on Gram-only states.
 4. Final result is materialized as `SelectionState` or `CrossValSelectionState` with `active_set` and RSS metrics; CV `beta` is a full-data post-selection refit.
 
@@ -200,8 +196,7 @@ This is the current architecture baseline: no separate legacy `beam_search.py`, 
   - grouped routines currently expose greedy add/drop policies only;
   - extension work should preserve complete-group support semantics.
 - Alternate frontends:
-  - maintain `selection.routines` as primary user-facing import path;
-  - treat `selection.routines_core` as compatibility surface, not long-term extension target.
+  - maintain `selection.routines` as primary user-facing import path.
 
 ---
 

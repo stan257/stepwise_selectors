@@ -3,7 +3,7 @@ import pytest
 
 from selection.criteria import BestRSSCriterion
 from selection.definitions import GramData
-from selection.routines_core import ForwardSelection
+from selection.routines import ForwardSelection
 from tests.helpers import explicit_beta_rss
 
 

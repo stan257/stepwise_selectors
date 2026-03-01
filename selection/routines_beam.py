@@ -38,12 +38,6 @@ class Beam:
     def signature(self) -> int:
         return self._signature
 
-
-def _beam_prune(beams: list[Beam], beam_limit: int) -> list[Beam]:
-    """Compatibility wrapper around shared beam-pruning logic."""
-    return prune_unique_beams(beams, beam_limit)
-
-
 def _beam_forward_children(beam: Beam, beam_width: int) -> list[Beam]:
     scored = beam.state.candidate_scores()
     if scored is None:
@@ -143,7 +137,7 @@ class BeamForwardSelection(ForwardSelection):
 
             if not candidates:
                 break
-            beams = _beam_prune(candidates, self.beam_width)
+            beams = prune_unique_beams(candidates, self.beam_width)
             steps += 1
 
         sel = min if criterion.minimize else max
@@ -211,7 +205,7 @@ class BeamBackwardSelection(ForwardSelection):
                 )
             if not candidates:
                 break
-            beams = _beam_prune(candidates, self.beam_width)
+            beams = prune_unique_beams(candidates, self.beam_width)
             steps += 1
 
         sel = min if criterion.minimize else max
@@ -285,7 +279,7 @@ class BeamMixedSelection(ForwardSelection):
                 candidates.extend(_beam_forward_children(beam, self.beam_width))
             if not candidates:
                 break
-            beams = _beam_prune(candidates, self.beam_width)
+            beams = prune_unique_beams(candidates, self.beam_width)
             best = sel(beams, key=lambda b: b.score)
             forward_steps += 1
             total_ops += len(beams)
@@ -320,7 +314,6 @@ class BeamMixedSelection(ForwardSelection):
 
 __all__ = [
     "Beam",
-    "_beam_prune",
     "_beam_forward_children",
     "_beam_backward_children",
     "_beam_best_backward_child",

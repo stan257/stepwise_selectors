@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from selection.definitions import GramData
-from selection.routines_core import ForwardState
+from selection.forward_state import ForwardState
 
 
 def test_random_steps_preserve_active_set_and_rss_consistency():

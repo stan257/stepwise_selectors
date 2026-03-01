@@ -2,7 +2,7 @@ import numpy as np
 
 from selection.criteria import BestRSSCriterion
 from selection.definitions import CrossValGramData, GramData
-from selection.routines_core import (
+from selection.routines import (
     BeamCrossValBackwardSelection,
 )
 
