@@ -245,6 +245,9 @@ class SelectionState:
             self.active_idx_buf[: self.active_len] = np.array(self.active_set, dtype=int)
             # Reset and fill only once per sync to keep mask consistent.
             self.active_mask.fill(False)
+            self.active_mask[self.active_idx] = True
+        else:
+            self.active_mask.fill(False)
 
     def _ensure_matrix_buffers(self) -> None:
         """Allocate O(p^2) buffers lazily to reduce baseline memory usage."""
@@ -252,9 +255,6 @@ class SelectionState:
             self.K_buf = np.empty((self.p, self.p))
         if self.outer_buf is None:
             self.outer_buf = np.empty((self.p, self.p))
-            self.active_mask[self.active_idx] = True
-        else:
-            self.active_mask.fill(False)
 
     def init_empty(self):
         self.active_set = []
