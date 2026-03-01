@@ -16,6 +16,12 @@ Run multi-seed stability benchmark suite + summary artifacts:
 python3 benchmarks/stability.py
 ```
 
+Run higher-confidence full profile (more seeds on hard scenarios):
+
+```bash
+python3 benchmarks/stability.py --profile full
+```
+
 Re-render stability markdown report from saved summary JSON:
 
 ```bash
@@ -85,6 +91,10 @@ Additional support-recovery options:
 - `clustered_support`: if `true`, support indices are contiguous.
 - `support_seed`: optional fixed seed for true-support identity across runs.
 - `min_signal_abs`: optional lower bound on absolute true coefficient magnitudes.
+- `twin_decoys_per_signal`: number of near-duplicate decoys per true feature.
+- `twin_strength`: linear coupling of twin decoys to source feature in `[0, 1]`.
+- `twin_noise_std`: additive noise scale for twin decoys.
+- `nonlinear_strength`: magnitude of nonlinear target component (misspecification stress).
 
 ### Method config
 
@@ -131,10 +141,20 @@ Stability pipeline outputs:
 - `stability_summary.json`: aggregated stability/effectiveness metrics.
 - `stability_report.md`: scenario-wise markdown summary table.
 
+Stability summary now includes:
+
+- mean test/support metrics with 95% CI,
+- paired-seed win rates vs `forward_bic` and `topk_abs_cov`,
+- optional oracle gap vs exact train-RSS best subset (when `p` and `C(p,k)` are under configured limits).
+
 ## Synthetic Dataset Suite
 
 `benchmarks/synthetic_datasets/` provides a curated set of progressively harder
-support-recovery scenarios (easy -> very_hard) with known true support.
+support-recovery scenarios, plus explicit failure modes:
+
+- ultra-collinear twin decoys,
+- misspecified nonlinear targets,
+- small-`p` oracle-check scenario for exact subset gaps.
 
 ## CI Smoke Gate
 

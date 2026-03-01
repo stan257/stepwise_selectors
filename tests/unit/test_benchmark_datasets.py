@@ -49,3 +49,29 @@ def test_support_seed_keeps_true_support_fixed_across_run_seeds():
     ds_b = build_dataset(cfg_b)
 
     np.testing.assert_array_equal(ds_a.true_support, ds_b.true_support)
+
+
+def test_synthetic_support_recovery_with_twins_and_nonlinear_term_builds():
+    cfg = {
+        "kind": "synthetic_support_recovery",
+        "name": "twins_nonlinear",
+        "seed": 321,
+        "n_samples": 160,
+        "n_features": 30,
+        "support_size": 5,
+        "noise_std": 0.5,
+        "signal_scale": 2.2,
+        "correlation": 0.6,
+        "twin_decoys_per_signal": 1,
+        "twin_strength": 0.98,
+        "twin_noise_std": 0.1,
+        "nonlinear_strength": 0.7,
+        "train_fraction": 0.6,
+        "val_fraction": 0.2,
+    }
+    ds = build_dataset(cfg)
+
+    assert ds.X_train.shape == (96, 30)
+    assert ds.X_val.shape == (32, 30)
+    assert ds.X_test.shape == (32, 30)
+    assert ds.true_support.shape == (5,)

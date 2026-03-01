@@ -51,6 +51,15 @@ def _validate_optional_seed(value, *, name: str) -> int | None:
     return int(value)
 
 
+def _validate_nonnegative_int(value, *, name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise TypeError(f"{name} must be a non-negative integer.")
+    value = int(value)
+    if value < 0:
+        raise ValueError(f"{name} must be >= 0.")
+    return value
+
+
 def _split_indices(
     n_samples: int, train_fraction: float, val_fraction: float
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -105,6 +114,58 @@ def _enforce_min_abs(values: np.ndarray, min_abs: float) -> np.ndarray:
     return signs * magnitudes
 
 
+def _apply_twin_decoys(
+    *,
+    X: np.ndarray,
+    true_support: np.ndarray,
+    rng: np.random.Generator,
+    twin_decoys_per_signal: int,
+    twin_strength: float,
+    twin_noise_std: float,
+) -> None:
+    if twin_decoys_per_signal <= 0:
+        return
+
+    n_features = X.shape[1]
+    support_set = set(int(i) for i in true_support.tolist())
+    available = [
+        idx
+        for idx in range(n_features)
+        if idx not in support_set
+    ]
+    needed = int(twin_decoys_per_signal) * int(true_support.size)
+    if needed > len(available):
+        raise ValueError(
+            "Not enough non-support features to allocate requested twin decoys."
+        )
+
+    cursor = 0
+    n_samples = X.shape[0]
+    for support_idx in true_support.tolist():
+        source = X[:, int(support_idx)]
+        for _ in range(twin_decoys_per_signal):
+            dst = available[cursor]
+            cursor += 1
+            X[:, dst] = (
+                twin_strength * source + twin_noise_std * rng.standard_normal(n_samples)
+            )
+
+
+def _nonlinear_component(X: np.ndarray, support: np.ndarray) -> np.ndarray:
+    if support.size == 0:
+        return np.zeros(X.shape[0], dtype=float)
+    terms = np.zeros(X.shape[0], dtype=float)
+    s0 = int(support[0])
+    terms += 0.5 * (X[:, s0] ** 2 - 1.0)
+    if support.size >= 2:
+        s1 = int(support[1])
+        terms += X[:, s0] * X[:, s1]
+    if support.size >= 3:
+        s2 = int(support[2])
+        terms += 0.5 * (X[:, s2] ** 2 - 1.0)
+    return terms
+
+
 def _build_synthetic_dataset(config: dict, *, correlation: float) -> BenchmarkDataset:
     seed = int(config["seed"])
     n_samples = int(config["n_samples"])
@@ -115,6 +176,12 @@ def _build_synthetic_dataset(config: dict, *, correlation: float) -> BenchmarkDa
     min_signal_abs = float(config.get("min_signal_abs", 0.0))
     clustered_support = bool(config.get("clustered_support", False))
     support_seed = _validate_optional_seed(config.get("support_seed"), name="support_seed")
+    twin_decoys_per_signal = _validate_nonnegative_int(
+        config.get("twin_decoys_per_signal", 0), name="twin_decoys_per_signal"
+    )
+    twin_strength = float(config.get("twin_strength", 0.98))
+    twin_noise_std = float(config.get("twin_noise_std", 0.1))
+    nonlinear_strength = float(config.get("nonlinear_strength", 0.0))
 
     train_fraction = _validate_fraction(
         config.get("train_fraction", 0.6), name="train_fraction"
@@ -131,6 +198,12 @@ def _build_synthetic_dataset(config: dict, *, correlation: float) -> BenchmarkDa
         raise ValueError("noise_std must be >= 0.")
     if min_signal_abs < 0:
         raise ValueError("min_signal_abs must be >= 0.")
+    if not (0.0 <= twin_strength <= 1.0):
+        raise ValueError("twin_strength must be in [0, 1].")
+    if twin_noise_std < 0:
+        raise ValueError("twin_noise_std must be >= 0.")
+    if nonlinear_strength < 0:
+        raise ValueError("nonlinear_strength must be >= 0.")
 
     rng = np.random.default_rng(seed)
     z = rng.standard_normal((n_samples, n_features))
@@ -151,7 +224,18 @@ def _build_synthetic_dataset(config: dict, *, correlation: float) -> BenchmarkDa
     beta_support = _enforce_min_abs(beta_support, min_signal_abs)
     beta_true[true_support] = beta_support
 
+    _apply_twin_decoys(
+        X=X,
+        true_support=true_support,
+        rng=np.random.default_rng(seed + 29),
+        twin_decoys_per_signal=twin_decoys_per_signal,
+        twin_strength=twin_strength,
+        twin_noise_std=twin_noise_std,
+    )
+
     y = X @ beta_true + noise_std * rng.standard_normal(n_samples)
+    if nonlinear_strength > 0.0:
+        y = y + nonlinear_strength * _nonlinear_component(X, true_support)
 
     split_rng = np.random.default_rng(seed + 1)
     permutation = split_rng.permutation(n_samples)
