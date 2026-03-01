@@ -171,13 +171,16 @@ def test_cv_selectors_default_to_best_rss(selector_cls):
     "selector_cls",
     CV_SELECTOR_VALIDATION_CASES,
 )
-@pytest.mark.parametrize("criterion_cls", [AICCriterion, GCVCriterion])
-def test_cv_selectors_reject_disallowed_criteria(selector_cls, criterion_cls):
+@pytest.mark.parametrize(
+    "criterion_spec",
+    [AICCriterion, GCVCriterion, "aic", "gcv"],
+)
+def test_cv_selectors_reject_disallowed_criteria(selector_cls, criterion_spec):
     with pytest.raises(
         ValueError,
-        match=rf"{criterion_cls.__name__} is not supported for CV selection routines",
+        match=r"is not supported for CV selection routines",
     ):
-        selector_cls(criterion_cls=criterion_cls)
+        selector_cls(criterion_cls=criterion_spec)
 
 
 @pytest.mark.parametrize(
@@ -190,6 +193,13 @@ def test_cv_selectors_reject_cv_incompatible_custom_criterion(selector_cls):
         match=r"IncompatibleCriterion is not supported for CV selection routines",
     ):
         selector_cls(criterion_cls=IncompatibleCriterion)
+
+
+@pytest.mark.parametrize("selector_cls", CV_SELECTOR_VALIDATION_CASES)
+def test_cv_selectors_accept_named_best_rss_key(selector_cls):
+    cv_data = make_cv_problem(seed=448, folds=3, n=60, p=6, support=2)
+    state = selector_cls(criterion="rss").fit(data=cv_data, max_steps=2)
+    assert isinstance(state, CrossValSelectionState)
 
 
 @pytest.mark.parametrize(

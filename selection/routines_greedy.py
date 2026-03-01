@@ -16,6 +16,7 @@ from .criteria import AICCriterion, CriterionProtocol
 from .definitions import GramData
 from .selector_validation import (
     _resolve_criterion,
+    _resolve_criterion_provider,
     _validate_cv_criterion,
     _validate_state_target,
 )
@@ -62,13 +63,17 @@ class ForwardSelection:
                 f"{type(self).__name__} accepts either `criterion` or `criterion_cls`, not both."
             )
         self.criterion = criterion
-        if criterion is None:
-            self.criterion_cls = criterion_cls or self._default_criterion
-        else:
-            self.criterion_cls = criterion if isinstance(criterion, type) else type(criterion)
+        self.criterion_cls = criterion_cls
+        if self.criterion is None and self.criterion_cls is None:
+            self.criterion_cls = self._default_criterion
         self.criterion_kwargs = dict(criterion_kwargs or {})
         if self._reject_ic:
-            candidate = criterion if criterion is not None else self.criterion_cls
+            candidate = _resolve_criterion_provider(
+                selector_name=type(self).__name__,
+                criterion=self.criterion,
+                criterion_cls=self.criterion_cls if self.criterion is None else None,
+                default_criterion_cls=self._default_criterion,
+            )
             if getattr(candidate, "cv_compatible", True) is False:
                 name = (
                     candidate.__name__

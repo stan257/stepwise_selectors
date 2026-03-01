@@ -136,6 +136,29 @@ def test_forward_selection_accepts_criterion_instance():
     assert len(result.active_set) <= 3
 
 
+def test_forward_selection_accepts_named_criterion_key():
+    data = make_regression_gram(4441, n=100, p=10)
+    selector = ForwardSelection(criterion="rss")
+    result = selector.fit(data=data, max_steps=3)
+    assert isinstance(result, SelectionState)
+    assert len(result.active_set) <= 3
+
+
+def test_forward_selection_rejects_unknown_criterion_key():
+    data = make_regression_gram(4442, n=100, p=10)
+    selector = ForwardSelection(criterion="not_a_real_criterion")
+    with pytest.raises(ValueError, match=r"unknown criterion key"):
+        selector.fit(data=data, max_steps=2)
+
+
+def test_forward_selection_accepts_named_criterion_cls_key():
+    data = make_regression_gram(4443, n=100, p=10)
+    selector = ForwardSelection(criterion_cls="aic")
+    result = selector.fit(data=data, max_steps=3)
+    assert isinstance(result, SelectionState)
+    assert len(result.active_set) <= 3
+
+
 def test_forward_selection_accepts_criterion_factory_with_auto_params():
     data = make_regression_gram(445, n=90, p=9)
     RecordingRSSCriterion.init_history.clear()

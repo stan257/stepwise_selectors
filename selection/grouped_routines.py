@@ -178,10 +178,9 @@ class BaseGroupedSelection:
             pinv_rcond, name="pinv_rcond"
         )
         self.criterion = criterion
-        if criterion is None:
-            self.criterion_cls = criterion_cls or AICCriterion
-        else:
-            self.criterion_cls = criterion if isinstance(criterion, type) else type(criterion)
+        self.criterion_cls = criterion_cls
+        if self.criterion is None and self.criterion_cls is None:
+            self.criterion_cls = AICCriterion
         self.criterion_kwargs = dict(criterion_kwargs or {})
 
     def _init_criterion(self, data: GramData) -> CriterionProtocol:

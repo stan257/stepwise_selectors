@@ -5,6 +5,10 @@ from __future__ import annotations
 import inspect
 from typing import Any
 
+from .criterion_registry import (
+    available_builtin_criteria,
+    resolve_builtin_criterion,
+)
 from .criteria import (
     BestRSSCriterion,
     CriterionProtocol,
@@ -52,6 +56,33 @@ def _inject_default_criterion_params(
     return resolved
 
 
+def _resolve_criterion_provider(
+    *,
+    selector_name: str,
+    criterion: Any,
+    criterion_cls: Any,
+    default_criterion_cls: Any,
+) -> Any:
+    provider = (
+        criterion if criterion is not None else (criterion_cls or default_criterion_cls)
+    )
+    if not isinstance(provider, str):
+        return provider
+    try:
+        return resolve_builtin_criterion(provider)
+    except TypeError as err:
+        raise TypeError(f"{selector_name} {err}") from err
+    except ValueError as err:
+        raise ValueError(f"{selector_name} {err}") from err
+    except KeyError as err:
+        key = str(err.args[0])
+        supported = ", ".join(available_builtin_criteria())
+        raise ValueError(
+            f"{selector_name} received unknown criterion key '{key}'. "
+            f"Use one of: {supported}."
+        ) from err
+
+
 def _resolve_criterion(
     *,
     selector_name: str,
@@ -61,8 +92,11 @@ def _resolve_criterion(
     default_criterion_cls: Any,
     criterion_kwargs: dict[str, Any] | None,
 ) -> CriterionProtocol:
-    provider = (
-        criterion if criterion is not None else (criterion_cls or default_criterion_cls)
+    provider = _resolve_criterion_provider(
+        selector_name=selector_name,
+        criterion=criterion,
+        criterion_cls=criterion_cls,
+        default_criterion_cls=default_criterion_cls,
     )
     params = dict(criterion_kwargs or {})
 
@@ -136,6 +170,7 @@ def _validate_cv_state_target(
 __all__ = [
     "_inject_default_criterion_params",
     "_resolve_criterion",
+    "_resolve_criterion_provider",
     "_validate_criterion_protocol",
     "_validate_cv_criterion",
     "_validate_state_target",
