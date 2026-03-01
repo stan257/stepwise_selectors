@@ -1,4 +1,4 @@
-# useful selection toolkit
+# stepwise selectors toolkit
 
 Lightweight linear-model selection routines built on precomputed Gram statistics. Includes:
 - Greedy forward/backward/mixed selection with AIC and RSS criteria.
