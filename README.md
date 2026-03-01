@@ -10,6 +10,7 @@ Lightweight linear-model selection routines built on precomputed Gram statistics
 - `selection/`: core code (criteria, state objects, selection routines, grouped variants).
 - `docs/PORTING.md`: exact porting contract (data interfaces, equations, failure semantics).
 - `docs/CONTRACTS.md`: validation-boundary and precondition contract for contributors.
+- `docs/ARCHITECTURE.md`: high-level map of repository boundaries, data flow, and extension points.
 - `tests/`: pytest suite organized by category:
   - `tests/unit/`
   - `tests/integration/`
