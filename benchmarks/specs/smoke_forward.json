@@ -20,7 +20,7 @@
         "criterion": "AICCriterion"
       },
       "fit_params": {
-        "max_steps": 12
+        "max_steps": 7
       }
     },
     {
@@ -31,7 +31,7 @@
         "beam_width": 4
       },
       "fit_params": {
-        "max_steps": 12
+        "max_steps": 7
       }
     },
     {
@@ -41,8 +41,8 @@
         "criterion": "AICCriterion"
       },
       "fit_params": {
-        "max_forward_steps": 10,
-        "max_total_steps": 20
+        "max_forward_steps": 7,
+        "max_total_steps": 14
       }
     },
     {
