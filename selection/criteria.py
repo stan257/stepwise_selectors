@@ -76,6 +76,18 @@ class SelectionCriterion:
             idx = int(np.argmax(flat))
         return idx, float(flat[idx])
 
+    def _coerce_positive_rss(self, rss, *, error_message: str) -> np.ndarray:
+        rss_arr = np.asarray(rss, dtype=float)
+        if np.any(rss_arr < -self.abs_tol):
+            raise ValueError(error_message)
+        return np.where(rss_arr <= self.abs_tol, self.abs_tol, rss_arr)
+
+    def _coerce_non_negative_rss(self, rss, *, error_message: str) -> np.ndarray:
+        rss_arr = np.asarray(rss, dtype=float)
+        if np.any(rss_arr < -self.abs_tol):
+            raise ValueError(error_message)
+        return np.clip(rss_arr, 0.0, None)
+
 
 class AICCriterion(SelectionCriterion):
     """Akaike information criterion."""
@@ -89,9 +101,9 @@ class AICCriterion(SelectionCriterion):
             raise ValueError("n_samples must be positive for AIC.")
 
     def evaluate(self, rss, k: int):
-        rss_arr = np.asarray(rss, dtype=float)
-        if np.any(rss_arr <= 0):
-            raise ValueError("RSS must be positive to compute AIC.")
+        rss_arr = self._coerce_positive_rss(
+            rss, error_message="RSS must be positive to compute AIC."
+        )
         return self.n_samples * np.log(rss_arr / self.n_samples) + 2 * k
 
     def best_candidate(self, rss, k: int):
@@ -116,9 +128,9 @@ class BICCriterion(SelectionCriterion):
             raise ValueError("n_samples must be positive for BIC.")
 
     def evaluate(self, rss, k: int):
-        rss_arr = np.asarray(rss, dtype=float)
-        if np.any(rss_arr <= 0):
-            raise ValueError("RSS must be positive to compute BIC.")
+        rss_arr = self._coerce_positive_rss(
+            rss, error_message="RSS must be positive to compute BIC."
+        )
         n = self.n_samples
         return n * np.log(rss_arr / n) + k * np.log(n)
 
@@ -135,9 +147,9 @@ class AICcCriterion(SelectionCriterion):
             raise ValueError("n_samples must be positive for AICc.")
 
     def evaluate(self, rss, k: int):
-        rss_arr = np.asarray(rss, dtype=float)
-        if np.any(rss_arr <= 0):
-            raise ValueError("RSS must be positive to compute AICc.")
+        rss_arr = self._coerce_positive_rss(
+            rss, error_message="RSS must be positive to compute AICc."
+        )
         n = self.n_samples
         aic = n * np.log(rss_arr / n) + 2 * k
         denom = n - k - 1
@@ -163,9 +175,9 @@ class HQICCriterion(SelectionCriterion):
             )
 
     def evaluate(self, rss, k: int):
-        rss_arr = np.asarray(rss, dtype=float)
-        if np.any(rss_arr <= 0):
-            raise ValueError("RSS must be positive to compute HQIC.")
+        rss_arr = self._coerce_positive_rss(
+            rss, error_message="RSS must be positive to compute HQIC."
+        )
         n = self.n_samples
         penalty = 2.0 * k * np.log(np.log(n))
         return n * np.log(rss_arr / n) + penalty
@@ -189,9 +201,9 @@ class EBICCriterion(SelectionCriterion):
             raise ValueError("p must be positive for EBIC.")
 
     def evaluate(self, rss, k: int):
-        rss_arr = np.asarray(rss, dtype=float)
-        if np.any(rss_arr <= 0):
-            raise ValueError("RSS must be positive to compute EBIC.")
+        rss_arr = self._coerce_positive_rss(
+            rss, error_message="RSS must be positive to compute EBIC."
+        )
         if k < 0 or k > self.p:
             raise ValueError("k must be between 0 and p for EBIC.")
         n = self.n_samples
@@ -218,9 +230,9 @@ class GCVCriterion(SelectionCriterion):
             raise ValueError("n_samples must be positive for GCV.")
 
     def evaluate(self, rss, k: int):
-        rss_arr = np.asarray(rss, dtype=float)
-        if np.any(rss_arr < 0):
-            raise ValueError("RSS must be non-negative to compute GCV.")
+        rss_arr = self._coerce_non_negative_rss(
+            rss, error_message="RSS must be non-negative to compute GCV."
+        )
         denom = self.n_samples - k
         if denom <= 0:
             return np.full_like(rss_arr, np.inf, dtype=float)
@@ -235,9 +247,9 @@ class BestRSSCriterion(SelectionCriterion):
         super().__init__(minimize=True, **kwargs)
 
     def evaluate(self, rss, k: int):
-        rss_arr = np.asarray(rss, dtype=float)
-        if np.any(rss_arr < 0):
-            raise ValueError("RSS must be non-negative.")
+        rss_arr = self._coerce_non_negative_rss(
+            rss, error_message="RSS must be non-negative."
+        )
         return rss_arr
 
     def best_candidate(self, rss, k: int):

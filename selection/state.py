@@ -66,7 +66,7 @@ def _build_forward_cache(
         candidates = candidates[valid_rss]
         resid_var = resid_var[valid_rss]
         resid_corr = resid_corr[valid_rss]
-        rss_new = np.clip(rss_new[valid_rss], tol, None)
+        rss_new = rss_new[valid_rss]
         return ForwardDeltaCache(
             candidates=candidates,
             rss_new=rss_new,
@@ -108,7 +108,7 @@ def _build_forward_cache(
         return None
     return ForwardDeltaCache(
         candidates=candidates[valid_rss],
-        rss_new=np.clip(rss_new[valid_rss], tol, None),
+        rss_new=rss_new[valid_rss],
         resid_var=resid_var[valid_rss],
         resid_corr=resid_corr[valid_rss],
         proj_col=proj_col[:, valid_rss],

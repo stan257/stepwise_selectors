@@ -133,8 +133,10 @@ class ForwardState:
         r_valid = self.r[candidates]
         v_valid = self.v[candidates]
         rss_new = self.rss - (r_valid**2) / v_valid
-        rss_new = np.clip(rss_new, self.tol, None)
-        return candidates, rss_new
+        valid_rss = rss_new > -self.tol
+        if not np.any(valid_rss):
+            return None
+        return candidates[valid_rss], rss_new[valid_rss]
 
     def apply_forward(self, feat_idx: int) -> float:
         """Apply a forward step while updating QR/Gram state in O(p)."""
