@@ -64,7 +64,7 @@ def test_forward_near_singular_gram_remains_finite():
     y = X @ beta + 0.01 * rng.standard_normal(n)
 
     data = GramData(X.T @ X, X.T @ y, y @ y, n_samples=n)
-    state = ForwardSelection(criterion_cls=BestRSSCriterion).fit(
+    state = ForwardSelection(criterion=BestRSSCriterion).fit(
         data=data, max_steps=3
     )
 

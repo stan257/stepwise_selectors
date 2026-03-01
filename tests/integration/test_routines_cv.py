@@ -37,10 +37,10 @@ def test_crossval_backward_selection_recovers_true_support():
 
 def test_crossval_forward_selection_matches_full_run(esl_cv_data):
     cv_data, support, full_data = esl_cv_data
-    ForwardSelection(criterion_cls=BestRSSCriterion).fit(
+    ForwardSelection(criterion=BestRSSCriterion).fit(
         data=full_data, max_steps=len(support)
     )
-    selector = CrossValForwardSelection(criterion_cls=BestRSSCriterion)
+    selector = CrossValForwardSelection(criterion=BestRSSCriterion)
     state = selector.fit(data=cv_data, max_steps=len(support))
 
     recovered = set(state.active_set)
@@ -49,10 +49,10 @@ def test_crossval_forward_selection_matches_full_run(esl_cv_data):
 
 def test_crossval_backward_selection_matches_full_run(esl_cv_data):
     cv_data, support, full_data = esl_cv_data
-    BackwardSelection(criterion_cls=BestRSSCriterion).fit(
+    BackwardSelection(criterion=BestRSSCriterion).fit(
         data=full_data, max_steps=full_data.gram.shape[0] - len(support)
     )
-    selector = CrossValBackwardSelection(criterion_cls=BestRSSCriterion)
+    selector = CrossValBackwardSelection(criterion=BestRSSCriterion)
     p = cv_data.gram_total.shape[0]
     state = selector.fit(data=cv_data, max_steps=p - len(support))
 
@@ -116,11 +116,11 @@ def test_cv_beam_matches_greedy_support_on_heterogeneous_folds():
 
 def test_crossval_beam_can_beat_greedy_in_two_steps():
     cv_data = make_cv_beam_trap_problem()
-    greedy_state = CrossValForwardSelection(criterion_cls=BestRSSCriterion).fit(
+    greedy_state = CrossValForwardSelection(criterion=BestRSSCriterion).fit(
         data=cv_data, max_steps=2
     )
     beam_state = BeamCrossValForwardSelection(
-        beam_width=2, criterion_cls=BestRSSCriterion
+        beam_width=2, criterion=BestRSSCriterion
     ).fit(data=cv_data, max_steps=2)
 
     assert 0 in greedy_state.active_set

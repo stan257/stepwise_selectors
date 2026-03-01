@@ -39,13 +39,13 @@ def raising_typeerror_factory(**kwargs):
 NON_CV_SELECTOR_CASES = [
     pytest.param(
         ForwardSelection,
-        {"criterion_cls": BestRSSCriterion},
+        {"criterion": BestRSSCriterion},
         {"max_steps": 3},
         id="forward",
     ),
     pytest.param(
         BeamMixedSelection,
-        {"criterion_cls": BestRSSCriterion, "beam_width": 2},
+        {"criterion": BestRSSCriterion, "beam_width": 2},
         {"max_forward_steps": 3, "max_total_steps": 5},
         id="beam_mixed",
     ),
@@ -88,12 +88,12 @@ def test_non_cv_selector_reuses_matching_state(
     [
         pytest.param(
             MixedSelection,
-            {"criterion_cls": BestRSSCriterion},
+            {"criterion": BestRSSCriterion},
             id="mixed",
         ),
         pytest.param(
             BeamMixedSelection,
-            {"criterion_cls": BestRSSCriterion, "beam_width": 2},
+            {"criterion": BestRSSCriterion, "beam_width": 2},
             id="beam_mixed",
         ),
     ],
@@ -114,7 +114,7 @@ def test_mixed_selectors_respect_zero_forward_budget(selector_cls, selector_kwar
 
 def test_beam_mixed_selector_respects_zero_total_budget():
     data = make_regression_gram(808, n=100, p=10)
-    state = BeamMixedSelection(beam_width=3, criterion_cls=BestRSSCriterion).fit(
+    state = BeamMixedSelection(beam_width=3, criterion=BestRSSCriterion).fit(
         data=data, max_forward_steps=5, max_total_steps=0
     )
     assert state.active_set == []
@@ -123,20 +123,12 @@ def test_beam_mixed_selector_respects_zero_total_budget():
 def test_cv_beam_mixed_selector_respects_zero_total_budget():
     cv_data = make_cv_problem(seed=809, folds=4, n=80, p=10, support=3)
     state = BeamCrossValMixedSelection(
-        beam_width=3, criterion_cls=BestRSSCriterion
+        beam_width=3, criterion=BestRSSCriterion
     ).fit(data=cv_data, max_forward_steps=5, max_total_steps=0)
     assert state.active_set == []
 
 
-def test_forward_selection_accepts_criterion_instance():
-    data = make_regression_gram(444, n=100, p=10)
-    selector = ForwardSelection(criterion=BestRSSCriterion())
-    result = selector.fit(data=data, max_steps=3)
-    assert isinstance(result, SelectionState)
-    assert len(result.active_set) <= 3
-
-
-def test_forward_selection_accepts_named_criterion_key():
+def test_forward_selection_accepts_named_rss_criterion_key():
     data = make_regression_gram(4441, n=100, p=10)
     selector = ForwardSelection(criterion="rss")
     result = selector.fit(data=data, max_steps=3)
@@ -151,9 +143,9 @@ def test_forward_selection_rejects_unknown_criterion_key():
         selector.fit(data=data, max_steps=2)
 
 
-def test_forward_selection_accepts_named_criterion_cls_key():
+def test_forward_selection_accepts_named_aic_criterion_key():
     data = make_regression_gram(4443, n=100, p=10)
-    selector = ForwardSelection(criterion_cls="aic")
+    selector = ForwardSelection(criterion="aic")
     result = selector.fit(data=data, max_steps=3)
     assert isinstance(result, SelectionState)
     assert len(result.active_set) <= 3
@@ -183,14 +175,6 @@ def test_forward_selection_surfaces_factory_typeerror_detail():
 
     with pytest.raises(TypeError, match="inner detail marker"):
         selector.fit(data=data, max_steps=1)
-
-
-def test_forward_selection_rejects_criterion_and_criterion_cls_together():
-    with pytest.raises(ValueError, match="either `criterion` or `criterion_cls`"):
-        ForwardSelection(
-            criterion=BestRSSCriterion(),
-            criterion_cls=BestRSSCriterion,
-        )
 
 
 def test_forward_selection_rejects_kwargs_with_criterion_instance():

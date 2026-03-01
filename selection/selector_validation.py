@@ -60,12 +60,9 @@ def _resolve_criterion_provider(
     *,
     selector_name: str,
     criterion: Any,
-    criterion_cls: Any,
     default_criterion_cls: Any,
 ) -> Any:
-    provider = (
-        criterion if criterion is not None else (criterion_cls or default_criterion_cls)
-    )
+    provider = criterion if criterion is not None else default_criterion_cls
     if not isinstance(provider, str):
         return provider
     try:
@@ -88,14 +85,12 @@ def _resolve_criterion(
     selector_name: str,
     data: GramData,
     criterion: Any,
-    criterion_cls: Any,
     default_criterion_cls: Any,
     criterion_kwargs: dict[str, Any] | None,
 ) -> CriterionProtocol:
     provider = _resolve_criterion_provider(
         selector_name=selector_name,
         criterion=criterion,
-        criterion_cls=criterion_cls,
         default_criterion_cls=default_criterion_cls,
     )
     params = dict(criterion_kwargs or {})
@@ -110,7 +105,7 @@ def _resolve_criterion(
     else:
         if not callable(provider):
             raise TypeError(
-                f"{selector_name} requires `criterion`/`criterion_cls` to be callable "
+                f"{selector_name} requires `criterion` to be callable "
                 "or a criterion instance."
             )
         call_params = _inject_default_criterion_params(provider, params, data)

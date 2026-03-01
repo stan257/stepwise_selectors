@@ -53,8 +53,8 @@ def test_beam_pruning_is_deterministic_and_non_worsening():
     y_norm = float(cov @ cov)
     n_samples = 50
 
-    greedy = BeamForwardSelection(beam_width=1, criterion_cls=BestRSSCriterion)
-    wider = BeamForwardSelection(beam_width=3, criterion_cls=BestRSSCriterion)
+    greedy = BeamForwardSelection(beam_width=1, criterion=BestRSSCriterion)
+    wider = BeamForwardSelection(beam_width=3, criterion=BestRSSCriterion)
 
     greedy_state = greedy.fit(data=GramData(gram, cov, y_norm, n_samples), max_steps=1)
     wider_state = wider.fit(data=GramData(gram, cov, y_norm, n_samples), max_steps=1)
@@ -86,7 +86,7 @@ def test_rank_deficient_backward_recovers_full_rank_subset():
     assert np.isfinite(inv_direct).all()
 
     beam = BeamBackwardSelection(
-        beam_width=2, criterion_cls=BestRSSCriterion, allow_worse=True
+        beam_width=2, criterion=BestRSSCriterion, allow_worse=True
     )
     beam_state = beam.fit(data=data, max_steps=1)
     assert len(beam_state.active_set) == 2

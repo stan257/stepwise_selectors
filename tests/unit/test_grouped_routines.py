@@ -43,7 +43,7 @@ def _active_features(active_groups: list[int], groups: list[list[int]]) -> list[
 
 def test_group_forward_selects_strong_group_first():
     data, groups = make_group_problem()
-    selector = GroupForwardSelection(groups, criterion_cls=BestRSSCriterion)
+    selector = GroupForwardSelection(groups, criterion=BestRSSCriterion)
     state = selector.fit(data=data, max_steps=1)
 
     assert isinstance(state, GroupedSelectionState)
@@ -58,7 +58,7 @@ def test_group_forward_selects_strong_group_first():
 
 def test_group_forward_adds_all_when_budget_allows():
     data, groups = make_group_problem()
-    selector = GroupForwardSelection(groups, criterion_cls=BestRSSCriterion)
+    selector = GroupForwardSelection(groups, criterion=BestRSSCriterion)
     state = selector.fit(data=data, max_steps=2)
 
     assert isinstance(state, GroupedSelectionState)
@@ -72,7 +72,7 @@ def test_group_forward_adds_all_when_budget_allows():
 
 def test_group_backward_drops_weak_group():
     data, groups = make_group_problem()
-    selector = GroupBackwardSelection(groups, criterion_cls=AICCriterion)
+    selector = GroupBackwardSelection(groups, criterion=AICCriterion)
     state = selector.fit(data=data, max_steps=1)
 
     assert isinstance(state, GroupedSelectionState)

@@ -47,10 +47,10 @@ def test_cv_forward_is_invariant_to_fold_order():
     cv_data = CrossValGramData(folds)
     permuted = CrossValGramData([folds[i] for i in [3, 0, 4, 1, 2]])
 
-    state = CrossValForwardSelection(criterion_cls=BestRSSCriterion).fit(
+    state = CrossValForwardSelection(criterion=BestRSSCriterion).fit(
         data=cv_data, max_steps=4
     )
-    state_perm = CrossValForwardSelection(criterion_cls=BestRSSCriterion).fit(
+    state_perm = CrossValForwardSelection(criterion=BestRSSCriterion).fit(
         data=permuted, max_steps=4
     )
 
@@ -67,10 +67,10 @@ def test_beam_selection_is_deterministic_under_exact_ties():
     cv_runs = []
     for _ in range(5):
         single_state = BeamForwardSelection(
-            beam_width=4, criterion_cls=BestRSSCriterion
+            beam_width=4, criterion=BestRSSCriterion
         ).fit(data=data, max_steps=3)
         cv_state = BeamCrossValForwardSelection(
-            beam_width=4, criterion_cls=BestRSSCriterion
+            beam_width=4, criterion=BestRSSCriterion
         ).fit(data=cv_data, max_steps=3)
         single_runs.append((single_state.active_set, single_state.rss))
         cv_runs.append((cv_state.active_set, cv_state.rss_cv))
@@ -93,10 +93,10 @@ def test_cv_forward_consistent_across_equivalent_proportional_decompositions():
     cv_a = _make_proportional_cv_data(base, [1, 1, 1, 1])
     cv_b = _make_proportional_cv_data(base, [1, 2, 1])
 
-    state_a = CrossValForwardSelection(criterion_cls=BestRSSCriterion).fit(
+    state_a = CrossValForwardSelection(criterion=BestRSSCriterion).fit(
         data=cv_a, max_steps=4
     )
-    state_b = CrossValForwardSelection(criterion_cls=BestRSSCriterion).fit(
+    state_b = CrossValForwardSelection(criterion=BestRSSCriterion).fit(
         data=cv_b, max_steps=4
     )
 

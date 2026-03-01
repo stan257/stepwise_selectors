@@ -25,14 +25,14 @@ def test_ill_conditioned_forward_and_backward_are_finite():
 
     data = GramData(gram, cov, y_norm, n_samples=500)
 
-    forward_state = ForwardSelection(criterion_cls=BestRSSCriterion).fit(
+    forward_state = ForwardSelection(criterion=BestRSSCriterion).fit(
         data=data, max_steps=10
     )
     assert np.isfinite(forward_state.rss)
     assert np.isfinite(forward_state.beta).all()
 
     backward_state = BackwardSelection(
-        criterion_cls=BestRSSCriterion, allow_worse=True
+        criterion=BestRSSCriterion, allow_worse=True
     ).fit(data=data, max_steps=5)
     assert np.isfinite(backward_state.rss)
     assert np.isfinite(backward_state.beta).all()
@@ -53,7 +53,7 @@ def test_cv_forward_with_variable_fold_sizes_matches_manual_rss():
     cv_data = CrossValGramData(fold_data)
     assert cv_data.n_samples_total == sum(fold_sizes)
 
-    cv_state = CrossValForwardSelection(criterion_cls=BestRSSCriterion).fit(
+    cv_state = CrossValForwardSelection(criterion=BestRSSCriterion).fit(
         data=cv_data, max_steps=3
     )
 

@@ -34,7 +34,7 @@ def test_forward_matches_explicit_across_regimes(kind: str):
     data = _make_data_scenario(kind, seed=2025)
     max_steps = 5
 
-    state = ForwardSelection(criterion_cls=BestRSSCriterion).fit(
+    state = ForwardSelection(criterion=BestRSSCriterion).fit(
         data=data, max_steps=max_steps
     )
     beta, rss = explicit_beta_rss(data, state.active_set)

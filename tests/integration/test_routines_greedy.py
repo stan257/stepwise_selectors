@@ -27,7 +27,7 @@ def test_backward_prunes_to_best_single_variable(small_problem):
 
 
 def test_forward_with_best_rss_matches_standard(small_problem):
-    state = ForwardSelection(criterion_cls=BestRSSCriterion).fit(data=small_problem)
+    state = ForwardSelection(criterion=BestRSSCriterion).fit(data=small_problem)
 
     assert set(state.active_set) == {0, 1}
     np.testing.assert_allclose(
@@ -37,7 +37,7 @@ def test_forward_with_best_rss_matches_standard(small_problem):
 
 def test_forward_selection_recovers_esl_support(esl_book):
     gram_data, support = esl_book
-    selector = ForwardSelection(criterion_cls=BestRSSCriterion)
+    selector = ForwardSelection(criterion=BestRSSCriterion)
     state = selector.fit(data=gram_data, max_steps=len(support))
     recovered = set(state.active_set)
     assert len(recovered & set(support)) >= int(0.8 * len(support))
@@ -45,9 +45,9 @@ def test_forward_selection_recovers_esl_support(esl_book):
 
 def test_backward_selection_recovers_esl_support(esl_book):
     gram_data, support = esl_book
-    forward_selector = ForwardSelection(criterion_cls=BestRSSCriterion)
+    forward_selector = ForwardSelection(criterion=BestRSSCriterion)
     forward_state = forward_selector.fit(data=gram_data, max_steps=len(support))
-    selector = BackwardSelection(criterion_cls=BestRSSCriterion)
+    selector = BackwardSelection(criterion=BestRSSCriterion)
     p = gram_data.gram.shape[0]
     state = selector.fit(data=gram_data, max_steps=p - len(support))
 
@@ -64,7 +64,7 @@ def test_forward_selection_permutation_invariance():
     gram_perm = P.T @ gram @ P
     cov_perm = P.T @ cov
 
-    selector = ForwardSelection(criterion_cls=BestRSSCriterion)
+    selector = ForwardSelection(criterion=BestRSSCriterion)
     base_state = selector.fit(
         data=GramData(gram, cov, y_norm, n_samples), max_steps=steps
     )
@@ -80,7 +80,7 @@ def test_forward_selection_permutation_invariance():
 def test_best_rss_selects_largest_coefficients_forward_and_backward(p, steps):
     gram, cov, y_norm, n_samples = make_diagonal_problem(p)
 
-    forward_selector = ForwardSelection(criterion_cls=BestRSSCriterion)
+    forward_selector = ForwardSelection(criterion=BestRSSCriterion)
     forward_state = forward_selector.fit(
         data=GramData(gram, cov, y_norm, n_samples), max_steps=steps
     )
@@ -116,7 +116,7 @@ def test_mixed_selection_matches_direct_solution():
 def test_forward_then_backward_returns_to_empty_state():
     gram, cov, y_norm, n_samples = make_diagonal_problem(p=10)
     data = GramData(gram, cov, y_norm, n_samples)
-    forward_state = ForwardSelection(criterion_cls=BestRSSCriterion).fit(
+    forward_state = ForwardSelection(criterion=BestRSSCriterion).fit(
         data=data, max_steps=4
     )
 

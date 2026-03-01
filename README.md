@@ -82,7 +82,7 @@ print(gstate.active_groups, gstate.active_set, gstate.beta, gstate.rss)
 - `GramData` accepts array-like inputs for `gram` and `cov` and stores contiguous NumPy arrays internally.
 - CV output states expose `beta` as a post-selection refit on full-data Gram statistics at the selected support.
 - Single-dataset selectors default to `AICCriterion`; CV selectors default to `BestRSSCriterion`.
-- Selector constructors accept `criterion` (string key, class, instance, or factory) in addition to legacy `criterion_cls` (also accepts string key aliases). Built-in keys: `rss`, `aic`, `aicc`, `bic`, `hqic`, `ebic`, `gcv`.
+- Selector constructors accept `criterion` (string key, class, instance, or factory). Built-in keys: `rss`, `aic`, `aicc`, `bic`, `hqic`, `ebic`, `gcv`.
 - CV selectors reject criteria with `cv_compatible=False` to avoid double regularization on top of held-out RSS.
 - Backward beam selectors are improvement-only by default; set `allow_worse=True` to force removals under a step budget.
 - Selector hyperparameters are validated strictly (fail-fast): no implicit coercion for `beam_width`, `allow_worse`, step budgets, or `tol`.

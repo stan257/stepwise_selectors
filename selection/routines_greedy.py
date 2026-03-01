@@ -43,7 +43,6 @@ class ForwardSelection:
         ridge_alpha: float = 1e-8,
         pinv_rcond: float = 1e-12,
         criterion=None,
-        criterion_cls=None,
         criterion_kwargs=None,
     ):
         self.tol = validate_positive_finite_float(tol, name="tol")
@@ -58,20 +57,14 @@ class ForwardSelection:
         self.pinv_rcond = validate_positive_finite_float(
             pinv_rcond, name="pinv_rcond"
         )
-        if criterion is not None and criterion_cls is not None:
-            raise ValueError(
-                f"{type(self).__name__} accepts either `criterion` or `criterion_cls`, not both."
-            )
-        self.criterion = criterion
-        self.criterion_cls = criterion_cls
-        if self.criterion is None and self.criterion_cls is None:
-            self.criterion_cls = self._default_criterion
+        self.criterion = (
+            self._default_criterion if criterion is None else criterion
+        )
         self.criterion_kwargs = dict(criterion_kwargs or {})
         if self._reject_ic:
             candidate = _resolve_criterion_provider(
                 selector_name=type(self).__name__,
                 criterion=self.criterion,
-                criterion_cls=self.criterion_cls if self.criterion is None else None,
                 default_criterion_cls=self._default_criterion,
             )
             if getattr(candidate, "cv_compatible", True) is False:
@@ -91,7 +84,6 @@ class ForwardSelection:
             selector_name=type(self).__name__,
             data=data,
             criterion=self.criterion,
-            criterion_cls=self.criterion_cls if self.criterion is None else None,
             default_criterion_cls=self._default_criterion,
             criterion_kwargs=self.criterion_kwargs,
         )

@@ -45,7 +45,7 @@ def test_state_non_strict_solver_handles_singular_full_active_set(solver_policy)
 
 def test_backward_selection_strict_rejects_singular_full_active_set():
     data = _make_rank_deficient_data()
-    selector = BackwardSelection(criterion_cls=BestRSSCriterion)
+    selector = BackwardSelection(criterion=BestRSSCriterion)
     with pytest.raises(np.linalg.LinAlgError):
         selector.fit(data=data, max_steps=1)
 
@@ -54,7 +54,7 @@ def test_backward_selection_strict_rejects_singular_full_active_set():
 def test_backward_selection_non_strict_handles_singular_full_active_set(solver_policy):
     data = _make_rank_deficient_data()
     selector = BackwardSelection(
-        criterion_cls=BestRSSCriterion,
+        criterion=BestRSSCriterion,
         solver_policy=solver_policy,
         ridge_alpha=1e-6,
         pinv_rcond=1e-10,

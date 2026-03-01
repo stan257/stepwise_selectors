@@ -18,7 +18,7 @@ def test_golden_forward_best_rss_active_set():
     y = X @ beta_true + 0.1 * rng.standard_normal(n)
 
     data = GramData(X.T @ X, X.T @ y, y @ y, n)
-    state = ForwardSelection(criterion_cls=BestRSSCriterion).fit(data=data, max_steps=k)
+    state = ForwardSelection(criterion=BestRSSCriterion).fit(data=data, max_steps=k)
 
     assert state.active_set == [2, 5, 6]
 
@@ -49,7 +49,7 @@ def test_golden_cv_forward_best_rss_active_set():
         fold_data.append(GramData(X.T @ X, X.T @ y, y @ y, n))
 
     cv_data = CrossValGramData(fold_data)
-    cv_state = CrossValForwardSelection(criterion_cls=BestRSSCriterion).fit(
+    cv_state = CrossValForwardSelection(criterion=BestRSSCriterion).fit(
         data=cv_data, max_steps=2
     )
 
@@ -64,7 +64,7 @@ def test_golden_beam_forward_best_rss_active_set():
     y = X @ beta_true + 0.1 * rng.standard_normal(n)
 
     data = GramData(X.T @ X, X.T @ y, y @ y, n)
-    state = BeamForwardSelection(beam_width=3, criterion_cls=BestRSSCriterion).fit(
+    state = BeamForwardSelection(beam_width=3, criterion=BestRSSCriterion).fit(
         data=data, max_steps=k
     )
 

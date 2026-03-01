@@ -97,7 +97,7 @@ def test_backward_rss_monotone_and_matches_ols(seed: int):
     rss_path: list[float] = []
     for max_steps in range(p + 1):
         state = BackwardSelection(
-            criterion_cls=BestRSSCriterion, allow_worse=True
+            criterion=BestRSSCriterion, allow_worse=True
         ).fit(data=data, max_steps=max_steps)
 
         # Verify beta/RSS match direct OLS on the active support.
@@ -154,7 +154,7 @@ def test_cv_forward_finds_optimal_subset_on_diagonal():
                 best_subset = set(subset)
 
         # Run CV forward selection.
-        state = CrossValForwardSelection(criterion_cls=BestRSSCriterion).fit(
+        state = CrossValForwardSelection(criterion=BestRSSCriterion).fit(
             data=cv_data, max_steps=k
         )
 
@@ -223,7 +223,7 @@ def test_grouped_active_set_is_always_union_of_complete_groups(seed: int):
     # Forward: start empty, add groups one by one.
     for max_steps in range(1, len(groups) + 1):
         result = GroupForwardSelection(
-            groups, criterion_cls=BestRSSCriterion
+            groups, criterion=BestRSSCriterion
         ).fit(data=data, max_steps=max_steps)
 
         expected_features = set()
@@ -242,7 +242,7 @@ def test_grouped_active_set_is_always_union_of_complete_groups(seed: int):
     # Start full, remove groups one by one.
     for max_steps in range(1, len(groups)):
         result = GroupBackwardSelection(
-            groups, criterion_cls=AICCriterion
+            groups, criterion=AICCriterion
         ).fit(data=data, max_steps=max_steps)
 
         expected_features = set()
@@ -292,11 +292,11 @@ def test_mixed_selection_improves_over_pure_forward():
     data = GramData(X.T @ X, X.T @ y, y @ y, n_samples)
 
     # Pure forward with AIC.
-    forward_state = ForwardSelection(criterion_cls=AICCriterion).fit(data=data)
+    forward_state = ForwardSelection(criterion=AICCriterion).fit(data=data)
 
     # Mixed with AIC: backward refinement after each forward step can remove
     # features that became redundant, allowing a strictly better model.
-    mixed_state = MixedSelection(criterion_cls=AICCriterion).fit(
+    mixed_state = MixedSelection(criterion=AICCriterion).fit(
         data=data, max_total_steps=30
     )
 

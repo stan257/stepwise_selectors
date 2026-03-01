@@ -32,7 +32,7 @@ def test_forward_best_rss_matches_direct_ols_on_selected():
     y_norm = float(y @ y)
 
     data = GramData(gram, cov, y_norm, n)
-    state = ForwardSelection(criterion_cls=BestRSSCriterion).fit(
+    state = ForwardSelection(criterion=BestRSSCriterion).fit(
         data=data, max_steps=k
     )
 
@@ -62,10 +62,10 @@ def test_cv_forward_matches_full_data_on_replicated_folds():
     cv_data = CrossValGramData([fold for _ in range(folds)])
     full_data = cv_data.make_full_data()
 
-    forward_state = ForwardSelection(criterion_cls=BestRSSCriterion).fit(
+    forward_state = ForwardSelection(criterion=BestRSSCriterion).fit(
         data=full_data, max_steps=k
     )
-    cv_state = CrossValForwardSelection(criterion_cls=BestRSSCriterion).fit(
+    cv_state = CrossValForwardSelection(criterion=BestRSSCriterion).fit(
         data=cv_data, max_steps=k
     )
 
@@ -82,11 +82,11 @@ def test_beam_search_can_beat_greedy_in_two_steps():
 
     data = GramData(gram, cov, y_norm, n_samples=50)
 
-    greedy_state = ForwardSelection(criterion_cls=BestRSSCriterion).fit(
+    greedy_state = ForwardSelection(criterion=BestRSSCriterion).fit(
         data=data, max_steps=2
     )
     beam_state = BeamForwardSelection(
-        beam_width=2, criterion_cls=BestRSSCriterion
+        beam_width=2, criterion=BestRSSCriterion
     ).fit(data=data, max_steps=2)
 
     assert 0 in greedy_state.active_set
@@ -104,11 +104,11 @@ def test_grouped_forward_matches_forward_with_singleton_groups():
     data = GramData(X.T @ X, X.T @ y, y @ y, n)
     groups = [[i] for i in range(p)]
 
-    forward_state = ForwardSelection(criterion_cls=BestRSSCriterion).fit(
+    forward_state = ForwardSelection(criterion=BestRSSCriterion).fit(
         data=data, max_steps=3
     )
     grouped_state = GroupForwardSelection(
-        groups, criterion_cls=BestRSSCriterion
+        groups, criterion=BestRSSCriterion
     ).fit(data=data, max_steps=3)
 
     assert set(grouped_state.active_groups) == set(forward_state.active_set)
@@ -144,7 +144,7 @@ def test_information_criteria_choose_expected_size_on_diagonal():
         expected_k = int(np.argmin(values))
 
         state = ForwardSelection(
-            criterion_cls=crit_cls, criterion_kwargs=kwargs
+            criterion=crit_cls, criterion_kwargs=kwargs
         ).fit(data=data, max_steps=p)
 
         assert len(state.active_set) == expected_k
@@ -208,7 +208,7 @@ def test_cv_backward_handles_near_collinearity_across_folds():
     assert np.linalg.cond(cv_data.gram_total) > 1e6
 
     selector = BeamCrossValBackwardSelection(
-        beam_width=2, criterion_cls=BestRSSCriterion
+        beam_width=2, criterion=BestRSSCriterion
     )
     cv_state = selector.fit(data=cv_data, max_steps=1)
 

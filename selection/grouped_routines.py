@@ -135,13 +135,8 @@ class BaseGroupedSelection:
         ridge_alpha: float = 1e-8,
         pinv_rcond: float = 1e-12,
         criterion=None,
-        criterion_cls=None,
         criterion_kwargs=None,
     ):
-        if criterion is not None and criterion_cls is not None:
-            raise ValueError(
-                f"{type(self).__name__} accepts either `criterion` or `criterion_cls`, not both."
-            )
         normalized_groups = []
         for group in groups:
             normalized_groups.append(tuple(_normalize_group_feature_index(f) for f in group))
@@ -177,10 +172,7 @@ class BaseGroupedSelection:
         self.pinv_rcond = validate_positive_finite_float(
             pinv_rcond, name="pinv_rcond"
         )
-        self.criterion = criterion
-        self.criterion_cls = criterion_cls
-        if self.criterion is None and self.criterion_cls is None:
-            self.criterion_cls = AICCriterion
+        self.criterion = AICCriterion if criterion is None else criterion
         self.criterion_kwargs = dict(criterion_kwargs or {})
 
     def _init_criterion(self, data: GramData) -> CriterionProtocol:
@@ -188,7 +180,6 @@ class BaseGroupedSelection:
             selector_name=type(self).__name__,
             data=data,
             criterion=self.criterion,
-            criterion_cls=self.criterion_cls if self.criterion is None else None,
             default_criterion_cls=AICCriterion,
             criterion_kwargs=self.criterion_kwargs,
         )

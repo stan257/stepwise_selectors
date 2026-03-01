@@ -23,7 +23,7 @@ def test_best_rss_forward_monotone_and_matches_ols(seed):
     rss_vals = []
 
     for k in range(k_max + 1):
-        state = ForwardSelection(criterion_cls=BestRSSCriterion).fit(
+        state = ForwardSelection(criterion=BestRSSCriterion).fit(
             data=data, max_steps=k
         )
         rss_vals.append(state.rss)

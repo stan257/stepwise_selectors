@@ -58,7 +58,7 @@ def test_beam_forward_matches_exhaustive_best_subset():
     # Beam width large enough to retain all subsets up to size k.
     beam_width = 100  # >= C(8, 3) = 56
     state = BeamForwardSelection(
-        beam_width=beam_width, criterion_cls=BestRSSCriterion
+        beam_width=beam_width, criterion=BestRSSCriterion
     ).fit(data=data, max_steps=k)
 
     chosen = tuple(sorted(state.active_set))
@@ -110,7 +110,7 @@ def test_forward_matches_exhaustive_across_criteria():
                     best_sets.add(subset)
 
         state = ForwardSelection(
-            criterion_cls=crit_cls, criterion_kwargs=kwargs
+            criterion=crit_cls, criterion_kwargs=kwargs
         ).fit(data=data, max_steps=p)
 
         chosen = tuple(sorted(state.active_set))

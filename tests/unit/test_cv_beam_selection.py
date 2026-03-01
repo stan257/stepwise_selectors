@@ -22,10 +22,10 @@ def test_cv_beam_backward_is_improvement_only_by_default():
     cv_data = _make_full_model_optimal_cv(folds=3, n=40, p=6)
 
     strict = BeamCrossValBackwardSelection(
-        beam_width=2, criterion_cls=BestRSSCriterion
+        beam_width=2, criterion=BestRSSCriterion
     ).fit(data=cv_data, max_steps=1)
     relaxed = BeamCrossValBackwardSelection(
-        beam_width=2, criterion_cls=BestRSSCriterion, allow_worse=True
+        beam_width=2, criterion=BestRSSCriterion, allow_worse=True
     ).fit(data=cv_data, max_steps=1)
 
     assert len(strict.active_set) == cv_data.p

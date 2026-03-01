@@ -36,7 +36,7 @@ def test_crossvalgramdata_requires_at_least_two_folds():
 
 def test_cv_forward_matches_explicit_rss():
     cv_data = make_cv_problem()
-    state = CrossValForwardSelection(criterion_cls=BestRSSCriterion).fit(
+    state = CrossValForwardSelection(criterion=BestRSSCriterion).fit(
         data=cv_data, max_steps=4
     )
     expected_rss = explicit_cv_rss(cv_data, state.active_set)
@@ -45,7 +45,7 @@ def test_cv_forward_matches_explicit_rss():
 
 def test_cv_backward_matches_explicit_rss():
     cv_data = make_cv_problem()
-    state = CrossValBackwardSelection(criterion_cls=BestRSSCriterion).fit(
+    state = CrossValBackwardSelection(criterion=BestRSSCriterion).fit(
         data=cv_data, max_steps=4
     )
     expected_rss = explicit_cv_rss(cv_data, state.active_set)
@@ -54,7 +54,7 @@ def test_cv_backward_matches_explicit_rss():
 
 def test_cv_mixed_matches_explicit_rss():
     cv_data = make_cv_problem()
-    state = CrossValMixedSelection(criterion_cls=BestRSSCriterion).fit(
+    state = CrossValMixedSelection(criterion=BestRSSCriterion).fit(
         data=cv_data, max_forward_steps=3, max_total_steps=5
     )
     expected_rss = explicit_cv_rss(cv_data, state.active_set)
@@ -63,14 +63,14 @@ def test_cv_mixed_matches_explicit_rss():
 
 def test_cv_state_exposes_full_data_postselection_beta():
     cv_data = make_cv_problem(seed=2026, folds=4, n=100, p=10, support=4)
-    state = CrossValForwardSelection(criterion_cls=BestRSSCriterion).fit(
+    state = CrossValForwardSelection(criterion=BestRSSCriterion).fit(
         data=cv_data, max_steps=4
     )
     full_data = cv_data.make_full_data()
     expected_beta = explicit_beta_from_active(full_data, state.active_set)
     np.testing.assert_allclose(state.beta, expected_beta, atol=1e-8, rtol=1e-8)
 
-    empty = CrossValForwardSelection(criterion_cls=BestRSSCriterion).fit(
+    empty = CrossValForwardSelection(criterion=BestRSSCriterion).fit(
         data=cv_data, max_steps=0
     )
     np.testing.assert_allclose(empty.beta, np.zeros_like(empty.beta), atol=0.0, rtol=0.0)
@@ -81,12 +81,12 @@ def test_cv_state_exposes_full_data_postselection_beta():
     [
         pytest.param(
             CrossValMixedSelection,
-            {"criterion_cls": BestRSSCriterion},
+            {"criterion": BestRSSCriterion},
             id="cv_mixed",
         ),
         pytest.param(
             BeamCrossValMixedSelection,
-            {"criterion_cls": BestRSSCriterion, "beam_width": 2},
+            {"criterion": BestRSSCriterion, "beam_width": 2},
             id="cv_beam_mixed",
         ),
     ],
@@ -103,13 +103,13 @@ def test_cv_mixed_selectors_respect_zero_forward_budget(selector_cls, selector_k
 CV_SELECTOR_STATE_CONTRACT_CASES = [
     pytest.param(
         CrossValForwardSelection,
-        {"criterion_cls": BestRSSCriterion},
+        {"criterion": BestRSSCriterion},
         {"max_steps": 3},
         id="cv_forward",
     ),
     pytest.param(
         BeamCrossValForwardSelection,
-        {"criterion_cls": BestRSSCriterion, "beam_width": 2},
+        {"criterion": BestRSSCriterion, "beam_width": 2},
         {"max_steps": 3},
         id="cv_beam_forward",
     ),
@@ -162,15 +162,6 @@ CV_SELECTOR_VALIDATION_CASES = [
     "selector_cls",
     CV_SELECTOR_VALIDATION_CASES,
 )
-def test_cv_selectors_default_to_best_rss(selector_cls):
-    selector = selector_cls()
-    assert selector.criterion_cls is BestRSSCriterion
-
-
-@pytest.mark.parametrize(
-    "selector_cls",
-    CV_SELECTOR_VALIDATION_CASES,
-)
 @pytest.mark.parametrize(
     "criterion_spec",
     [AICCriterion, GCVCriterion, "aic", "gcv"],
@@ -180,7 +171,7 @@ def test_cv_selectors_reject_disallowed_criteria(selector_cls, criterion_spec):
         ValueError,
         match=r"is not supported for CV selection routines",
     ):
-        selector_cls(criterion_cls=criterion_spec)
+        selector_cls(criterion=criterion_spec)
 
 
 @pytest.mark.parametrize(
@@ -192,7 +183,7 @@ def test_cv_selectors_reject_cv_incompatible_custom_criterion(selector_cls):
         ValueError,
         match=r"IncompatibleCriterion is not supported for CV selection routines",
     ):
-        selector_cls(criterion_cls=IncompatibleCriterion)
+        selector_cls(criterion=IncompatibleCriterion)
 
 
 @pytest.mark.parametrize("selector_cls", CV_SELECTOR_VALIDATION_CASES)

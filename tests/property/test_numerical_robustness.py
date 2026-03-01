@@ -47,7 +47,7 @@ def _make_ill_conditioned_cv_data(
 def test_non_strict_solvers_keep_single_dataset_paths_finite(seed, solver_policy):
     data = _make_ill_conditioned_data(seed)
     common_kwargs = {
-        "criterion_cls": BestRSSCriterion,
+        "criterion": BestRSSCriterion,
         "solver_policy": solver_policy,
         "ridge_alpha": 1e-6,
         "pinv_rcond": 1e-10,
