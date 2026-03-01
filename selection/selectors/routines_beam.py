@@ -7,17 +7,17 @@ from dataclasses import dataclass
 import numpy as np
 
 from .beam_pruning import prune_unique_beams
-from .criteria import CriterionProtocol
-from .definitions import GramData
-from .interface_validation import (
+from ..criteria import CriterionProtocol
+from ..core.definitions import GramData
+from ..validation.interface_validation import (
     validate_bool,
     validate_optional_non_negative_int,
     validate_positive_int,
 )
-from .selector_validation import _validate_state_target
+from ..validation.selector_validation import _validate_state_target
 from .routines_greedy import ForwardSelection
-from .incremental_solver import IncrementalSolver
-from .state_single import SelectionState
+from ..core.incremental_solver import IncrementalSolver
+from ..core.state_single import SelectionState
 from .topk import topk_indices
 
 

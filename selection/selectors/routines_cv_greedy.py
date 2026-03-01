@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import numpy as np
 
-from .criteria import BestRSSCriterion
-from .definitions import CrossValGramData
-from .interface_validation import validate_optional_non_negative_int
+from ..criteria import BestRSSCriterion
+from ..core.definitions import CrossValGramData
+from ..validation.interface_validation import validate_optional_non_negative_int
 from .routines_cv_scoring import (
     _build_fold_states,
     _build_cv_state_from_active_set,
@@ -17,8 +17,8 @@ from .routines_cv_scoring import (
     _rebuild_states,
 )
 from .routines_greedy import ForwardSelection
-from .selector_validation import _validate_cv_state_target
-from .state_cv import CrossValSelectionState
+from ..validation.selector_validation import _validate_cv_state_target
+from ..core.state_cv import CrossValSelectionState
 
 
 class _BaseCrossValSelection(ForwardSelection):

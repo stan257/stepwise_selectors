@@ -4,7 +4,7 @@ from typing import Any, Protocol, runtime_checkable
 
 import numpy as np
 
-from .constants import ABS_TOL
+from .core.constants import ABS_TOL
 
 
 @runtime_checkable

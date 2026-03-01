@@ -14,7 +14,7 @@ dependencies = ["numpy"]
 dev = ["pytest"]
 
 [tool.setuptools.packages.find]
-include = ["selection"]
+include = ["selection", "selection.*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

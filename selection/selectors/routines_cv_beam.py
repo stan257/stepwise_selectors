@@ -7,10 +7,10 @@ from dataclasses import dataclass
 import numpy as np
 
 from .beam_pruning import prune_unique_beams
-from .criteria import BestRSSCriterion, CriterionProtocol
-from .definitions import CrossValGramData
-from .incremental_solver import IncrementalSolver
-from .interface_validation import (
+from ..criteria import BestRSSCriterion, CriterionProtocol
+from ..core.definitions import CrossValGramData
+from ..core.incremental_solver import IncrementalSolver
+from ..validation.interface_validation import (
     validate_bool,
     validate_optional_non_negative_int,
     validate_positive_int,
@@ -25,8 +25,8 @@ from .routines_cv_scoring import (
     _rebuild_states,
 )
 from .routines_greedy import ForwardSelection
-from .selector_validation import _validate_cv_state_target
-from .state_cv import CrossValSelectionState
+from ..validation.selector_validation import _validate_cv_state_target
+from ..core.state_cv import CrossValSelectionState
 from .topk import topk_indices
 
 

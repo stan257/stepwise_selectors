@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .criteria import (
+from ..criteria import (
     AICCriterion,
     AICcCriterion,
     BICCriterion,

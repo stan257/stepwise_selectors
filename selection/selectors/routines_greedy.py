@@ -4,24 +4,24 @@ from __future__ import annotations
 
 import numpy as np
 
-from .constants import ABS_TOL
-from .interface_validation import (
+from ..core.constants import ABS_TOL
+from ..validation.interface_validation import (
     validate_choice,
     validate_bool,
     validate_non_negative_finite_float,
     validate_optional_non_negative_int,
     validate_positive_finite_float,
 )
-from .criteria import AICCriterion, CriterionProtocol
-from .definitions import GramData
-from .selector_validation import (
+from ..criteria import AICCriterion, CriterionProtocol
+from ..core.definitions import GramData
+from ..validation.selector_validation import (
     _resolve_criterion,
     _resolve_criterion_provider,
     _validate_cv_criterion,
     _validate_state_target,
 )
-from .incremental_solver import IncrementalSolver
-from .state_single import SelectionState
+from ..core.incremental_solver import IncrementalSolver
+from ..core.state_single import SelectionState
 
 
 class ForwardSelection:

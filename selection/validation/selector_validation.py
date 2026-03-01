@@ -15,13 +15,13 @@ from .criterion_registry import (
     available_builtin_criteria,
     resolve_builtin_criterion,
 )
-from .criteria import (
+from ..criteria import (
     BestRSSCriterion,
     CriterionProtocol,
 )
-from .definitions import CrossValGramData, GramData
-from .state_cv import CrossValSelectionState
-from .state_single import SelectionState
+from ..core.definitions import CrossValGramData, GramData
+from ..core.state_cv import CrossValSelectionState
+from ..core.state_single import SelectionState
 
 
 def _validate_criterion_protocol(
