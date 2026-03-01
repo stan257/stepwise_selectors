@@ -419,6 +419,18 @@ class CrossValSelectionState:
         self.oos_rss_folds = np.array(self.data.y_norm_folds, dtype=float)
         self.rss_cv = float(self.oos_rss_folds.sum())
 
+    def _assert_synced_active_set(self) -> None:
+        """Require identical active_set across all per-fold training states."""
+        if not self.train_states:
+            return
+        reference = list(self.train_states[0].active_set)
+        for fold_idx, fold_state in enumerate(self.train_states[1:], start=1):
+            if list(fold_state.active_set) != reference:
+                raise ValueError(
+                    "CV fold states must share identical active_set across folds; "
+                    f"fold 0 has {reference}, fold {fold_idx} has {fold_state.active_set}."
+                )
+
     def _refit_full_data_beta(self) -> None:
         """Refit coefficients on full data for the current active set.
 
@@ -468,6 +480,7 @@ class CrossValSelectionState:
 
     def recompute_oos_rss(self) -> float:
         """Recompute out-of-sample RSS across folds using Gram-only formulas."""
+        self._assert_synced_active_set()
         S = self.active_set
         if not S:
             self.oos_rss_folds = np.array(self.data.y_norm_folds, dtype=float)
@@ -493,10 +506,10 @@ class CrossValSelectionState:
         return self.rss_cv
 
     def _sync_active_set(self) -> None:
-        if self.train_states:
-            self.active_set = list(self.train_states[0].active_set)
-        else:
-            self.active_set = []
+        self._assert_synced_active_set()
+        self.active_set = (
+            list(self.train_states[0].active_set) if self.train_states else []
+        )
 
     def apply_backward_step(self, idx_local: int, tol: float | None = None) -> None:
         tol_value = ABS_TOL if tol is None else float(tol)

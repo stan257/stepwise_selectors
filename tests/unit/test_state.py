@@ -3,7 +3,8 @@ import numpy as np
 import pytest
 
 from selection.definitions import GramData
-from selection.state import SelectionState
+from selection.definitions import CrossValGramData
+from selection.state import CrossValSelectionState, SelectionState
 
 
 def make_random_state(n=30, p=5, seed=0):
@@ -80,3 +81,19 @@ def test_init_from_active_set_rejects_non_integer_indices():
     state = make_random_state(p=4)
     with pytest.raises(TypeError, match="integers"):
         state.init_from_active_set([0, 1.5])
+
+
+def test_cv_state_rejects_desynced_fold_active_sets():
+    rng = np.random.default_rng(987)
+    fold_data = []
+    for _ in range(2):
+        X = rng.standard_normal((30, 3))
+        y = rng.standard_normal(30)
+        fold_data.append(GramData(X.T @ X, X.T @ y, y @ y, n_samples=30))
+
+    cv_state = CrossValSelectionState(CrossValGramData(fold_data))
+    cv_state.train_states[0].init_from_active_set([0])
+    cv_state.train_states[1].init_from_active_set([1])
+
+    with pytest.raises(ValueError, match="identical active_set across folds"):
+        cv_state._sync_active_set()
