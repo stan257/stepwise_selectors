@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from .beam_pruning import prune_unique_beams
-from .criteria import SelectionCriterion
+from .criteria import CriterionProtocol
 from .definitions import GramData
 from .interface_validation import (
     validate_bool,
@@ -24,7 +24,7 @@ from .topk import topk_indices
 @dataclass
 class Beam:
     state: ForwardState
-    criterion: SelectionCriterion
+    criterion: CriterionProtocol
     score: float
     _signature: int = 0
 

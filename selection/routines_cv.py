@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from .beam_pruning import prune_unique_beams
-from .criteria import BestRSSCriterion, SelectionCriterion
+from .criteria import BestRSSCriterion, CriterionProtocol
 from .definitions import CrossValGramData
 from .interface_validation import (
     validate_bool,
@@ -32,7 +32,7 @@ from .topk import topk_indices
 @dataclass
 class CVBeam:
     states: list[ForwardState]
-    criterion: SelectionCriterion
+    criterion: CriterionProtocol
     score: float
     _signature: int = 0
 
