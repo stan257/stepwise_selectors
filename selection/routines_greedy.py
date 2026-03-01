@@ -19,7 +19,7 @@ from .selector_validation import (
     _validate_cv_criterion,
     _validate_state_target,
 )
-from .forward_state import ForwardState
+from .forward_state import IncrementalSolver
 from .state_single import SelectionState
 
 
@@ -111,7 +111,7 @@ class ForwardSelection:
 
         max_steps = validate_optional_non_negative_int(max_steps, name="max_steps")
         criterion = self._init_criterion(data)
-        work_state = ForwardState.create(
+        work_state = IncrementalSolver.create(
             data,
             self.tol,
             solver_policy=self.solver_policy,
@@ -170,7 +170,7 @@ class BackwardSelection(ForwardSelection):
         max_steps = validate_optional_non_negative_int(max_steps, name="max_steps")
         criterion = self._init_criterion(data)
         full_active = list(range(data.gram.shape[0]))
-        work_state = ForwardState.from_active_set(
+        work_state = IncrementalSolver.from_active_set(
             data,
             full_active,
             self.tol,
@@ -235,7 +235,7 @@ class MixedSelection(ForwardSelection):
             max_total_steps, name="max_total_steps"
         )
         criterion = self._init_criterion(data)
-        work_state = ForwardState.create(
+        work_state = IncrementalSolver.create(
             data,
             self.tol,
             solver_policy=self.solver_policy,

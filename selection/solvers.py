@@ -12,7 +12,7 @@ SolverPolicy = Literal["strict", "ridge", "pinv"]
 
 @dataclass(frozen=True)
 class ForwardFactorization:
-    """Numerical factors needed to initialize ForwardState from an active set."""
+    """Numerical factors needed to initialize IncrementalSolver from an active set."""
 
     R: np.ndarray
     Z: np.ndarray
@@ -65,7 +65,7 @@ def build_forward_factorization(
     pinv_rcond: float,
     context: str,
 ) -> ForwardFactorization:
-    """Build R/Z/qy/K/beta for ForwardState.from_active_set under a policy."""
+    """Build R/Z/qy/K/beta for IncrementalSolver.from_active_set under a policy."""
     match solver_policy:
         case "strict" | "ridge":
             work = (

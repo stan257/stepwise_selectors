@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from selection.definitions import GramData
-from selection.forward_state import ForwardState
+from selection.forward_state import IncrementalSolver
 from selection.state_single import SelectionState
 
 
@@ -14,7 +14,7 @@ def test_random_steps_preserve_active_set_and_rss_consistency():
     y = X @ beta + 0.1 * rng.standard_normal(n)
     data = GramData(X.T @ X, X.T @ y, y @ y, n)
 
-    state = ForwardState.create(data, tol=1e-12)
+    state = IncrementalSolver.create(data, tol=1e-12)
 
     for _ in range(30):
         scored = state.candidate_scores()
@@ -65,7 +65,7 @@ def test_forward_state_from_active_set_rejects_invalid_indices(
     )
 
     with pytest.raises(error_type, match=match):
-        ForwardState.from_active_set(data, active_set, tol=1e-12)
+        IncrementalSolver.from_active_set(data, active_set, tol=1e-12)
 
 
 @pytest.mark.parametrize("seed", [303, 304, 305])
@@ -80,7 +80,7 @@ def test_forward_state_from_active_set_matches_selection_state(seed: int):
         k = int(rng.integers(0, 10))
         active = sorted(int(i) for i in rng.choice(p, size=k, replace=False))
 
-        fstate = ForwardState.from_active_set(data, active, tol=1e-12)
+        fstate = IncrementalSolver.from_active_set(data, active, tol=1e-12)
         sstate = SelectionState(data)
         sstate.init_from_active_set(active)
 

@@ -13,7 +13,7 @@ import pytest
 
 from selection.criteria import AICCriterion, BestRSSCriterion
 from selection.definitions import CrossValGramData, GramData
-from selection.forward_state import ForwardState
+from selection.forward_state import IncrementalSolver
 from selection.routines import (
     BackwardSelection,
     CrossValForwardSelection,
@@ -29,7 +29,7 @@ from tests.helpers import explicit_beta_rss, explicit_cv_rss, make_regression_gr
 
 
 # ---------------------------------------------------------------------------
-# Test 1: ForwardState and SelectionState pick identical features
+# Test 1: IncrementalSolver and SelectionState pick identical features
 # ---------------------------------------------------------------------------
 
 
@@ -40,7 +40,7 @@ def test_reference_and_state_select_same_features_stepwise(seed: int):
     n, p = 80, 10
     data = make_regression_gram(seed, n=n, p=p)
 
-    fast = ForwardState.create(data, tol=1e-10)
+    fast = IncrementalSolver.create(data, tol=1e-10)
     ref = SelectionState(data)
     ref.init_empty()
 
@@ -72,7 +72,7 @@ def test_reference_and_state_select_same_features_stepwise(seed: int):
         ref.apply_forward_step(ref_cache, ref_best_pos)
 
     # From the full model, backward scores should match.
-    full_fast = ForwardState.from_active_set(data, list(range(p)), tol=1e-10)
+    full_fast = IncrementalSolver.from_active_set(data, list(range(p)), tol=1e-10)
     full_ref = SelectionState(data)
     full_ref.init_full()
 

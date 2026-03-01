@@ -10,7 +10,7 @@ import numpy as np
 from .constants import ABS_TOL
 from .criteria import AICCriterion, CriterionProtocol
 from .definitions import GramData
-from .forward_state import ForwardState
+from .forward_state import IncrementalSolver
 from .interface_validation import (
     validate_choice,
     validate_non_negative_finite_float,
@@ -46,7 +46,7 @@ def _flatten_group_indices(groups: Iterable[int], group_map: Sequence[Sequence[i
     return sorted(idx)
 
 
-def _beta_from_state(state: ForwardState, p: int) -> np.ndarray:
+def _beta_from_state(state: IncrementalSolver, p: int) -> np.ndarray:
     beta = np.zeros(p, dtype=float)
     if state.k:
         idx = np.array(state.active_set, dtype=int)
@@ -59,7 +59,7 @@ def _build_grouped_state(
     data: GramData,
     groups: Sequence[Sequence[int]],
     active_groups: list[int],
-    state: ForwardState,
+    state: IncrementalSolver,
 ) -> GroupedSelectionState:
     active_group_list = list(active_groups)
     active_set = _flatten_group_indices(active_group_list, groups)
@@ -73,7 +73,7 @@ def _build_grouped_state(
     )
 
 
-def _apply_group_forward(state: ForwardState, group: Sequence[int]) -> None:
+def _apply_group_forward(state: IncrementalSolver, group: Sequence[int]) -> None:
     # Apply group members in a stable, deterministic order.
     for feat_idx in group:
         if state.active_mask[int(feat_idx)]:
@@ -81,7 +81,7 @@ def _apply_group_forward(state: ForwardState, group: Sequence[int]) -> None:
         state.apply_forward(int(feat_idx))
 
 
-def _apply_group_backward(state: ForwardState, group: Sequence[int]) -> None:
+def _apply_group_backward(state: IncrementalSolver, group: Sequence[int]) -> None:
     # Remove in descending index order to avoid shifting positions mid-loop.
     pos_map = {feat: pos for pos, feat in enumerate(state.active_set)}
     positions = sorted((pos_map[int(feat)] for feat in group), reverse=True)
@@ -91,12 +91,12 @@ def _apply_group_backward(state: ForwardState, group: Sequence[int]) -> None:
 
 def _select_best_group_move(
     *,
-    state: ForwardState,
+    state: IncrementalSolver,
     candidate_groups: Iterable[int],
     groups: Sequence[Sequence[int]],
     criterion: CriterionProtocol,
-    apply_group_move: Callable[[ForwardState, Sequence[int]], None],
-) -> tuple[int | None, float | None, ForwardState | None]:
+    apply_group_move: Callable[[IncrementalSolver, Sequence[int]], None],
+) -> tuple[int | None, float | None, IncrementalSolver | None]:
     """Evaluate candidate group moves and return the best improving move."""
     best_group = None
     best_candidate_score = None
@@ -205,7 +205,7 @@ class GroupForwardSelection(BaseGroupedSelection):
         _validate_group_feature_bounds(self.groups, data.gram.shape[0])
         criterion = self._init_criterion(data)
         active: list[int] = []
-        state = ForwardState.create(
+        state = IncrementalSolver.create(
             data,
             self.tol,
             solver_policy=self.solver_policy,
@@ -255,7 +255,7 @@ class GroupBackwardSelection(BaseGroupedSelection):
         criterion = self._init_criterion(data)
         active = list(range(self.num_groups))
         full_idx = _flatten_group_indices(active, self.groups)
-        state = ForwardState.from_active_set(
+        state = IncrementalSolver.from_active_set(
             data,
             full_idx,
             self.tol,

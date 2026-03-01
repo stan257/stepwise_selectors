@@ -1,7 +1,7 @@
 import numpy as np
 
 from selection.definitions import GramData
-from selection.forward_state import ForwardState
+from selection.forward_state import IncrementalSolver
 
 
 def test_backward_step_matches_direct_rss_for_active_set():
@@ -13,7 +13,7 @@ def test_backward_step_matches_direct_rss_for_active_set():
     data = GramData(X.T @ X, X.T @ y, y @ y, n)
 
     # Build a forward state with a few steps.
-    state = ForwardState.create(data, tol=1e-10)
+    state = IncrementalSolver.create(data, tol=1e-10)
     for _ in range(6):
         cand, rss_new = state.candidate_scores()
         feat = int(cand[int(np.argmin(rss_new))])

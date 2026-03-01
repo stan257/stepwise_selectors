@@ -16,14 +16,14 @@ from .interface_validation import (
 )
 from .selector_validation import _validate_state_target
 from .routines_greedy import ForwardSelection
-from .forward_state import ForwardState
+from .forward_state import IncrementalSolver
 from .state_single import SelectionState
 from .topk import topk_indices
 
 
 @dataclass
 class Beam:
-    state: ForwardState
+    state: IncrementalSolver
     criterion: CriterionProtocol
     score: float
     _signature: int = 0
@@ -117,7 +117,7 @@ class BeamForwardSelection(ForwardSelection):
         max_steps = validate_optional_non_negative_int(max_steps, name="max_steps")
         criterion = self._init_criterion(data)
         initial = Beam(
-            ForwardState.create(
+            IncrementalSolver.create(
                 data,
                 self.tol,
                 solver_policy=self.solver_policy,
@@ -180,7 +180,7 @@ class BeamBackwardSelection(ForwardSelection):
         max_steps = validate_optional_non_negative_int(max_steps, name="max_steps")
         criterion = self._init_criterion(data)
         full_active = list(range(data.gram.shape[0]))
-        initial_state = ForwardState.from_active_set(
+        initial_state = IncrementalSolver.from_active_set(
             data,
             full_active,
             self.tol,
@@ -253,7 +253,7 @@ class BeamMixedSelection(ForwardSelection):
         )
         criterion = self._init_criterion(data)
         initial = Beam(
-            ForwardState.create(
+            IncrementalSolver.create(
                 data,
                 self.tol,
                 solver_policy=self.solver_policy,

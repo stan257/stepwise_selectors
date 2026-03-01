@@ -80,7 +80,7 @@ These classes remain the output interface for `.fit(...)` results and some valid
 The implementation is split by responsibility:
 
 - `selection/forward_state.py`
-  - `ForwardState` and its QR/Gram rank-one update and downdate machinery.
+  - `IncrementalSolver` and its QR/Gram rank-one update and downdate machinery.
 
 - `selection/routines_greedy.py`
   - Single-dataset greedy selectors:

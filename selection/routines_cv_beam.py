@@ -9,7 +9,7 @@ import numpy as np
 from .beam_pruning import prune_unique_beams
 from .criteria import BestRSSCriterion, CriterionProtocol
 from .definitions import CrossValGramData
-from .forward_state import ForwardState
+from .forward_state import IncrementalSolver
 from .interface_validation import (
     validate_bool,
     validate_optional_non_negative_int,
@@ -31,7 +31,7 @@ from .topk import topk_indices
 
 @dataclass
 class CVBeam:
-    states: list[ForwardState]
+    states: list[IncrementalSolver]
     criterion: CriterionProtocol
     score: float
     _signature: int = 0

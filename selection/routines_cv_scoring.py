@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 from .definitions import CrossValGramData
-from .forward_state import ForwardState
+from .forward_state import IncrementalSolver
 from .state_cv import CrossValSelectionState
 
 
@@ -17,11 +17,11 @@ def _build_fold_states(
     solver_policy: str = "strict",
     ridge_alpha: float = 1e-8,
     pinv_rcond: float = 1e-12,
-) -> list[ForwardState]:
-    """Build per-fold ForwardState objects for a shared active set."""
+) -> list[IncrementalSolver]:
+    """Build per-fold IncrementalSolver objects for a shared active set."""
     if active_set is None:
         return [
-            ForwardState.create(
+            IncrementalSolver.create(
                 data.train_data_for_fold(k),
                 tol,
                 solver_policy=solver_policy,
@@ -31,7 +31,7 @@ def _build_fold_states(
             for k in range(data.n_folds)
         ]
     return [
-        ForwardState.from_active_set(
+        IncrementalSolver.from_active_set(
             data.train_data_for_fold(k),
             active_set,
             tol,
@@ -43,7 +43,7 @@ def _build_fold_states(
     ]
 
 
-def _assert_synced_active_sets(fold_states: list[ForwardState]) -> None:
+def _assert_synced_active_sets(fold_states: list[IncrementalSolver]) -> None:
     """Require identical active sets across all fold states."""
     if not fold_states:
         return
@@ -56,7 +56,7 @@ def _assert_synced_active_sets(fold_states: list[ForwardState]) -> None:
             )
 
 
-def _cv_rss(fold_states: list[ForwardState], data: CrossValGramData) -> float:
+def _cv_rss(fold_states: list[IncrementalSolver], data: CrossValGramData) -> float:
     """Compute summed validation RSS for the shared active set across folds."""
     _assert_synced_active_sets(fold_states)
     if not fold_states or not fold_states[0].active_set:
@@ -87,7 +87,7 @@ def _rebuild_states(
     solver_policy: str = "strict",
     ridge_alpha: float = 1e-8,
     pinv_rcond: float = 1e-12,
-) -> list[ForwardState]:
+) -> list[IncrementalSolver]:
     """Rebuild fold states from scratch to limit numerical drift."""
     return _build_fold_states(
         data,
@@ -127,7 +127,7 @@ def _build_cv_state_from_active_set(
 
 
 def _cv_forward_scores(
-    fold_states: list[ForwardState], data: CrossValGramData, tol: float
+    fold_states: list[IncrementalSolver], data: CrossValGramData, tol: float
 ) -> tuple[list[int], np.ndarray] | None:
     """Return common candidates and aggregated (summed) validation RSS.
 
@@ -192,7 +192,7 @@ def _cv_forward_scores(
 
 
 def _cv_backward_scores(
-    fold_states: list[ForwardState], data: CrossValGramData, tol: float
+    fold_states: list[IncrementalSolver], data: CrossValGramData, tol: float
 ) -> np.ndarray | None:
     """Compute aggregated CV backward scores using Gram-only downdates."""
     _assert_synced_active_sets(fold_states)

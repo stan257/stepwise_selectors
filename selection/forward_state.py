@@ -17,7 +17,7 @@ from .solvers import build_forward_factorization
 
 
 @dataclass
-class ForwardState:
+class IncrementalSolver:
     data: GramData
     tol: float
     solver_policy: str
@@ -44,7 +44,7 @@ class ForwardState:
         solver_policy: str = "strict",
         ridge_alpha: float = 1e-8,
         pinv_rcond: float = 1e-12,
-    ) -> "ForwardState":
+    ) -> "IncrementalSolver":
         policy, ridge, rcond = validate_solver_params(
             solver_policy, ridge_alpha, pinv_rcond
         )
@@ -79,7 +79,7 @@ class ForwardState:
         solver_policy: str = "strict",
         ridge_alpha: float = 1e-8,
         pinv_rcond: float = 1e-12,
-    ) -> "ForwardState":
+    ) -> "IncrementalSolver":
         policy, ridge, rcond = validate_solver_params(
             solver_policy, ridge_alpha, pinv_rcond
         )
@@ -134,8 +134,8 @@ class ForwardState:
         state.beta_S[:k] = factors.beta
         return state
 
-    def clone(self) -> "ForwardState":
-        return ForwardState(
+    def clone(self) -> "IncrementalSolver":
+        return IncrementalSolver(
             data=self.data,
             tol=self.tol,
             solver_policy=self.solver_policy,
@@ -351,4 +351,4 @@ class ForwardState:
         self._refresh_residuals_from_basis()
 
 
-__all__ = ["ForwardState"]
+__all__ = ["IncrementalSolver"]
