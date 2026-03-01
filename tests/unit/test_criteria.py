@@ -1,3 +1,5 @@
+import math
+
 import numpy as np
 import pytest
 
@@ -29,6 +31,71 @@ def test_aic_value_matches_formula():
     n = state.data.n_samples
     expected = n * np.log(rss / n) + 2
     assert pytest.approx(value) == expected
+
+
+def test_bic_value_matches_formula():
+    crit = BICCriterion(n_samples=80)
+    rss = 12.5
+    k = 4
+    value = float(np.asarray(crit.evaluate(rss, k=k)))
+    expected = 80 * np.log(rss / 80) + k * np.log(80)
+    assert value == pytest.approx(expected)
+
+
+def test_aicc_value_matches_formula():
+    crit = AICcCriterion(n_samples=30)
+    rss = 10.0
+    k = 5
+    value = float(np.asarray(crit.evaluate(rss, k=k)))
+    expected = 30 * np.log(rss / 30) + 2 * k + (2 * k * (k + 1)) / (30 - k - 1)
+    assert value == pytest.approx(expected)
+
+
+def test_aicc_returns_inf_at_boundary():
+    crit = AICcCriterion(n_samples=10)
+    assert np.isinf(float(np.asarray(crit.evaluate(1.0, k=9))))
+
+
+def test_hqic_value_matches_formula():
+    n = 100
+    k = 6
+    rss = 18.0
+    crit = HQICCriterion(n_samples=n)
+    value = float(np.asarray(crit.evaluate(rss, k=k)))
+    expected = n * np.log(rss / n) + 2.0 * k * np.log(np.log(n))
+    assert value == pytest.approx(expected)
+
+
+def test_ebic_value_matches_formula():
+    n = 120
+    p = 25
+    k = 4
+    gamma = 0.3
+    rss = 15.0
+    crit = EBICCriterion(n_samples=n, p=p, gamma=gamma)
+    value = float(np.asarray(crit.evaluate(rss, k=k)))
+    log_choose = (
+        math.lgamma(p + 1)
+        - math.lgamma(k + 1)
+        - math.lgamma(p - k + 1)
+    )
+    expected = n * np.log(rss / n) + k * np.log(n) + 2.0 * gamma * log_choose
+    assert value == pytest.approx(expected)
+
+
+def test_gcv_value_matches_formula():
+    n = 90
+    k = 7
+    rss = 9.0
+    crit = GCVCriterion(n_samples=n)
+    value = float(np.asarray(crit.evaluate(rss, k=k)))
+    expected = (rss / n) / ((n - k) / n) ** 2
+    assert value == pytest.approx(expected)
+
+
+def test_gcv_returns_inf_when_degrees_of_freedom_are_exhausted():
+    crit = GCVCriterion(n_samples=8)
+    assert np.isinf(float(np.asarray(crit.evaluate(1.0, k=8))))
 
 
 def test_is_improvement_uses_tolerance():

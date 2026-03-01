@@ -6,13 +6,14 @@ from selection.definitions import GramData
 from selection.routines_core import (
     BackwardSelection,
     BeamBackwardSelection,
+    BeamCrossValMixedSelection,
     BeamForwardSelection,
     BeamMixedSelection,
     ForwardSelection,
     MixedSelection,
 )
 from selection.state import SelectionState
-from tests.helpers import make_regression_gram
+from tests.helpers import make_cv_problem, make_regression_gram
 
 
 class RecordingRSSCriterion(BestRSSCriterion):
@@ -135,6 +136,22 @@ def test_mixed_selectors_respect_zero_forward_budget(selector_cls, selector_kwar
     state = selector_cls(**selector_kwargs).fit(
         data=data, max_forward_steps=0, max_total_steps=10
     )
+    assert state.active_set == []
+
+
+def test_beam_mixed_selector_respects_zero_total_budget():
+    data = make_regression_gram(808, n=100, p=10)
+    state = BeamMixedSelection(beam_width=3, criterion_cls=BestRSSCriterion).fit(
+        data=data, max_forward_steps=5, max_total_steps=0
+    )
+    assert state.active_set == []
+
+
+def test_cv_beam_mixed_selector_respects_zero_total_budget():
+    cv_data = make_cv_problem(seed=809, folds=4, n=80, p=10, support=3)
+    state = BeamCrossValMixedSelection(
+        beam_width=3, criterion_cls=BestRSSCriterion
+    ).fit(data=cv_data, max_forward_steps=5, max_total_steps=0)
     assert state.active_set == []
 
 
