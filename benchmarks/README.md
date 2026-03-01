@@ -84,6 +84,9 @@ From the latest full-profile run (`--profile full --seed-start 202600`):
 
 Treat this as a reproducible snapshot, not a fixed theorem: rerun with the command above when algorithm or dataset settings change.
 
+Suggested report paragraph:
+"On a seven-scenario synthetic benchmark suite (easy through very-hard regimes, including collinear decoys, misspecification, and oracle-check cases), Gram-based selector methods consistently outperformed naive covariance ranking, with winner-level test-MSE improvements of approximately 62% to 95% over `TopKAbsCovBaseline`. Relative to external sparse baselines (`LassoCV` and adaptive lasso), the selector family achieved better predictive accuracy across scenarios, while maintaining near-oracle performance in the tractable small-`p` setting. Beam search provided additional gains in decoy-heavy collinearity regimes, indicating practical value beyond single-path greedy selection."
+
 ## Artifact Versioning Policy
 
 - Do not commit raw `benchmarks/results/stability_rows*.jsonl` files (large and run-specific).
