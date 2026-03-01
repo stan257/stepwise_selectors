@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from numbers import Integral
-from typing import Iterable, Sequence
+from typing import Callable, Iterable, Sequence
 
 import numpy as np
 
@@ -87,6 +87,40 @@ def _apply_group_backward(state: ForwardState, group: Sequence[int]) -> None:
         state.apply_backward(idx)
 
 
+def _select_best_group_move(
+    *,
+    state: ForwardState,
+    candidate_groups: Iterable[int],
+    groups: Sequence[Sequence[int]],
+    criterion: CriterionProtocol,
+    apply_group_move: Callable[[ForwardState, Sequence[int]], None],
+) -> tuple[int | None, float | None, ForwardState | None]:
+    """Evaluate candidate group moves and return the best improving move."""
+    best_group = None
+    best_candidate_score = None
+    best_candidate_state = None
+
+    for g in candidate_groups:
+        candidate_state = state.clone()
+        try:
+            apply_group_move(candidate_state, groups[g])
+        except ValueError:
+            continue
+        score_cand = float(
+            np.asarray(criterion.evaluate(candidate_state.rss, candidate_state.k))
+        )
+        if not criterion.is_improvement(score_cand):
+            continue
+        if best_candidate_score is None or criterion.is_improvement(
+            score_cand, best_candidate_score
+        ):
+            best_group = g
+            best_candidate_score = score_cand
+            best_candidate_state = candidate_state
+
+    return best_group, best_candidate_score, best_candidate_state
+
+
 class BaseGroupedSelection:
     """Shared machinery for grouped greedy selection."""
 
@@ -161,29 +195,16 @@ class GroupForwardSelection(BaseGroupedSelection):
 
         steps = 0
         while max_steps is None or steps < max_steps:
-            best_group = None
-            best_candidate_score = None
-            best_candidate_state = None
-
-            for g in range(self.num_groups):
-                if g in active:
-                    continue
-                candidate_state = state.clone()
-                try:
-                    _apply_group_forward(candidate_state, self.groups[g])
-                except ValueError:
-                    continue
-                score_cand = float(
-                    np.asarray(criterion.evaluate(candidate_state.rss, candidate_state.k))
+            candidates = (g for g in range(self.num_groups) if g not in active)
+            best_group, best_candidate_score, best_candidate_state = (
+                _select_best_group_move(
+                    state=state,
+                    candidate_groups=candidates,
+                    groups=self.groups,
+                    criterion=criterion,
+                    apply_group_move=_apply_group_forward,
                 )
-                if not criterion.is_improvement(score_cand):
-                    continue
-                if best_candidate_score is None or criterion.is_improvement(
-                    score_cand, best_candidate_score
-                ):
-                    best_group = g
-                    best_candidate_score = score_cand
-                    best_candidate_state = candidate_state
+            )
 
             if best_group is None or best_candidate_state is None:
                 break
@@ -220,27 +241,15 @@ class GroupBackwardSelection(BaseGroupedSelection):
 
         steps = 0
         while active and (max_steps is None or steps < max_steps):
-            best_drop = None
-            best_candidate_score = None
-            best_candidate_state = None
-
-            for g in active:
-                candidate_state = state.clone()
-                try:
-                    _apply_group_backward(candidate_state, self.groups[g])
-                except ValueError:
-                    continue
-                score_cand = float(
-                    np.asarray(criterion.evaluate(candidate_state.rss, candidate_state.k))
+            best_drop, best_candidate_score, best_candidate_state = (
+                _select_best_group_move(
+                    state=state,
+                    candidate_groups=active,
+                    groups=self.groups,
+                    criterion=criterion,
+                    apply_group_move=_apply_group_backward,
                 )
-                if not criterion.is_improvement(score_cand):
-                    continue
-                if best_candidate_score is None or criterion.is_improvement(
-                    score_cand, best_candidate_score
-                ):
-                    best_drop = g
-                    best_candidate_score = score_cand
-                    best_candidate_state = candidate_state
+            )
 
             if best_drop is None or best_candidate_state is None:
                 break
