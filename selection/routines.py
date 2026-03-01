@@ -1,16 +1,20 @@
 """Default public selection routines."""
 
-from .routines_core import (
-    BackwardSelection as BackwardSelection,
+from .routines_beam import (
     BeamBackwardSelection as BeamBackwardSelection,
+    BeamForwardSelection as BeamForwardSelection,
+    BeamMixedSelection as BeamMixedSelection,
+)
+from .routines_cv import (
     BeamCrossValBackwardSelection as BeamCrossValBackwardSelection,
     BeamCrossValForwardSelection as BeamCrossValForwardSelection,
     BeamCrossValMixedSelection as BeamCrossValMixedSelection,
-    BeamForwardSelection as BeamForwardSelection,
-    BeamMixedSelection as BeamMixedSelection,
     CrossValBackwardSelection as CrossValBackwardSelection,
     CrossValForwardSelection as CrossValForwardSelection,
     CrossValMixedSelection as CrossValMixedSelection,
+)
+from .routines_greedy import (
+    BackwardSelection as BackwardSelection,
     ForwardSelection as ForwardSelection,
     MixedSelection as MixedSelection,
 )
