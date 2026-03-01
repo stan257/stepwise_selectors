@@ -8,6 +8,7 @@ Lightweight linear-model selection routines built on precomputed Gram statistics
 
 ## Layout
 - `selection/`: core code (criteria, state objects, selection routines, grouped variants).
+- `docs/PORTING.md`: exact porting contract (data interfaces, equations, failure semantics).
 - `tests/`: pytest suite organized by category:
   - `tests/unit/`
   - `tests/integration/`
@@ -25,6 +26,15 @@ Lightweight linear-model selection routines built on precomputed Gram statistics
 - Beam + cross-val: `BeamCrossValForwardSelection`, `BeamCrossValBackwardSelection`, `BeamCrossValMixedSelection`
 - Grouped routines: `GroupForwardSelection`, `GroupBackwardSelection`
 - Criteria: `AICCriterion`, `BestRSSCriterion`, `CriterionProtocol`
+
+## Public API Boundary
+- Stable import surface:
+  - `selection.routines`
+  - `selection.grouped_routines`
+  - `selection.definitions`
+  - `selection.criteria`
+  - `selection` (package-level re-exports)
+- Internal modules in `selection/*` outside those entrypoints are implementation details and may change without compatibility guarantees.
 
 ## Selector guide
 - Use `ForwardSelection` when you want a fast, deterministic baseline and a single support path.

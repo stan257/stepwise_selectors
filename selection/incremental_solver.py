@@ -18,6 +18,22 @@ from .solvers import build_forward_factorization
 
 @dataclass
 class IncrementalSolver:
+    """Working state for Gram-only incremental forward/backward updates.
+
+    Symbol glossary:
+    - `active_set`: selected feature indices in step order.
+    - `active_mask`: boolean mask for constant-time membership checks.
+    - `r`: residual feature-target correlations (`X^T r_y`) for all features.
+    - `v`: residual feature variances after projection on active directions.
+    - `rss`: current residual sum of squares.
+    - `Z`: orthonormal basis rows spanning selected-feature Gram subspace.
+    - `qy`: projected target coordinates in the same basis as `Z`.
+    - `R`: upper-triangular factor used by QR-style downdates.
+    - `K`: inverse Gram block on the active support (`(G_SS)^{-1}`).
+    - `beta_S`: coefficients on active features only (support order).
+    - `k`: current active support size.
+    """
+
     data: GramData
     tol: float
     solver_policy: str
