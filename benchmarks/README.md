@@ -10,6 +10,18 @@ Run smoke benchmark + threshold checks + report in one command:
 python3 benchmarks/smoke.py
 ```
 
+Run multi-seed stability benchmark suite + summary artifacts:
+
+```bash
+python3 benchmarks/stability.py
+```
+
+Re-render stability markdown report from saved summary JSON:
+
+```bash
+python3 benchmarks/stability_report.py --summary benchmarks/results/stability_summary.json --output benchmarks/results/stability_report.md
+```
+
 Equivalent manual steps are still available:
 
 Run all specs under `benchmarks/specs`:
@@ -55,6 +67,7 @@ Specs are JSON objects with these keys:
 Currently supported:
 
 - `kind`: `"synthetic_linear"`
+- `kind`: `"synthetic_support_recovery"` (correlated synthetic suite with known support)
 - `seed`: integer random seed.
 - `n_samples`: total sample count.
 - `n_features`: feature count.
@@ -65,6 +78,13 @@ Currently supported:
 - `val_fraction`: split fraction for validation.
 
 Test fraction is `1 - train_fraction - val_fraction`.
+
+Additional support-recovery options:
+
+- `correlation`: Toeplitz feature-correlation parameter in `[0, 1)`.
+- `clustered_support`: if `true`, support indices are contiguous.
+- `support_seed`: optional fixed seed for true-support identity across runs.
+- `min_signal_abs`: optional lower bound on absolute true coefficient magnitudes.
 
 ### Method config
 
@@ -104,6 +124,17 @@ Each method execution writes one JSON line with:
 - error information if the method fails
 
 Generated outputs are written to `benchmarks/results/` by default.
+
+Stability pipeline outputs:
+
+- `stability_rows.jsonl`: per-seed run rows.
+- `stability_summary.json`: aggregated stability/effectiveness metrics.
+- `stability_report.md`: scenario-wise markdown summary table.
+
+## Synthetic Dataset Suite
+
+`benchmarks/synthetic_datasets/` provides a curated set of progressively harder
+support-recovery scenarios (easy -> very_hard) with known true support.
 
 ## CI Smoke Gate
 
