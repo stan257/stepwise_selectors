@@ -10,6 +10,7 @@ __pycache__/
 # Test and tool caches
 .pytest_cache/
 .mypy_cache/
+benchmarks/results/
 
 # OS / editor artifacts
 .DS_Store

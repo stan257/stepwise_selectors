@@ -1,0 +1,60 @@
+{
+  "name": "smoke_forward_benchmarks",
+  "dataset": {
+    "kind": "synthetic_linear",
+    "name": "synthetic_linear_smoke",
+    "seed": 20260301,
+    "n_samples": 240,
+    "n_features": 32,
+    "support_size": 6,
+    "noise_std": 0.4,
+    "signal_scale": 2.5,
+    "train_fraction": 0.6,
+    "val_fraction": 0.2
+  },
+  "methods": [
+    {
+      "name": "forward_aic",
+      "selector": "ForwardSelection",
+      "selector_params": {
+        "criterion_cls": "AICCriterion"
+      },
+      "fit_params": {
+        "max_steps": 12
+      }
+    },
+    {
+      "name": "beam_forward_aic_w4",
+      "selector": "BeamForwardSelection",
+      "selector_params": {
+        "criterion_cls": "AICCriterion",
+        "beam_width": 4
+      },
+      "fit_params": {
+        "max_steps": 12
+      }
+    },
+    {
+      "name": "mixed_aic",
+      "selector": "MixedSelection",
+      "selector_params": {
+        "criterion_cls": "AICCriterion"
+      },
+      "fit_params": {
+        "max_forward_steps": 10,
+        "max_total_steps": 20
+      }
+    },
+    {
+      "name": "cv_forward_best_rss",
+      "selector": "CrossValForwardSelection",
+      "selector_params": {
+        "criterion_cls": "BestRSSCriterion"
+      },
+      "cv_folds": 5,
+      "fit_params": {
+        "max_steps": 12
+      }
+    }
+  ]
+}
