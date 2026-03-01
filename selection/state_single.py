@@ -8,25 +8,12 @@ from .constants import ABS_TOL
 FORWARD_BLOCK_SIZE = 4096
 from .definitions import GramData
 from .index_validation import validate_feature_indices
+from .state_ops import (
+    backward_rss_scores,
+    backward_schur_downdate,
+    validate_solver_params,
+)
 from .solvers import solve_active_system
-
-
-def _validate_solver_params(
-    solver_policy: str, ridge_alpha: float, pinv_rcond: float
-) -> tuple[str, float, float]:
-    policy = str(solver_policy).strip().lower()
-    match policy:
-        case "strict" | "ridge" | "pinv":
-            pass
-        case _:
-            raise ValueError("solver_policy must be one of: pinv, ridge, strict.")
-    ridge = float(ridge_alpha)
-    if not np.isfinite(ridge) or ridge < 0.0:
-        raise ValueError("ridge_alpha must be finite and >= 0.")
-    rcond = float(pinv_rcond)
-    if not np.isfinite(rcond) or rcond <= 0.0:
-        raise ValueError("pinv_rcond must be finite and > 0.")
-    return policy, ridge, rcond
 
 
 @dataclass
@@ -190,30 +177,15 @@ def _backward_components(
     state: "SelectionState", active_pos: int, tol: float
 ) -> tuple[int, list[int], np.ndarray, np.ndarray, float] | None:
     """Compute the Schur-complement downdate for removing one active feature."""
-    k = len(state.active_set)
-    if not 0 <= active_pos < k:
+    if state.K is None:
         return None
-
-    K_inv = state.K
-    idx_to_keep = np.delete(np.arange(k), active_pos)
-
-    K_11 = K_inv[np.ix_(idx_to_keep, idx_to_keep)]
-    k_12 = K_inv[idx_to_keep, active_pos]
-    k_22 = K_inv[active_pos, active_pos]
-
-    if not np.isfinite(k_22) or k_22 <= tol:
+    downdate = backward_schur_downdate(state.K, state.beta_S, active_pos, tol)
+    if downdate is None:
         return None
-
-    K_new = K_11 - np.outer(k_12, k_12) / k_22
-
+    idx_to_keep, K_new, beta_S_new, rss_delta = downdate
     removed_var = state.active_set[active_pos]
     new_active_set_indices = [state.active_set[i] for i in idx_to_keep]
-    beta_removed = state.beta_S[active_pos]
-    beta_keep = np.delete(state.beta_S, active_pos)
-    beta_S_new = (
-        beta_keep - (beta_removed / k_22) * k_12 if beta_keep.size else np.zeros(0)
-    )
-    rss_new = state.rss + (beta_removed**2) / k_22
+    rss_new = state.rss + rss_delta
     return removed_var, new_active_set_indices, K_new, beta_S_new, float(rss_new)
 
 
@@ -246,7 +218,7 @@ class SelectionState:
     active_len: int = field(init=False, default=0)
 
     def __post_init__(self):
-        policy, ridge, rcond = _validate_solver_params(
+        policy, ridge, rcond = validate_solver_params(
             self.solver_policy, self.ridge_alpha, self.pinv_rcond
         )
         self.solver_policy = policy
@@ -406,13 +378,8 @@ class SelectionState:
         k = len(self.active_set)
         if k == 0 or self.K is None:
             return None
-        diag_K = np.diag(self.K)
-        rss_new = np.full(k, np.inf, dtype=float)
         tol_value = ABS_TOL if tol is None else float(tol)
-        safe = diag_K > tol_value
-        if np.any(safe):
-            rss_new[safe] = self.rss + self.beta_S[safe] ** 2 / diag_K[safe]
-        return rss_new
+        return backward_rss_scores(self.rss, self.beta_S, self.K, tol_value)
 
     def apply_backward_step(self, active_pos: int, tol: float | None = None) -> int:
         tol_value = ABS_TOL if tol is None else float(tol)

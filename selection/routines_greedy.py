@@ -20,7 +20,7 @@ from .routines_base import (
     _validate_state_target,
 )
 from .forward_state import ForwardState
-from .state import SelectionState
+from .state_single import SelectionState
 
 
 class ForwardSelection:

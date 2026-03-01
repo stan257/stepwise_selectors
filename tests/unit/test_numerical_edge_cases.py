@@ -5,7 +5,7 @@ from selection.constants import ABS_TOL
 from selection.criteria import BestRSSCriterion
 from selection.definitions import GramData
 from selection.routines import ForwardSelection
-from selection.state import SelectionState
+from selection.state_single import SelectionState
 
 
 def test_forward_stops_after_duplicate_column():

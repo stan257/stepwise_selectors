@@ -43,7 +43,7 @@ This document summarizes the current `selection` package architecture. It is int
 
 ---
 
-## `selection/state.py` – reference mutable state objects
+## `selection/state_single.py` and `selection/state_cv.py` – reference mutable state objects
 - `ForwardDeltaCache`
   - Forward-step cache for candidate indices, residual variance/correlation, and post-step RSS.
 
@@ -56,7 +56,7 @@ This document summarizes the current `selection` package architecture. It is int
     - `clone()`
   - Uses rank-one updates/downdates and shared scratch buffers for efficiency.
 
-- `CrossValSelectionState`
+- `CrossValSelectionState` (`selection/state_cv.py`)
   - Wraps one training `SelectionState` per fold and tracks aggregate OOS RSS (`rss_cv`).
   - Exposes `beta` as a post-selection full-data refit on the selected support.
   - Key methods:
@@ -105,11 +105,12 @@ The implementation is split by responsibility:
     - `_rebuild_states`
     - `_build_cv_state_from_active_set`
 
-- `selection/routines_cv.py`
+- `selection/routines_cv_greedy.py`
   - CV greedy selectors:
     - `CrossValForwardSelection`
     - `CrossValBackwardSelection`
     - `CrossValMixedSelection`
+- `selection/routines_cv_beam.py`
   - CV beam selectors:
     - `BeamCrossValForwardSelection`
     - `BeamCrossValBackwardSelection`
@@ -117,6 +118,8 @@ The implementation is split by responsibility:
   - CV beam helper type/functions:
     - `CVBeam`
     - `_cv_beam_*`
+- `selection/routines_cv.py`
+  - Thin public facade re-exporting CV selectors.
 
 Important behavior:
 - CV candidate scoring uses summed fold validation RSS (same scale as `rss_cv`).
@@ -169,7 +172,9 @@ Notable files:
 - `tests/unit/test_state.py`
 - `tests/unit/test_cv_selection.py`
 - `tests/unit/test_interface_contracts.py`
-- `tests/integration/test_selection_routines.py`
+- `tests/integration/test_routines_greedy.py`
+- `tests/integration/test_routines_beam.py`
+- `tests/integration/test_routines_cv.py`
 - `tests/unit/test_cv_beam_selection.py`
 - `tests/property/test_behavioral_properties.py`
 - `tests/property/test_equivalence_sweeps.py`
@@ -203,6 +208,6 @@ This is the current architecture baseline: no separate legacy `beam_search.py`, 
 ## Porting notes
 - Core algorithmic behavior lives in:
   - `selection/forward_state.py` (QR/inverse-Gram state updates),
-  - `selection/state.py` (reference state and CV state materialization),
+  - `selection/state_single.py` and `selection/state_cv.py` (reference state materialization),
   - `selection/routines_cv_scoring.py` (fold-aggregated scoring formulas).
 - The package is intentionally light on dependencies; porting effort is mostly linear-algebra API translation plus state-management semantics.

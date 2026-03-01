@@ -18,7 +18,7 @@ from .interface_validation import (
     validate_positive_finite_float,
 )
 from .routines_base import _resolve_criterion
-from .state import GroupedSelectionState
+from .state_single import GroupedSelectionState
 
 
 def _normalize_group_feature_index(feat: int) -> int:

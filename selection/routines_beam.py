@@ -17,7 +17,7 @@ from .interface_validation import (
 from .routines_base import _validate_state_target
 from .routines_greedy import ForwardSelection
 from .forward_state import ForwardState
-from .state import SelectionState
+from .state_single import SelectionState
 from .topk import topk_indices
 
 

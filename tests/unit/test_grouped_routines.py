@@ -3,7 +3,7 @@ import pytest
 from selection.criteria import AICCriterion, BestRSSCriterion
 from selection.definitions import GramData
 from selection.grouped_routines import GroupBackwardSelection, GroupForwardSelection
-from selection.state import GroupedSelectionState
+from selection.state_single import GroupedSelectionState
 
 
 class GroupRecordingCriterion(BestRSSCriterion):

@@ -13,7 +13,7 @@ from selection.criteria import (
     HQICCriterion,
 )
 from selection.definitions import GramData
-from selection.state import SelectionState
+from selection.state_single import SelectionState
 
 
 def make_state():

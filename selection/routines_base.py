@@ -10,7 +10,8 @@ from .criteria import (
     CriterionProtocol,
 )
 from .definitions import CrossValGramData, GramData
-from .state import CrossValSelectionState, SelectionState
+from .state_cv import CrossValSelectionState
+from .state_single import SelectionState
 
 
 def _validate_criterion_protocol(

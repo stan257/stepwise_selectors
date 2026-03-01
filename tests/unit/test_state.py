@@ -4,7 +4,8 @@ import pytest
 
 from selection.definitions import GramData
 from selection.definitions import CrossValGramData
-from selection.state import CrossValSelectionState, SelectionState
+from selection.state_cv import CrossValSelectionState
+from selection.state_single import SelectionState
 
 
 def make_random_state(n=30, p=5, seed=0):

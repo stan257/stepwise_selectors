@@ -6,7 +6,7 @@ import numpy as np
 
 from .definitions import CrossValGramData
 from .forward_state import ForwardState
-from .state import CrossValSelectionState
+from .state_cv import CrossValSelectionState
 
 
 def _build_fold_states(

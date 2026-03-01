@@ -3,7 +3,7 @@ import numpy as np
 from selection.criteria import BestRSSCriterion
 from selection.definitions import GramData
 from selection.routines import BeamBackwardSelection, BeamForwardSelection, BeamMixedSelection
-from selection.state import SelectionState
+from selection.state_single import SelectionState
 from tests.integration._selection_routines_helpers import (
     expected_indices,
     make_diagonal_problem,
@@ -92,4 +92,3 @@ def test_rank_deficient_backward_recovers_full_rank_subset():
     assert len(beam_state.active_set) == 2
     inv_beam = np.linalg.inv(gram[np.ix_(beam_state.active_set, beam_state.active_set)])
     assert np.isfinite(inv_beam).all()
-

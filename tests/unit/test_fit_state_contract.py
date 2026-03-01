@@ -9,7 +9,7 @@ from selection.routines import (
     ForwardSelection,
     MixedSelection,
 )
-from selection.state import SelectionState
+from selection.state_single import SelectionState
 from tests.helpers import make_cv_problem, make_regression_gram
 
 

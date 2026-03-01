@@ -10,7 +10,7 @@ from selection.routines import (
     CrossValForwardSelection,
     CrossValMixedSelection,
 )
-from selection.state import CrossValSelectionState
+from selection.state_cv import CrossValSelectionState
 from tests.helpers import explicit_beta_from_active, explicit_cv_rss, make_cv_problem
 
 

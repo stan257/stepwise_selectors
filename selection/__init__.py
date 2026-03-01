@@ -30,7 +30,8 @@ from .routines import (
     ForwardSelection,
     MixedSelection,
 )
-from .state import CrossValSelectionState, GroupedSelectionState, SelectionState
+from .state_cv import CrossValSelectionState
+from .state_single import GroupedSelectionState, SelectionState
 
 __all__ = [
     "AICCriterion",

@@ -3,6 +3,7 @@ import pytest
 
 from selection.definitions import GramData
 from selection.forward_state import ForwardState
+from selection.state_single import SelectionState
 
 
 def test_random_steps_preserve_active_set_and_rss_consistency():
@@ -65,3 +66,28 @@ def test_forward_state_from_active_set_rejects_invalid_indices(
 
     with pytest.raises(error_type, match=match):
         ForwardState.from_active_set(data, active_set, tol=1e-12)
+
+
+@pytest.mark.parametrize("seed", [303, 304, 305])
+def test_forward_state_from_active_set_matches_selection_state(seed: int):
+    rng = np.random.default_rng(seed)
+    n, p = 160, 24
+    X = rng.standard_normal((n, p))
+    y = rng.standard_normal(n)
+    data = GramData(X.T @ X, X.T @ y, float(y @ y), n_samples=n)
+
+    for _ in range(10):
+        k = int(rng.integers(0, 10))
+        active = sorted(int(i) for i in rng.choice(p, size=k, replace=False))
+
+        fstate = ForwardState.from_active_set(data, active, tol=1e-12)
+        sstate = SelectionState(data)
+        sstate.init_from_active_set(active)
+
+        beta_forward = np.zeros(p, dtype=float)
+        if fstate.k:
+            idx = np.array(fstate.active_set, dtype=int)
+            beta_forward[idx] = fstate.beta_S[: fstate.k]
+
+        np.testing.assert_allclose(beta_forward, sstate.beta, atol=1e-8, rtol=1e-8)
+        assert fstate.rss == pytest.approx(sstate.rss, rel=1e-8, abs=1e-8)

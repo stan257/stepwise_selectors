@@ -24,7 +24,7 @@ from selection.grouped_routines import (
     GroupBackwardSelection,
     GroupForwardSelection,
 )
-from selection.state import SelectionState
+from selection.state_single import SelectionState
 from tests.helpers import explicit_beta_rss, explicit_cv_rss, make_regression_gram
 
 

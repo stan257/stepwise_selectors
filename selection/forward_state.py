@@ -8,25 +8,12 @@ import numpy as np
 
 from .definitions import GramData
 from .index_validation import validate_feature_indices
+from .state_ops import (
+    backward_rss_scores,
+    backward_schur_downdate,
+    validate_solver_params,
+)
 from .solvers import build_forward_factorization
-
-
-def _normalize_solver_params(
-    solver_policy: str, ridge_alpha: float, pinv_rcond: float
-) -> tuple[str, float, float]:
-    policy = str(solver_policy).strip().lower()
-    match policy:
-        case "strict" | "ridge" | "pinv":
-            pass
-        case _:
-            raise ValueError("solver_policy must be one of: pinv, ridge, strict.")
-    ridge = float(ridge_alpha)
-    if not np.isfinite(ridge) or ridge < 0.0:
-        raise ValueError("ridge_alpha must be finite and >= 0.")
-    rcond = float(pinv_rcond)
-    if not np.isfinite(rcond) or rcond <= 0.0:
-        raise ValueError("pinv_rcond must be finite and > 0.")
-    return policy, ridge, rcond
 
 
 @dataclass
@@ -58,7 +45,7 @@ class ForwardState:
         ridge_alpha: float = 1e-8,
         pinv_rcond: float = 1e-12,
     ) -> "ForwardState":
-        policy, ridge, rcond = _normalize_solver_params(
+        policy, ridge, rcond = validate_solver_params(
             solver_policy, ridge_alpha, pinv_rcond
         )
         p = data.gram.shape[0]
@@ -93,7 +80,7 @@ class ForwardState:
         ridge_alpha: float = 1e-8,
         pinv_rcond: float = 1e-12,
     ) -> "ForwardState":
-        policy, ridge, rcond = _normalize_solver_params(
+        policy, ridge, rcond = validate_solver_params(
             solver_policy, ridge_alpha, pinv_rcond
         )
         p = data.gram.shape[0]
@@ -270,12 +257,12 @@ class ForwardState:
     def backward_scores(self) -> np.ndarray | None:
         if self.k == 0:
             return None
-        diag_K = np.diag(self.K[: self.k, : self.k])
-        rss_new = np.full(self.k, np.inf, dtype=float)
-        safe = diag_K > self.tol
-        if np.any(safe):
-            rss_new[safe] = self.rss + (self.beta_S[: self.k][safe] ** 2) / diag_K[safe]
-        return rss_new
+        return backward_rss_scores(
+            self.rss,
+            self.beta_S[: self.k],
+            self.K[: self.k, : self.k],
+            self.tol,
+        )
 
     def apply_backward(self, idx: int) -> None:
         """Remove one active feature via inverse-Gram and QR downdates."""
@@ -285,19 +272,12 @@ class ForwardState:
         # Update K and beta_S via the standard inverse-Gram downdate.
         Kk = self.K[: self.k, : self.k]
         beta_k = self.beta_S[: self.k]
-        k_22 = Kk[idx, idx]
-        if not np.isfinite(k_22) or k_22 <= self.tol:
+        downdate = backward_schur_downdate(Kk, beta_k, idx, self.tol)
+        if downdate is None:
             raise ValueError("Backward update failed due to near-singular pivot.")
+        idx_keep, K_new, beta_new, _ = downdate
         removed = self.active_set.pop(idx)
         self.active_mask[removed] = False
-        idx_keep = np.delete(np.arange(self.k), idx)
-        K_11 = Kk[np.ix_(idx_keep, idx_keep)]
-        k_12 = Kk[idx_keep, idx]
-        K_new = K_11 - np.outer(k_12, k_12) / k_22
-
-        beta_removed = beta_k[idx]
-        beta_keep = np.delete(beta_k, idx)
-        beta_new = beta_keep - (beta_removed / k_22) * k_12 if beta_keep.size else np.zeros(0)
 
         # Apply QR downdate to Z, qy, and R using Givens rotations.
         if idx < self.k - 1:

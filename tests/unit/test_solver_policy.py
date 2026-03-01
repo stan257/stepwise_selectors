@@ -4,7 +4,7 @@ import pytest
 from selection.criteria import BestRSSCriterion
 from selection.definitions import CrossValGramData, GramData
 from selection.routines import BackwardSelection, CrossValBackwardSelection, ForwardSelection
-from selection.state import SelectionState
+from selection.state_single import SelectionState
 
 
 def _make_rank_deficient_data() -> GramData:
