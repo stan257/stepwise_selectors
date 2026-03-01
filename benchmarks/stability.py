@@ -52,11 +52,21 @@ def _default_output_paths() -> tuple[Path, Path, Path]:
     )
 
 
-def _default_methods(*, support_size: int) -> list[dict]:
+def _sklearn_available() -> bool:
+    try:
+        import sklearn  # noqa: F401
+    except Exception:
+        return False
+    return True
+
+
+def _default_methods(
+    *, support_size: int, include_external_baselines: bool
+) -> list[dict]:
     # In this synthetic suite we know true support size and use it as the
     # selection budget to evaluate search quality (not size-penalty tuning).
     max_steps = int(support_size)
-    return [
+    methods = [
         {
             "name": "forward_bic",
             "selector": "ForwardSelection",
@@ -104,6 +114,26 @@ def _default_methods(*, support_size: int) -> list[dict]:
             "baseline_params": {"k": int(support_size)},
         },
     ]
+    if include_external_baselines:
+        methods.extend(
+            [
+                {
+                    "name": "lasso_cv",
+                    "baseline": "LassoCVBaseline",
+                    "baseline_params": {"cv_folds": 5, "random_state": 0},
+                },
+                {
+                    "name": "adaptive_lasso_cv",
+                    "baseline": "AdaptiveLassoBaseline",
+                    "baseline_params": {
+                        "cv_folds": 5,
+                        "random_state": 0,
+                        "gamma": 1.0,
+                    },
+                },
+            ]
+        )
+    return methods
 
 
 def _profile_defaults(profile: Literal["quick", "full"]) -> dict:
@@ -160,6 +190,7 @@ def run_stability_benchmark(
     strict: bool,
     oracle_max_features: int,
     oracle_max_combinations: int,
+    include_external_baselines: bool,
 ) -> tuple[list[dict], list[dict]]:
     if seeds_override is not None and seeds_override <= 0:
         raise ValueError("seeds_override must be > 0 when provided.")
@@ -201,7 +232,10 @@ def run_stability_benchmark(
             dataset = build_dataset(dataset_cfg)
 
             support_size = int(dataset_cfg["support_size"])
-            methods = _default_methods(support_size=support_size)
+            methods = _default_methods(
+                support_size=support_size,
+                include_external_baselines=include_external_baselines,
+            )
             oracle_result = exact_best_subset_train_rss(
                 dataset,
                 k=support_size,
@@ -325,6 +359,15 @@ def main() -> int:
         default=None,
         help="Optional upper bound on C(p, k) for exact-subset oracle.",
     )
+    parser.add_argument(
+        "--include-external-baselines",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help=(
+            "Include external baselines (LassoCV, AdaptiveLasso). "
+            "Defaults to enabled for full profile and disabled for quick."
+        ),
+    )
     args = parser.parse_args()
 
     profile = str(args.profile)
@@ -339,6 +382,16 @@ def main() -> int:
         if args.oracle_max_combinations is not None
         else int(defaults["oracle_max_combinations"])
     )
+    if args.include_external_baselines is None:
+        include_external_baselines = profile == "full"
+    else:
+        include_external_baselines = bool(args.include_external_baselines)
+    if include_external_baselines and not _sklearn_available():
+        print(
+            "Warning: scikit-learn not available; disabling external baselines.",
+            file=sys.stderr,
+        )
+        include_external_baselines = False
 
     rows_output_path = Path(args.rows_output).resolve()
     summary_output_path = Path(args.summary_output).resolve()
@@ -352,6 +405,7 @@ def main() -> int:
         strict=bool(args.strict),
         oracle_max_features=oracle_max_features,
         oracle_max_combinations=oracle_max_combinations,
+        include_external_baselines=include_external_baselines,
     )
 
     summary_payload = summarize_stability_rows(rows)
@@ -361,6 +415,7 @@ def main() -> int:
         "seed_start": int(args.seed_start),
         "oracle_max_features": oracle_max_features,
         "oracle_max_combinations": oracle_max_combinations,
+        "include_external_baselines": include_external_baselines,
         "scenario_plan": scenario_plan,
     }
 

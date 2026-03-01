@@ -15,8 +15,10 @@ class SplitMetrics:
     mse: float
 
 
-def _regression_metrics(X: np.ndarray, y: np.ndarray, beta: np.ndarray) -> SplitMetrics:
-    residual = y - X @ beta
+def _regression_metrics(
+    X: np.ndarray, y: np.ndarray, beta: np.ndarray, intercept: float
+) -> SplitMetrics:
+    residual = y - (X @ beta + intercept)
     rss = float(residual @ residual)
     mse = rss / float(X.shape[0])
     return SplitMetrics(rss=rss, mse=mse)
@@ -55,10 +57,11 @@ def collect_metrics(state, dataset: BenchmarkDataset, elapsed_ms: float) -> dict
         )
 
     active_set = np.asarray(state.active_set, dtype=int)
+    intercept = float(getattr(state, "intercept", 0.0))
 
-    train = _regression_metrics(dataset.X_train, dataset.y_train, beta)
-    val = _regression_metrics(dataset.X_val, dataset.y_val, beta)
-    test = _regression_metrics(dataset.X_test, dataset.y_test, beta)
+    train = _regression_metrics(dataset.X_train, dataset.y_train, beta, intercept)
+    val = _regression_metrics(dataset.X_val, dataset.y_val, beta, intercept)
+    test = _regression_metrics(dataset.X_test, dataset.y_test, beta, intercept)
 
     base_rss = getattr(state, "rss", None)
     cv_rss = getattr(state, "rss_cv", None)
@@ -68,6 +71,7 @@ def collect_metrics(state, dataset: BenchmarkDataset, elapsed_ms: float) -> dict
         "n_selected": int(active_set.size),
         "state_rss": None if base_rss is None else float(base_rss),
         "state_rss_cv": None if cv_rss is None else float(cv_rss),
+        "state_intercept": intercept,
         "train_rss": train.rss,
         "train_mse": train.mse,
         "val_rss": val.rss,

@@ -22,6 +22,12 @@ Run higher-confidence full profile (more seeds on hard scenarios):
 python3 benchmarks/stability.py --profile full
 ```
 
+Run full profile without external (scikit-learn) baselines:
+
+```bash
+python3 benchmarks/stability.py --profile full --no-include-external-baselines
+```
+
 Run a reproducible "evidence" job with explicit artifact names:
 
 ```bash
@@ -153,6 +159,10 @@ For criteria, pass class names as strings in `selector_params`:
 Current built-in baseline:
 
 - `TopKAbsCovBaseline`: selects top-k features by absolute train covariance (`|X^T y|`) and refits OLS on that support.
+- `LassoCVBaseline`: `LassoCV` with standardized features; reports coefficients in original feature scale.
+- `AdaptiveLassoBaseline`: two-stage adaptive lasso (ridge weights + weighted `LassoCV`).
+
+For `LassoCVBaseline` and `AdaptiveLassoBaseline`, install `scikit-learn`.
 
 ## Output Format
 
@@ -178,6 +188,11 @@ Stability summary now includes:
 - mean test/support metrics with 95% CI,
 - paired-seed win rates vs `forward_bic` and `topk_abs_cov`,
 - optional oracle gap vs exact train-RSS best subset (when `p` and `C(p,k)` are under configured limits).
+
+By default:
+
+- `--profile quick` runs internal selectors + `TopKAbsCovBaseline`.
+- `--profile full` also includes `LassoCVBaseline` and `AdaptiveLassoBaseline` when scikit-learn is available.
 
 ## Synthetic Dataset Suite
 
