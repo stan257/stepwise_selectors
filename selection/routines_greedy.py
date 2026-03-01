@@ -43,8 +43,14 @@ class ForwardSelection:
         ridge_alpha: float = 1e-8,
         pinv_rcond: float = 1e-12,
         criterion=None,
+        criterion_cls=None,
         criterion_kwargs=None,
     ):
+        if criterion is not None and criterion_cls is not None:
+            raise ValueError(
+                "ForwardSelection received both `criterion` and legacy "
+                "`criterion_cls`; pass only one."
+            )
         self.tol = validate_positive_finite_float(tol, name="tol")
         self.solver_policy = validate_choice(
             solver_policy,
@@ -57,8 +63,11 @@ class ForwardSelection:
         self.pinv_rcond = validate_positive_finite_float(
             pinv_rcond, name="pinv_rcond"
         )
+        criterion_provider = criterion if criterion is not None else criterion_cls
         self.criterion = (
-            self._default_criterion if criterion is None else criterion
+            self._default_criterion
+            if criterion_provider is None
+            else criterion_provider
         )
         self.criterion_kwargs = dict(criterion_kwargs or {})
         if self._reject_ic:

@@ -193,6 +193,15 @@ def test_cv_selectors_accept_named_best_rss_key(selector_cls):
     assert isinstance(state, CrossValSelectionState)
 
 
+@pytest.mark.parametrize("selector_cls", CV_SELECTOR_VALIDATION_CASES)
+def test_cv_selectors_accept_legacy_criterion_cls_alias(selector_cls):
+    cv_data = make_cv_problem(seed=4481, folds=3, n=60, p=6, support=2)
+    state = selector_cls(criterion_cls=BestRSSCriterion).fit(
+        data=cv_data, max_steps=2
+    )
+    assert isinstance(state, CrossValSelectionState)
+
+
 @pytest.mark.parametrize(
     "selector_cls,fit_kwargs",
     [
