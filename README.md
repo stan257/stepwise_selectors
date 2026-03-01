@@ -133,3 +133,11 @@ print(gstate.active_groups, gstate.active_set, gstate.beta, gstate.rss)
 - Use explicit seeds when generating synthetic data for experiments.
 - Treat near-tie selections as potentially unstable across tiny floating-point perturbations; report support sets and objective values, not only one metric.
 - For critical claims, validate selected supports against explicit OLS recomputation on the same support (as done in the test suite).
+
+## Benchmark Claims (Synthetic Suite)
+- Full-profile benchmark command: `python3 benchmarks/stability.py --profile full --seed-start 202600`
+- In the latest full run, selector methods outperformed `TopKAbsCovBaseline` on test MSE across all benchmark scenarios.
+- Beam search showed a concrete gain over greedy forward in the twin-decoy stress case.
+- Small-`p` oracle checks showed near-zero gap for top selector methods.
+
+See [benchmarks/README.md](benchmarks/README.md) for the full claim-validation workflow and artifact policy.

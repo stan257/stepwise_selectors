@@ -66,6 +66,33 @@ Optional fast sanity run:
 python3 benchmarks/stability.py --profile quick
 ```
 
+Build a compact dominance dashboard from the produced summary:
+
+```bash
+python3 benchmarks/dominance_report.py --summary benchmarks/results/stability_summary.json --output benchmarks/results/dominance_report.md
+```
+
+## Latest Claim Snapshot
+
+From the latest full-profile run (`--profile full --seed-start 202600`):
+
+- Best selector beat `topk_abs_cov` on test MSE in all scenarios.
+- Winner relative test-MSE gain vs `topk_abs_cov`: ~`61.8%` to `95.3%` (scenario-dependent).
+- `LassoCVBaseline` and `AdaptiveLassoBaseline` did not beat `forward_bic` on mean test MSE in any scenario in this run.
+- In `hard_ultra_collinear_twins`, beam search outperformed greedy forward (`beam_forward_bic_w4` vs `forward_bic`) on mean test MSE.
+- In `oracle_small_p`, top selector methods had near-zero oracle gap, while `topk_abs_cov` had a large gap.
+
+Treat this as a reproducible snapshot, not a fixed theorem: rerun with the command above when algorithm or dataset settings change.
+
+## Artifact Versioning Policy
+
+- Do not commit raw `benchmarks/results/stability_rows*.jsonl` files (large and run-specific).
+- Prefer committing compact evidence artifacts only when needed:
+  - a summary JSON snapshot,
+  - a markdown report,
+  - and optionally a dominance report.
+- If you want historical snapshots in git, store them under a docs path (for example `docs/benchmarks/`) rather than `benchmarks/results/`.
+
 Equivalent manual steps are still available:
 
 Run all specs under `benchmarks/specs`:
