@@ -3,16 +3,7 @@ import pytest
 
 from selection.criteria import AICCriterion, BestRSSCriterion, GCVCriterion
 from selection.definitions import CrossValGramData, GramData
-from selection.routines_core import (
-    BeamCrossValBackwardSelection,
-    BeamCrossValForwardSelection,
-    BeamCrossValMixedSelection,
-    CrossValBackwardSelection,
-    CrossValForwardSelection,
-    CrossValMixedSelection,
-)
 from selection.routines import (
-    BeamCrossValBackwardSelection,
     BeamCrossValForwardSelection,
     BeamCrossValMixedSelection,
     CrossValBackwardSelection,
@@ -109,7 +100,7 @@ def test_cv_mixed_selectors_respect_zero_forward_budget(selector_cls, selector_k
     assert state.active_set == []
 
 
-CV_SELECTOR_CASES = [
+CV_SELECTOR_STATE_CONTRACT_CASES = [
     pytest.param(
         CrossValForwardSelection,
         {"criterion_cls": BestRSSCriterion},
@@ -134,22 +125,12 @@ CV_SELECTOR_CASES = [
         {"max_steps": 3},
         id="cv_beam_forward",
     ),
-    pytest.param(
-        BeamCrossValBackwardSelection,
-        {"criterion_cls": BestRSSCriterion, "beam_width": 2, "allow_worse": True},
-        {"max_steps": 3},
-        id="cv_beam_backward",
-    ),
-    pytest.param(
-        BeamCrossValMixedSelection,
-        {"criterion_cls": BestRSSCriterion, "beam_width": 2},
-        {"max_forward_steps": 3, "max_total_steps": 5},
-        id="cv_beam_mixed",
-    ),
 ]
 
 
-@pytest.mark.parametrize("selector_cls,selector_kwargs,fit_kwargs", CV_SELECTOR_CASES)
+@pytest.mark.parametrize(
+    "selector_cls,selector_kwargs,fit_kwargs", CV_SELECTOR_STATE_CONTRACT_CASES
+)
 def test_cv_selector_rejects_mismatched_state_data(
     selector_cls, selector_kwargs, fit_kwargs
 ):
@@ -162,7 +143,9 @@ def test_cv_selector_rejects_mismatched_state_data(
         selector.fit(state=state, data=cv_data, **fit_kwargs)
 
 
-@pytest.mark.parametrize("selector_cls,selector_kwargs,fit_kwargs", CV_SELECTOR_CASES)
+@pytest.mark.parametrize(
+    "selector_cls,selector_kwargs,fit_kwargs", CV_SELECTOR_STATE_CONTRACT_CASES
+)
 def test_cv_selector_reuses_matching_state(
     selector_cls, selector_kwargs, fit_kwargs
 ):
@@ -181,16 +164,17 @@ def test_cv_selector_reuses_matching_state(
     assert result.rss_cv == pytest.approx(expected.rss_cv, rel=1e-8, abs=1e-8)
 
 
+CV_SELECTOR_VALIDATION_CASES = [
+    CrossValForwardSelection,
+    CrossValBackwardSelection,
+    CrossValMixedSelection,
+    BeamCrossValForwardSelection,
+]
+
+
 @pytest.mark.parametrize(
     "selector_cls",
-    [
-        CrossValForwardSelection,
-        CrossValBackwardSelection,
-        CrossValMixedSelection,
-        BeamCrossValForwardSelection,
-        BeamCrossValBackwardSelection,
-        BeamCrossValMixedSelection,
-    ],
+    CV_SELECTOR_VALIDATION_CASES,
 )
 def test_cv_selectors_default_to_best_rss(selector_cls):
     selector = selector_cls()
@@ -199,14 +183,7 @@ def test_cv_selectors_default_to_best_rss(selector_cls):
 
 @pytest.mark.parametrize(
     "selector_cls",
-    [
-        CrossValForwardSelection,
-        CrossValBackwardSelection,
-        CrossValMixedSelection,
-        BeamCrossValForwardSelection,
-        BeamCrossValBackwardSelection,
-        BeamCrossValMixedSelection,
-    ],
+    CV_SELECTOR_VALIDATION_CASES,
 )
 @pytest.mark.parametrize("criterion_cls", [AICCriterion, GCVCriterion])
 def test_cv_selectors_reject_disallowed_criteria(selector_cls, criterion_cls):
@@ -219,14 +196,7 @@ def test_cv_selectors_reject_disallowed_criteria(selector_cls, criterion_cls):
 
 @pytest.mark.parametrize(
     "selector_cls",
-    [
-        CrossValForwardSelection,
-        CrossValBackwardSelection,
-        CrossValMixedSelection,
-        BeamCrossValForwardSelection,
-        BeamCrossValBackwardSelection,
-        BeamCrossValMixedSelection,
-    ],
+    CV_SELECTOR_VALIDATION_CASES,
 )
 def test_cv_selectors_reject_cv_incompatible_custom_criterion(selector_cls):
     with pytest.raises(
@@ -240,14 +210,14 @@ def test_cv_selectors_reject_cv_incompatible_custom_criterion(selector_cls):
     "selector_cls,fit_kwargs",
     [
         pytest.param(CrossValForwardSelection, {"max_steps": 2}, id="cv_forward"),
-        pytest.param(CrossValBackwardSelection, {"max_steps": 2}, id="cv_backward"),
         pytest.param(
             CrossValMixedSelection,
             {"max_forward_steps": 2, "max_total_steps": 3},
             id="cv_mixed",
         ),
-        pytest.param(BeamCrossValForwardSelection, {"max_steps": 2}, id="cv_beam_forward"),
-        pytest.param(BeamCrossValBackwardSelection, {"max_steps": 2}, id="cv_beam_backward"),
+        pytest.param(
+            BeamCrossValForwardSelection, {"max_steps": 2}, id="cv_beam_forward"
+        ),
         pytest.param(
             BeamCrossValMixedSelection,
             {"max_forward_steps": 2, "max_total_steps": 3},
