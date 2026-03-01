@@ -18,7 +18,16 @@ def _build_fold_states(
     ridge_alpha: float = 1e-8,
     pinv_rcond: float = 1e-12,
 ) -> list[IncrementalSolver]:
-    """Build per-fold IncrementalSolver objects for a shared active set."""
+    """Build per-fold `IncrementalSolver` objects for a shared active set.
+
+    Preconditions:
+    - `data` is validated `CrossValGramData`.
+    - `active_set` is either `None` or a valid feature-index list for all folds.
+
+    Postconditions:
+    - returns one solver per fold with synchronized support when `active_set` is
+      provided.
+    """
     if active_set is None:
         return [
             IncrementalSolver.create(
@@ -44,7 +53,12 @@ def _build_fold_states(
 
 
 def _assert_synced_active_sets(fold_states: list[IncrementalSolver]) -> None:
-    """Require identical active sets across all fold states."""
+    """Require identical active sets across all fold states.
+
+    Contract:
+    - CV search helpers assume synchronized supports across folds.
+    - callers should enforce this via construction/rebuild paths.
+    """
     if not fold_states:
         return
     reference = list(fold_states[0].active_set)
@@ -57,7 +71,14 @@ def _assert_synced_active_sets(fold_states: list[IncrementalSolver]) -> None:
 
 
 def _cv_rss(fold_states: list[IncrementalSolver], data: CrossValGramData) -> float:
-    """Compute summed validation RSS for the shared active set across folds."""
+    """Compute summed validation RSS for the shared active set across folds.
+
+    Preconditions:
+    - fold states are synchronized (`_assert_synced_active_sets`).
+
+    Postconditions:
+    - returns objective on `rss_cv` scale: sum of per-fold validation RSS.
+    """
     _assert_synced_active_sets(fold_states)
     if not fold_states or not fold_states[0].active_set:
         return float(np.sum(data.y_norm_folds))
@@ -88,7 +109,12 @@ def _rebuild_states(
     ridge_alpha: float = 1e-8,
     pinv_rcond: float = 1e-12,
 ) -> list[IncrementalSolver]:
-    """Rebuild fold states from scratch to limit numerical drift."""
+    """Rebuild fold states from scratch to limit numerical drift.
+
+    Notes:
+    - This is intentionally conservative and favors numerical robustness over
+      maximal speed for long CV paths.
+    """
     return _build_fold_states(
         data,
         tol=tol,
@@ -108,7 +134,16 @@ def _build_cv_state_from_active_set(
     ridge_alpha: float = 1e-8,
     pinv_rcond: float = 1e-12,
 ) -> CrossValSelectionState:
-    """Materialize a CrossValSelectionState from an active set."""
+    """Materialize `CrossValSelectionState` from a finalized active set.
+
+    Preconditions:
+    - `active_set` is valid for `data.p`.
+    - `state` is either `None` or bound to `data`.
+
+    Postconditions:
+    - per-fold train states are rebuilt on `active_set`.
+    - `active_set`, `rss_cv`, and full-data refit `beta` are synchronized.
+    """
     cv_state = (
         state
         if state is not None
@@ -133,6 +168,14 @@ def _cv_forward_scores(
 
     Uses Gram-only formulas to score candidates per fold without materializing
     design matrices, then sums fold RSS to match rss_cv scale.
+
+    Preconditions:
+    - fold states are synchronized and numerically valid.
+    - `tol` is positive and consistent with solver tolerance policy.
+
+    Returns:
+    - `(candidates, aggregated_rss)` where aggregation is fold-summed RSS.
+    - `None` when no common valid candidate remains across folds.
     """
     _assert_synced_active_sets(fold_states)
     if not fold_states:
@@ -194,7 +237,15 @@ def _cv_forward_scores(
 def _cv_backward_scores(
     fold_states: list[IncrementalSolver], data: CrossValGramData, tol: float
 ) -> np.ndarray | None:
-    """Compute aggregated CV backward scores using Gram-only downdates."""
+    """Compute aggregated CV backward scores using Gram-only downdates.
+
+    Preconditions:
+    - fold states are synchronized and non-empty.
+
+    Returns:
+    - fold-summed validation RSS per removable local support index.
+    - `None` if no active features exist.
+    """
     _assert_synced_active_sets(fold_states)
     if not fold_states or not fold_states[0].active_set:
         return None

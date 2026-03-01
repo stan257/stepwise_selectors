@@ -9,6 +9,7 @@ Lightweight linear-model selection routines built on precomputed Gram statistics
 ## Layout
 - `selection/`: core code (criteria, state objects, selection routines, grouped variants).
 - `docs/PORTING.md`: exact porting contract (data interfaces, equations, failure semantics).
+- `docs/CONTRACTS.md`: validation-boundary and precondition contract for contributors.
 - `tests/`: pytest suite organized by category:
   - `tests/unit/`
   - `tests/integration/`

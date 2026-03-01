@@ -32,6 +32,11 @@ class IncrementalSolver:
     - `K`: inverse Gram block on the active support (`(G_SS)^{-1}`).
     - `beta_S`: coefficients on active features only (support order).
     - `k`: current active support size.
+
+    Contract role:
+    - internal numerical kernel used by selector routines.
+    - assumes boundary validation was already performed by public APIs.
+    - retains only safeguards required to avoid silent numerical corruption.
     """
 
     data: GramData
@@ -61,6 +66,13 @@ class IncrementalSolver:
         ridge_alpha: float = 1e-8,
         pinv_rcond: float = 1e-12,
     ) -> "IncrementalSolver":
+        """Create an empty incremental state.
+
+        Preconditions:
+        - `data` is validated `GramData`.
+        - solver hyperparameters are boundary-validated or acceptable to
+          `validate_solver_params`.
+        """
         policy, ridge, rcond = validate_solver_params(
             solver_policy, ridge_alpha, pinv_rcond
         )
@@ -96,6 +108,16 @@ class IncrementalSolver:
         ridge_alpha: float = 1e-8,
         pinv_rcond: float = 1e-12,
     ) -> "IncrementalSolver":
+        """Initialize incremental state from an explicit active support.
+
+        Preconditions:
+        - `active_set` uses valid, unique feature indices.
+        - active Gram block is solvable under the selected solver policy.
+
+        Raises:
+        - `ValueError`/`TypeError` for invalid feature indices.
+        - `np.linalg.LinAlgError` when initialization solve is unstable.
+        """
         policy, ridge, rcond = validate_solver_params(
             solver_policy, ridge_alpha, pinv_rcond
         )
@@ -193,6 +215,13 @@ class IncrementalSolver:
         self.beta_S = new_beta
 
     def candidate_scores(self) -> tuple[np.ndarray, np.ndarray] | None:
+        """Return forward candidate indices and their resulting RSS values.
+
+        Returns:
+        - `(candidates, rss_new)` with candidates filtered by residual variance
+          and non-negative RSS tolerance checks.
+        - `None` when no numerically valid forward move remains.
+        """
         valid = (~self.active_mask) & (self.v > self.tol)
         if not np.any(valid):
             return None
@@ -280,7 +309,17 @@ class IncrementalSolver:
         K_new[self.k, self.k] = 1.0 / resid_var
 
     def apply_forward(self, feat_idx: int) -> float:
-        """Apply a forward step while updating QR/Gram state in O(p)."""
+        """Apply one forward step while updating QR/Gram state in O(p).
+
+        Preconditions:
+        - `feat_idx` is currently inactive.
+        - candidate residual variance exceeds tolerance.
+
+        Postconditions:
+        - support size `k` increases by one.
+        - residual statistics (`r`, `v`, `rss`) and factors (`R`, `Z`, `K`,
+          `beta_S`) are updated consistently.
+        """
         resid_var, resid_corr, denom, z_col, z_new, qy_new = self._prepare_forward_step(
             feat_idx
         )
@@ -342,7 +381,17 @@ class IncrementalSolver:
         self.rss = float(self.data.y_norm - np.dot(self.qy[: self.k], self.qy[: self.k]))
 
     def apply_backward(self, idx: int) -> None:
-        """Remove one active feature via inverse-Gram and QR downdates."""
+        """Remove one active feature via inverse-Gram and QR downdates.
+
+        Preconditions:
+        - `idx` is a valid local index into current support order.
+        - Schur-complement downdate pivot is numerically admissible.
+
+        Postconditions:
+        - support size `k` decreases by one.
+        - `K`, `beta_S`, and residual statistics are refreshed to remain
+          algebraically consistent with the reduced support.
+        """
         if not (0 <= idx < self.k):
             raise IndexError("Backward index out of range.")
 

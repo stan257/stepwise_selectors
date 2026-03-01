@@ -82,6 +82,16 @@ class ForwardSelection:
                 )
 
     def _init_criterion(self, data: GramData) -> CriterionProtocol:
+        """Construct and initialize criterion state for this selector.
+
+        Preconditions:
+        - `data` is a validated `GramData` instance.
+        - constructor-level criterion config has passed boundary validation.
+
+        Postconditions:
+        - returns a criterion satisfying `CriterionProtocol`.
+        - criterion `current_value` is initialized at the empty model (`k=0`).
+        """
         criterion = _resolve_criterion(
             selector_name=type(self).__name__,
             data=data,
@@ -102,6 +112,24 @@ class ForwardSelection:
         data: GramData,
         max_steps: int | None = None,
     ) -> SelectionState:
+        """Run greedy forward selection.
+
+        Preconditions:
+        - `data` must be a validated `GramData`.
+        - if `state` is provided, it must be a `SelectionState` bound to `data`
+          and currently empty (no warm start).
+        - `max_steps` is `None` or a non-negative integer.
+
+        Postconditions:
+        - returns a `SelectionState` on the selected support.
+        - returned state coefficients/RSS are recomputed from final support via
+          stable solve (`SelectionState.init_from_active_set`).
+
+        Raises:
+        - `TypeError`/`ValueError` for contract violations at the API boundary.
+        - `np.linalg.LinAlgError` if final support refit is numerically singular
+          under the chosen solver policy.
+        """
         result_state = _validate_state_target(
             state, data, selector_name=type(self).__name__
         )
@@ -160,6 +188,16 @@ class BackwardSelection(ForwardSelection):
         data: GramData,
         max_steps: int | None = None,
     ) -> SelectionState:
+        """Run greedy backward elimination from full support.
+
+        Preconditions:
+        - same boundary requirements as `ForwardSelection.fit`.
+        - `allow_worse=False` means each accepted backward step must improve the
+          criterion; `allow_worse=True` allows forced removals under budget.
+
+        Postconditions:
+        - returns a `SelectionState` fit on the final active support.
+        """
         result_state = _validate_state_target(
             state, data, selector_name=type(self).__name__
         )
@@ -221,6 +259,17 @@ class MixedSelection(ForwardSelection):
         max_forward_steps: int | None = None,
         max_total_steps: int | None = None,
     ) -> SelectionState:
+        """Run mixed forward-then-backward greedy search.
+
+        Preconditions:
+        - same data/state boundary requirements as other greedy selectors.
+        - step budgets are `None` or non-negative integers.
+
+        Postconditions:
+        - applies at most one forward move per outer iteration, then zero or
+          more improving backward moves.
+        - returns a fully materialized `SelectionState` on final support.
+        """
         result_state = _validate_state_target(
             state, data, selector_name=type(self).__name__
         )

@@ -30,7 +30,20 @@ def solve_active_system(
     pinv_rcond: float,
     context: str,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Solve beta and inverse Gram for an active support under a policy."""
+    """Solve coefficients and inverse Gram for one active support.
+
+    Preconditions:
+    - `gram_ss` is square and aligned with `cov_s`.
+    - caller has already validated shapes/types at API boundary.
+    - `solver_policy` and hyperparameters are valid.
+
+    Returns:
+    - `(beta, K)` where `K` approximates `(G_SS)^{-1}` under the chosen policy.
+
+    Raises:
+    - `np.linalg.LinAlgError` when strict/ridge solves are numerically unstable.
+    - `ValueError` for unsupported solver policies.
+    """
     match solver_policy:
         case "strict":
             return _solve_cholesky(gram_ss, cov_s, context=context, strict_pivot_check=True)
@@ -65,7 +78,16 @@ def build_forward_factorization(
     pinv_rcond: float,
     context: str,
 ) -> ForwardFactorization:
-    """Build R/Z/qy/K/beta for IncrementalSolver.from_active_set under a policy."""
+    """Build initialization factors for `IncrementalSolver.from_active_set`.
+
+    Preconditions:
+    - caller passes support-restricted Gram blocks with consistent dimensions.
+    - boundary validation has already normalized solver params.
+
+    Postconditions:
+    - returns factors (`R`, `Z`, `qy`, `K`, `beta`) consistent with the chosen
+      solver policy for immediate use in incremental updates.
+    """
     match solver_policy:
         case "strict" | "ridge":
             work = (

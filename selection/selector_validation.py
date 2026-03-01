@@ -1,4 +1,10 @@
-"""Selector validation and criterion-construction helpers."""
+"""Selector validation and criterion-construction helpers.
+
+Contract boundary:
+- Functions in this module are called from public selector constructors/fit methods.
+- They perform strict user-facing validation and normalization.
+- Downstream algorithm kernels may assume these checks already passed.
+"""
 
 from __future__ import annotations
 
