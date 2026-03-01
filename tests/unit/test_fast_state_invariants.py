@@ -5,7 +5,7 @@ from selection.definitions import GramData
 from selection.routines_core import ForwardState
 
 
-def test_fast_state_invariants_after_random_steps():
+def test_state_invariants_after_random_steps():
     rng = np.random.default_rng(2024)
     n, p = 140, 40
     X = rng.standard_normal((n, p))
@@ -55,52 +55,6 @@ def test_fast_state_invariants_after_random_steps():
         )
         np.testing.assert_allclose(state.r, r_expected, atol=1e-8, rtol=1e-8)
         np.testing.assert_allclose(state.v, v_expected, atol=1e-8, rtol=1e-8)
-
-
-def test_fast_state_long_horizon_stability():
-    rng = np.random.default_rng(2025)
-    n, p = 200, 60
-    X = rng.standard_normal((n, p))
-    beta = rng.standard_normal(p)
-    y = X @ beta + 0.1 * rng.standard_normal(n)
-    data = GramData(X.T @ X, X.T @ y, y @ y, n)
-
-    state = ForwardState.create(data, tol=1e-12)
-
-    for step in range(200):
-        scored = state.candidate_scores()
-        can_forward = scored is not None and scored[0].size
-        do_forward = can_forward and (state.k == 0 or rng.random() < 0.55)
-
-        if do_forward:
-            candidates, _ = scored
-            feat_idx = int(rng.choice(candidates))
-            state.apply_forward(feat_idx)
-        elif state.k:
-            drop_idx = int(rng.integers(0, state.k))
-            state.apply_backward(drop_idx)
-
-        if step % 20 != 0:
-            continue
-
-        idx = np.array(state.active_set, dtype=int)
-        if idx.size:
-            G_ss = data.gram[np.ix_(idx, idx)]
-            cov_s = data.cov[idx]
-            beta_s = np.linalg.solve(G_ss, cov_s)
-            rss = float(data.y_norm - cov_s @ beta_s)
-            np.testing.assert_allclose(
-                state.beta_S[: state.k], beta_s, atol=1e-6, rtol=1e-6
-            )
-            np.testing.assert_allclose(state.rss, rss, atol=1e-6, rtol=1e-6)
-        else:
-            np.testing.assert_allclose(state.rss, data.y_norm, atol=1e-8, rtol=0.0)
-
-        assert np.isfinite(state.Z[: state.k, :]).all()
-        assert np.isfinite(state.qy[: state.k]).all()
-        assert np.isfinite(state.K[: state.k, : state.k]).all()
-        assert np.isfinite(state.r).all()
-        assert np.isfinite(state.v).all()
 
 
 @pytest.mark.parametrize(

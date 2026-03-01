@@ -36,7 +36,7 @@ def _rss_from_gram(data: GramData, subset: tuple[int, ...]) -> float:
     return float(data.y_norm - cov_s @ beta)
 
 
-def test_fast_beam_forward_matches_exhaustive_best_subset():
+def test_beam_forward_matches_exhaustive_best_subset():
     rng = np.random.default_rng(2026)
     n, p, k = 40, 8, 3
     X = rng.standard_normal((n, p))
@@ -73,7 +73,7 @@ def test_fast_beam_forward_matches_exhaustive_best_subset():
     np.testing.assert_allclose(state.beta, beta_full, atol=1e-8, rtol=1e-8)
 
 
-def test_fast_forward_matches_exhaustive_across_criteria():
+def test_forward_matches_exhaustive_across_criteria():
     p = 8
     cov = np.array([2.5, 2.0, 1.6, 1.3, 1.0, 0.8, 0.6, 0.4])
     gram = np.eye(p)

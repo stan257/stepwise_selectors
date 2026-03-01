@@ -44,7 +44,7 @@ def _assert_group_state_consistent(state, data: GramData, groups):
 
 @pytest.mark.parametrize("seed", [0, 1])
 @pytest.mark.parametrize("p", [32, 80])  # include p > 64 to exercise capacity growth
-def test_fast_greedy_consistency_sweep(seed: int, p: int):
+def test_greedy_consistency_sweep(seed: int, p: int):
     data = make_regression_gram(seed, n=140, p=p)
     max_steps = min(6, p // 2)
 
@@ -63,7 +63,7 @@ def test_fast_greedy_consistency_sweep(seed: int, p: int):
 
 
 @pytest.mark.parametrize("seed", [2, 3])
-def test_fast_beam_consistency_sweep(seed: int):
+def test_beam_consistency_sweep(seed: int):
     data = make_regression_gram(seed, n=120, p=25)
 
     fast_f = BeamForwardSelection(
@@ -83,7 +83,7 @@ def test_fast_beam_consistency_sweep(seed: int):
 
 
 @pytest.mark.parametrize("seed", [4, 5])
-def test_fast_cv_consistency_sweep(seed: int):
+def test_cv_consistency_sweep(seed: int):
     cv_data = make_cv_regression_gram(seed, folds=3, n=80, p=18)
 
     fast_f = CrossValForwardSelection(
@@ -109,7 +109,7 @@ def test_fast_cv_consistency_sweep(seed: int):
 
 
 @pytest.mark.parametrize("seed", [6, 7])
-def test_fast_cv_beam_consistency_sweep(seed: int):
+def test_cv_beam_consistency_sweep(seed: int):
     cv_data = make_cv_regression_gram(seed, folds=3, n=70, p=16)
 
     fast_f = BeamCrossValForwardSelection(
@@ -135,7 +135,7 @@ def test_fast_cv_beam_consistency_sweep(seed: int):
 
 
 @pytest.mark.parametrize("seed", [8, 9])
-def test_fast_grouped_consistency_sweep(seed: int):
+def test_grouped_consistency_sweep(seed: int):
     data = make_regression_gram(seed, n=100, p=12)
     groups = [list(range(i, i + 3)) for i in range(0, 12, 3)]
 

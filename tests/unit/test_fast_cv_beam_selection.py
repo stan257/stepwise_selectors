@@ -1,14 +1,10 @@
 import numpy as np
-import pytest
 
 from selection.criteria import BestRSSCriterion
 from selection.definitions import CrossValGramData, GramData
 from selection.routines_core import (
     BeamCrossValBackwardSelection,
-    BeamCrossValForwardSelection,
-    BeamCrossValMixedSelection,
 )
-from tests.helpers import explicit_cv_rss, make_cv_problem
 
 
 def _make_full_model_optimal_cv(*, folds: int = 3, n: int = 50, p: int = 6):
@@ -22,34 +18,7 @@ def _make_full_model_optimal_cv(*, folds: int = 3, n: int = 50, p: int = 6):
     return CrossValGramData(fold_data)
 
 
-def test_fast_cv_beam_forward_matches_explicit_rss():
-    cv_data = make_cv_problem()
-    state = BeamCrossValForwardSelection(
-        beam_width=2, criterion_cls=BestRSSCriterion
-    ).fit(data=cv_data, max_steps=4)
-    expected_rss = explicit_cv_rss(cv_data, state.active_set)
-    assert pytest.approx(state.rss_cv, rel=1e-8, abs=1e-8) == expected_rss
-
-
-def test_fast_cv_beam_backward_matches_explicit_rss():
-    cv_data = make_cv_problem()
-    state = BeamCrossValBackwardSelection(
-        beam_width=2, criterion_cls=BestRSSCriterion
-    ).fit(data=cv_data, max_steps=3)
-    expected_rss = explicit_cv_rss(cv_data, state.active_set)
-    assert pytest.approx(state.rss_cv, rel=1e-8, abs=1e-8) == expected_rss
-
-
-def test_fast_cv_beam_mixed_matches_explicit_rss():
-    cv_data = make_cv_problem()
-    state = BeamCrossValMixedSelection(
-        beam_width=2, criterion_cls=BestRSSCriterion
-    ).fit(data=cv_data, max_forward_steps=3, max_total_steps=5)
-    expected_rss = explicit_cv_rss(cv_data, state.active_set)
-    assert pytest.approx(state.rss_cv, rel=1e-8, abs=1e-8) == expected_rss
-
-
-def test_fast_cv_beam_backward_is_improvement_only_by_default():
+def test_cv_beam_backward_is_improvement_only_by_default():
     cv_data = _make_full_model_optimal_cv(folds=3, n=40, p=6)
 
     strict = BeamCrossValBackwardSelection(

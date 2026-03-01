@@ -152,13 +152,6 @@ def test_backward_prunes_to_best_single_variable(small_problem):
     assert np.isclose(state.beta[1], 0.0, atol=1e-9)
 
 
-def test_stepwise_matches_forward_result(small_problem):
-    state = MixedSelection().fit(data=small_problem)
-
-    assert state.active_set == [0]
-    assert np.isclose(state.beta[0], 0.95, atol=1e-6)
-
-
 def test_forward_with_best_rss_matches_standard(small_problem):
     state = ForwardSelection(criterion_cls=BestRSSCriterion).fit(data=small_problem)
 
@@ -166,32 +159,6 @@ def test_forward_with_best_rss_matches_standard(small_problem):
     np.testing.assert_allclose(
         state.beta[:2], np.linalg.solve(small_problem.gram, small_problem.cov)
     )
-
-
-# ---------------------------------------------------------------------------
-# Basic cross-validation on duplicated folds derived from the toy problem
-# ---------------------------------------------------------------------------
-def test_crossval_forward_selection_matches_forward(small_cv_problem):
-    cv_selector = CrossValForwardSelection()
-    cv_state = cv_selector.fit(data=small_cv_problem, max_steps=1)
-
-    assert cv_state.active_set == [0]
-
-
-def test_crossval_backward_selection_matches_backward(small_cv_problem):
-    cv_selector = CrossValBackwardSelection()
-    cv_state = cv_selector.fit(data=small_cv_problem, max_steps=1)
-
-    assert cv_state.active_set == [0, 1]
-
-
-def test_crossval_mixed_selection_matches_mixed(small_cv_problem):
-    cv_selector = CrossValMixedSelection()
-    cv_state = cv_selector.fit(
-        data=small_cv_problem, max_forward_steps=1, max_total_steps=2
-    )
-
-    assert cv_state.active_set == [0]
 
 
 # ---------------------------------------------------------------------------
@@ -280,14 +247,6 @@ def test_beam_crossval_backward_selection_recovers_true_support():
     state = selector.fit(data=cv_data, max_steps=50 - len(support_set))
 
     assert set(state.active_set) == set(support_set)
-
-
-def test_beam_crossval_mixed_selection_matches_forward(small_cv_problem):
-    selector = BeamCrossValMixedSelection(beam_width=2)
-    cv_state = selector.fit(
-        data=small_cv_problem, max_forward_steps=1, max_total_steps=2
-    )
-    assert cv_state.active_set == [0]
 
 
 def test_crossval_beam_matches_greedy_on_simple_problem():

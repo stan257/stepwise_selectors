@@ -30,7 +30,7 @@ def _make_data_scenario(kind: str, seed: int) -> GramData:
 
 
 @pytest.mark.parametrize("kind", ["p_gt_n", "n_gt_p", "ill_conditioned"])
-def test_fast_forward_matches_explicit_across_regimes(kind: str):
+def test_forward_matches_explicit_across_regimes(kind: str):
     data = _make_data_scenario(kind, seed=2025)
     max_steps = 5
 

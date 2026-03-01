@@ -34,7 +34,7 @@ from tests.helpers import explicit_beta_rss, explicit_cv_rss, make_regression_gr
 
 
 @pytest.mark.parametrize("seed", [10, 11, 12, 13, 14, 15])
-def test_fast_and_reference_select_same_features_stepwise(seed: int):
+def test_reference_and_state_select_same_features_stepwise(seed: int):
     """Both implementations must choose the same feature at every forward step
     and produce identical backward scores from the full model."""
     n, p = 80, 10

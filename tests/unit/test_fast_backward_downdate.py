@@ -5,7 +5,7 @@ from selection.definitions import GramData
 from selection.routines_core import ForwardState
 
 
-def test_fast_downdate_matches_rebuild():
+def test_downdate_matches_rebuild():
     rng = np.random.default_rng(135)
     n, p = 120, 12
     X = rng.standard_normal((n, p))
@@ -35,7 +35,7 @@ def test_fast_downdate_matches_rebuild():
 
 
 @pytest.mark.parametrize("pivot_mode", ["negative", "nan"])
-def test_fast_backward_failure_does_not_mutate_active_set(pivot_mode):
+def test_backward_failure_does_not_mutate_active_set(pivot_mode):
     rng = np.random.default_rng(246)
     n, p = 50, 4
     X = rng.standard_normal((n, p))
