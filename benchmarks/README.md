@@ -86,8 +86,7 @@ For baselines:
 
 For criteria, pass class names as strings in `selector_params`:
 
-- `criterion_cls`: e.g. `"AICCriterion"`, `"BestRSSCriterion"`
-- `criterion`: also accepted
+- `criterion`: e.g. `"AICCriterion"`, `"BestRSSCriterion"`
 
 Current built-in baseline:
 

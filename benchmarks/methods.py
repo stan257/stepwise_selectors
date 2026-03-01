@@ -105,14 +105,17 @@ def _build_cv_data(X: np.ndarray, y: np.ndarray, n_folds: int, seed: int) -> Cro
 
 def _resolve_criterion_refs(selector_params: dict) -> dict:
     resolved = dict(selector_params)
-    for key in ("criterion", "criterion_cls"):
-        value = resolved.get(key)
-        if isinstance(value, str):
-            if value not in CRITERION_MAP:
-                raise ValueError(
-                    f"Unknown criterion {value!r}. Supported: {sorted(CRITERION_MAP)}"
-                )
-            resolved[key] = CRITERION_MAP[value]
+    if "criterion_cls" in resolved:
+        raise ValueError(
+            "selector_params uses unsupported key `criterion_cls`; use `criterion`."
+        )
+    value = resolved.get("criterion")
+    if isinstance(value, str):
+        if value not in CRITERION_MAP:
+            raise ValueError(
+                f"Unknown criterion {value!r}. Supported: {sorted(CRITERION_MAP)}"
+            )
+        resolved["criterion"] = CRITERION_MAP[value]
     return resolved
 
 

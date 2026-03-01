@@ -17,7 +17,7 @@
       "name": "forward_aic",
       "selector": "ForwardSelection",
       "selector_params": {
-        "criterion_cls": "AICCriterion"
+        "criterion": "AICCriterion"
       },
       "fit_params": {
         "max_steps": 12
@@ -27,7 +27,7 @@
       "name": "beam_forward_aic_w4",
       "selector": "BeamForwardSelection",
       "selector_params": {
-        "criterion_cls": "AICCriterion",
+        "criterion": "AICCriterion",
         "beam_width": 4
       },
       "fit_params": {
@@ -38,7 +38,7 @@
       "name": "mixed_aic",
       "selector": "MixedSelection",
       "selector_params": {
-        "criterion_cls": "AICCriterion"
+        "criterion": "AICCriterion"
       },
       "fit_params": {
         "max_forward_steps": 10,
@@ -49,7 +49,7 @@
       "name": "cv_forward_best_rss",
       "selector": "CrossValForwardSelection",
       "selector_params": {
-        "criterion_cls": "BestRSSCriterion"
+        "criterion": "BestRSSCriterion"
       },
       "cv_folds": 5,
       "fit_params": {

@@ -4,7 +4,6 @@ import pytest
 from selection.criteria import BestRSSCriterion
 from selection.definitions import GramData
 from selection.routines import (
-    BeamForwardSelection,
     BeamCrossValMixedSelection,
     BeamMixedSelection,
     ForwardSelection,
@@ -137,27 +136,9 @@ def test_forward_selection_accepts_named_rss_criterion_key():
     assert len(result.active_set) <= 3
 
 
-def test_forward_selection_accepts_legacy_criterion_cls_alias():
-    data = make_regression_gram(44410, n=100, p=10)
-    selector = ForwardSelection(criterion_cls="rss")
-    result = selector.fit(data=data, max_steps=3)
-    assert isinstance(result, SelectionState)
-    assert len(result.active_set) <= 3
-
-
-def test_beam_forward_selection_accepts_legacy_criterion_cls_alias():
-    data = make_regression_gram(44411, n=100, p=10)
-    selector = BeamForwardSelection(beam_width=2, criterion_cls=BestRSSCriterion)
-    result = selector.fit(data=data, max_steps=3)
-    assert isinstance(result, SelectionState)
-    assert len(result.active_set) <= 3
-
-
-def test_forward_selection_rejects_conflicting_criterion_and_criterion_cls():
-    with pytest.raises(
-        ValueError, match=r"both `criterion` and legacy `criterion_cls`"
-    ):
-        ForwardSelection(criterion="rss", criterion_cls=BestRSSCriterion)
+def test_forward_selection_rejects_legacy_criterion_cls_kwarg():
+    with pytest.raises(TypeError, match=r"unexpected keyword argument 'criterion_cls'"):
+        ForwardSelection(criterion_cls=BestRSSCriterion)
 
 
 def test_forward_selection_rejects_unknown_criterion_key():
