@@ -33,10 +33,12 @@ def solve_active_system(
     """Solve beta and inverse Gram for an active support under a policy."""
     match solver_policy:
         case "strict":
-            return _solve_cholesky(gram_ss, cov_s, context=context)
+            return _solve_cholesky(gram_ss, cov_s, context=context, strict_pivot_check=True)
         case "ridge":
             regularized = gram_ss + ridge_alpha * np.eye(gram_ss.shape[0])
-            return _solve_cholesky(regularized, cov_s, context=context)
+            return _solve_cholesky(
+                regularized, cov_s, context=context, strict_pivot_check=False
+            )
         case "pinv":
             gram_sym = 0.5 * (gram_ss + gram_ss.T)
             K = np.linalg.pinv(gram_sym, rcond=pinv_rcond)
@@ -116,7 +118,11 @@ def build_forward_factorization(
 
 
 def _solve_cholesky(
-    gram_ss: np.ndarray, cov_s: np.ndarray, *, context: str
+    gram_ss: np.ndarray,
+    cov_s: np.ndarray,
+    *,
+    context: str,
+    strict_pivot_check: bool,
 ) -> tuple[np.ndarray, np.ndarray]:
     try:
         L = np.linalg.cholesky(gram_ss)
@@ -124,14 +130,15 @@ def _solve_cholesky(
         raise np.linalg.LinAlgError(f"{context} is singular or ill-conditioned.") from err
     # Guard against semidefinite/near-singular cases that can slip through
     # floating-point Cholesky with tiny pivots.
-    pivots = np.diag(L)
-    pivot_tol = np.sqrt(np.finfo(float).eps) * max(
-        1.0, float(np.max(np.diag(gram_ss)))
-    )
-    if np.any(pivots <= pivot_tol):
-        raise np.linalg.LinAlgError(
-            f"{context} is singular or near-singular under strict solver."
+    if strict_pivot_check:
+        pivots = np.diag(L)
+        pivot_tol = np.sqrt(np.finfo(float).eps) * max(
+            1.0, float(np.max(np.diag(gram_ss)))
         )
+        if np.any(pivots <= pivot_tol):
+            raise np.linalg.LinAlgError(
+                f"{context} is singular or near-singular under strict solver."
+            )
     beta = np.linalg.solve(L.T, np.linalg.solve(L, cov_s))
     K = np.linalg.solve(L.T, np.linalg.solve(L, np.eye(gram_ss.shape[0])))
     return beta, K
