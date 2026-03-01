@@ -1,0 +1,34 @@
+{
+  "smoke_forward_benchmarks": {
+    "forward_aic": {
+      "max_val_mse": 0.20,
+      "max_test_mse": 0.20,
+      "min_support_f1": 0.90,
+      "max_elapsed_ms": 20.0
+    },
+    "beam_forward_aic_w4": {
+      "max_val_mse": 0.20,
+      "max_test_mse": 0.20,
+      "min_support_f1": 0.80,
+      "max_elapsed_ms": 30.0
+    },
+    "mixed_aic": {
+      "max_val_mse": 0.20,
+      "max_test_mse": 0.20,
+      "min_support_f1": 0.90,
+      "max_elapsed_ms": 20.0
+    },
+    "cv_forward_best_rss": {
+      "max_val_mse": 0.20,
+      "max_test_mse": 0.22,
+      "min_support_f1": 0.60,
+      "max_elapsed_ms": 40.0
+    },
+    "topk_abs_cov_k6": {
+      "max_val_mse": 1.20,
+      "max_test_mse": 0.90,
+      "min_support_f1": 0.60,
+      "max_elapsed_ms": 10.0
+    }
+  }
+}

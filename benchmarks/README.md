@@ -16,6 +16,18 @@ Run a specific spec:
 python benchmarks/runner.py --spec benchmarks/specs/smoke_forward.json
 ```
 
+Validate output against committed thresholds:
+
+```bash
+python benchmarks/check_regression.py --results benchmarks/results/smoke_run.jsonl --baseline benchmarks/baseline.json
+```
+
+Render a markdown report:
+
+```bash
+python benchmarks/report.py --results benchmarks/results/smoke_run.jsonl --output benchmarks/results/smoke_report.md
+```
+
 Append to an existing output file:
 
 ```bash
@@ -85,3 +97,7 @@ Each method execution writes one JSON line with:
 - error information if the method fails
 
 Generated outputs are written to `benchmarks/results/` by default.
+
+## CI Smoke Gate
+
+`benchmark-smoke` workflow runs the smoke spec on pushes/PRs, checks threshold guards from `benchmarks/baseline.json`, and uploads JSONL + markdown artifacts.

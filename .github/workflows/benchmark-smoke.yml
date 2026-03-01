@@ -1,0 +1,52 @@
+name: benchmark-smoke
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  smoke-benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .[dev]
+
+      - name: Run smoke benchmark
+        run: |
+          python benchmarks/runner.py \
+            --spec benchmarks/specs/smoke_forward.json \
+            --output benchmarks/results/ci_smoke.jsonl
+
+      - name: Check benchmark thresholds
+        run: |
+          python benchmarks/check_regression.py \
+            --results benchmarks/results/ci_smoke.jsonl \
+            --baseline benchmarks/baseline.json
+
+      - name: Render benchmark report
+        run: |
+          python benchmarks/report.py \
+            --results benchmarks/results/ci_smoke.jsonl \
+            --output benchmarks/results/ci_smoke_report.md
+
+      - name: Upload benchmark artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-smoke-results
+          path: |
+            benchmarks/results/ci_smoke.jsonl
+            benchmarks/results/ci_smoke_report.md
