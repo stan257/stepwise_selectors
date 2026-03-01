@@ -120,6 +120,10 @@ def _apply_forward_from_cache(
     state: "SelectionState", cache: ForwardDeltaCache, cache_idx: int
 ) -> int:
     """Apply a cached forward candidate via a rank-one inverse Gram update."""
+    state._ensure_matrix_buffers()
+    if state.K_buf is None or state.outer_buf is None:
+        raise RuntimeError("SelectionState matrix buffers are unavailable.")
+
     resid_var = cache.resid_var[cache_idx]
     resid_corr = cache.resid_corr[cache_idx]
     rss_new = cache.rss_new[cache_idx]
@@ -211,9 +215,9 @@ class SelectionState:
     rss: float = field(init=False)  # residual sum of squares for the current model
 
     # Scratch buffers reused across updates to avoid per-step allocations
-    K_buf: np.ndarray = field(init=False)
+    K_buf: np.ndarray | None = field(init=False, default=None)
     beta_buf: np.ndarray = field(init=False)
-    outer_buf: np.ndarray = field(init=False)
+    outer_buf: np.ndarray | None = field(init=False, default=None)
     mask_buf: np.ndarray = field(init=False)
     active_mask: np.ndarray = field(init=False)
     active_idx_buf: np.ndarray = field(init=False)
@@ -223,12 +227,7 @@ class SelectionState:
         self.p = self.data.gram.shape[0]
         self.gram_diag = np.diag(self.data.gram)
         self.beta = np.zeros(self.p)
-        # TODO: Lazily allocate O(p^2) scratch buffers for large-p workloads.
-        # Eager allocation is fine for current scale but can dominate memory
-        # when many SelectionState objects are materialized (e.g., CV folds).
-        self.K_buf = np.empty((self.p, self.p))
         self.beta_buf = np.empty(self.p)
-        self.outer_buf = np.empty((self.p, self.p))
         self.mask_buf = np.empty(self.p, dtype=bool)
         self.active_mask = np.zeros(self.p, dtype=bool)
         self.active_idx_buf = np.empty(self.p, dtype=int)
@@ -246,6 +245,13 @@ class SelectionState:
             self.active_idx_buf[: self.active_len] = np.array(self.active_set, dtype=int)
             # Reset and fill only once per sync to keep mask consistent.
             self.active_mask.fill(False)
+
+    def _ensure_matrix_buffers(self) -> None:
+        """Allocate O(p^2) buffers lazily to reduce baseline memory usage."""
+        if self.K_buf is None:
+            self.K_buf = np.empty((self.p, self.p))
+        if self.outer_buf is None:
+            self.outer_buf = np.empty((self.p, self.p))
             self.active_mask[self.active_idx] = True
         else:
             self.active_mask.fill(False)
@@ -282,6 +288,9 @@ class SelectionState:
         self.rss = self.data.y_norm - c_S @ beta_S_val
 
         # Store solutions into buffers and set views to avoid future allocations.
+        self._ensure_matrix_buffers()
+        if self.K_buf is None:
+            raise RuntimeError("K buffer allocation failed.")
         k = len(idx_S)
         self.beta_buf[:k] = beta_S_val
         self.beta_S = self.beta_buf[:k]
@@ -314,6 +323,9 @@ class SelectionState:
         self.beta[idx_S] = beta_S_val
         self.rss = self.data.y_norm - self.data.cov[idx_S] @ beta_S_val
 
+        self._ensure_matrix_buffers()
+        if self.K_buf is None:
+            raise RuntimeError("K buffer allocation failed.")
         k = len(idx_S)
         self.beta_buf[:k] = beta_S_val
         self.beta_S = self.beta_buf[:k]
@@ -335,8 +347,8 @@ class SelectionState:
         clone.beta = self.beta.copy()
         # Deep copy live slices so clones do not share scratch buffers.
         clone.beta_buf = self.beta_buf.copy()
-        clone.outer_buf = self.outer_buf.copy()
-        clone.K_buf = self.K_buf.copy()
+        clone.outer_buf = self.outer_buf.copy() if self.outer_buf is not None else None
+        clone.K_buf = self.K_buf.copy() if self.K_buf is not None else None
         clone.mask_buf = self.mask_buf.copy()
         clone.active_mask = self.active_mask.copy()
         clone.active_idx_buf = self.active_idx_buf.copy()
@@ -389,6 +401,9 @@ class SelectionState:
         self._refresh_active_cache()
         k = len(new_active_set)
         if k > 0:
+            self._ensure_matrix_buffers()
+            if self.K_buf is None:
+                raise RuntimeError("K buffer allocation failed.")
             self.beta_buf[:k] = beta_S_new
             self.beta_S = self.beta_buf[:k]
             self.K_buf[:k, :k] = K_new
