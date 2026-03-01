@@ -94,6 +94,7 @@ print(gstate.active_groups, gstate.active_set, gstate.beta, gstate.rss)
 - CV output states expose `beta` as a post-selection refit on full-data Gram statistics at the selected support.
 - Single-dataset selectors default to `AICCriterion`; CV selectors default to `BestRSSCriterion`.
 - Selector constructors accept `criterion` (string key, class, instance, or factory). Built-in keys: `rss`, `aic`, `aicc`, `bic`, `hqic`, `ebic`, `gcv`.
+- CV selectors accept `cv_aggregation` with options `sum_rss` (default), `mean_mse`, and `median_mse`.
 - CV selectors reject criteria with `cv_compatible=False` to avoid double regularization on top of held-out RSS.
 - Backward beam selectors are improvement-only by default; set `allow_worse=True` to force removals under a step budget.
 - Selector hyperparameters are validated strictly (fail-fast): no implicit coercion for `beam_width`, `allow_worse`, step budgets, or `tol`.
@@ -119,7 +120,11 @@ print(gstate.active_groups, gstate.active_set, gstate.beta, gstate.rss)
 - Input statistics are assumed to be coherent summaries of the same data matrix/target vector. `GramData` validates shape, symmetry, finiteness, and basic positivity constraints, but it does not prove full PSD correctness.
 - Active-set solves rely on Cholesky factorization. Singular or ill-conditioned supports may raise `np.linalg.LinAlgError` during refits or state initialization.
 - Criterion values (AIC/BIC/AICc/HQIC/EBIC/GCV) are optimization targets. Their statistical interpretation depends on standard linear-model assumptions (e.g., iid noise, comparable sample definitions).
-- CV selectors optimize **summed fold validation RSS** and return `CrossValSelectionState.rss_cv` on that same scale. `CrossValSelectionState.beta` is a post-selection refit on full aggregated data, not a fold-averaged coefficient.
+- CV selectors optimize according to `cv_aggregation`:
+  - `sum_rss` (default): summed fold validation RSS
+  - `mean_mse`: mean fold validation MSE
+  - `median_mse`: median fold validation MSE
+  `CrossValSelectionState.rss_cv` remains reported on summed-RSS scale, and `CrossValSelectionState.beta` is a post-selection refit on full aggregated data (not fold-averaged coefficients).
 - Improvement checks use absolute+relative tolerances. Very small numerical differences can intentionally stop additional steps.
 - Grouped routines require disjoint groups with integer feature indices; selected support is the union of complete groups (`GroupedSelectionState.active_set`).
 

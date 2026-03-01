@@ -4,6 +4,7 @@ import pytest
 from selection.criteria import AICCriterion, BestRSSCriterion, GCVCriterion
 from selection.definitions import CrossValGramData, GramData
 from selection.routines import (
+    BeamCrossValBackwardSelection,
     BeamCrossValForwardSelection,
     BeamCrossValMixedSelection,
     CrossValBackwardSelection,
@@ -218,3 +219,64 @@ def test_cv_selectors_reject_cv_incompatible_factory_on_fit(selector_cls, fit_kw
         match=r"IncompatibleCriterion is not supported for CV selection routines",
     ):
         selector.fit(data=cv_data, **fit_kwargs)
+
+
+CV_AGGREGATION_SELECTOR_CASES = [
+    pytest.param(CrossValForwardSelection, {}, {"max_steps": 2}, id="cv_forward"),
+    pytest.param(CrossValBackwardSelection, {}, {"max_steps": 2}, id="cv_backward"),
+    pytest.param(
+        CrossValMixedSelection,
+        {},
+        {"max_forward_steps": 2, "max_total_steps": 3},
+        id="cv_mixed",
+    ),
+    pytest.param(
+        BeamCrossValForwardSelection,
+        {"beam_width": 2},
+        {"max_steps": 2},
+        id="cv_beam_forward",
+    ),
+    pytest.param(
+        BeamCrossValBackwardSelection,
+        {"beam_width": 2},
+        {"max_steps": 2},
+        id="cv_beam_backward",
+    ),
+    pytest.param(
+        BeamCrossValMixedSelection,
+        {"beam_width": 2},
+        {"max_forward_steps": 2, "max_total_steps": 3},
+        id="cv_beam_mixed",
+    ),
+]
+
+
+@pytest.mark.parametrize("selector_cls,selector_kwargs,fit_kwargs", CV_AGGREGATION_SELECTOR_CASES)
+def test_cv_selectors_accept_nondefault_cv_aggregation(
+    selector_cls, selector_kwargs, fit_kwargs
+):
+    cv_data = make_cv_problem(seed=551, folds=4, n=80, p=8, support=3)
+    selector = selector_cls(
+        **selector_kwargs,
+        criterion=BestRSSCriterion,
+        cv_aggregation="mean_mse",
+    )
+    state = selector.fit(data=cv_data, **fit_kwargs)
+    assert isinstance(state, CrossValSelectionState)
+
+
+@pytest.mark.parametrize("selector_cls,selector_kwargs,_", CV_AGGREGATION_SELECTOR_CASES)
+def test_cv_selectors_reject_invalid_cv_aggregation_value(
+    selector_cls, selector_kwargs, _
+):
+    with pytest.raises(
+        ValueError,
+        match=r"cv_aggregation must be one of: mean_mse, median_mse, sum_rss",
+    ):
+        selector_cls(**selector_kwargs, cv_aggregation="weighted")
+
+
+@pytest.mark.parametrize("selector_cls,selector_kwargs,_", CV_AGGREGATION_SELECTOR_CASES)
+def test_cv_selectors_reject_non_string_cv_aggregation(selector_cls, selector_kwargs, _):
+    with pytest.raises(TypeError, match=r"cv_aggregation must be a string"):
+        selector_cls(**selector_kwargs, cv_aggregation=1)

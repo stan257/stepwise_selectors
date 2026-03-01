@@ -13,6 +13,7 @@ from .routines_cv_scoring import (
     _cv_backward_scores,
     _cv_forward_scores,
     _cv_rss,
+    _normalize_cv_aggregation,
     _rebuild_states,
 )
 from .routines_greedy import ForwardSelection
@@ -20,11 +21,19 @@ from .selector_validation import _validate_cv_state_target
 from .state_cv import CrossValSelectionState
 
 
-class CrossValForwardSelection(ForwardSelection):
-    """Cross-validated forward selection using Gram-only training updates."""
+class _BaseCrossValSelection(ForwardSelection):
+    """Shared constructor for CV selectors with configurable aggregation."""
 
     _default_criterion = BestRSSCriterion
     _reject_ic = True
+
+    def __init__(self, *, cv_aggregation: str = "sum_rss", **kwargs):
+        super().__init__(**kwargs)
+        self.cv_aggregation = _normalize_cv_aggregation(cv_aggregation)
+
+
+class CrossValForwardSelection(_BaseCrossValSelection):
+    """Cross-validated forward selection using Gram-only training updates."""
 
     def fit(
         self,
@@ -49,12 +58,28 @@ class CrossValForwardSelection(ForwardSelection):
             pinv_rcond=self.pinv_rcond,
         )
         criterion.update_current(
-            float(np.asarray(criterion.evaluate(_cv_rss(fold_states, data), 0)))
+            float(
+                np.asarray(
+                    criterion.evaluate(
+                        _cv_rss(
+                            fold_states,
+                            data,
+                            cv_aggregation=self.cv_aggregation,
+                        ),
+                        0,
+                    )
+                )
+            )
         )
 
         steps = 0
         while max_steps is None or steps < max_steps:
-            scored = _cv_forward_scores(fold_states, data, self.tol)
+            scored = _cv_forward_scores(
+                fold_states,
+                data,
+                self.tol,
+                cv_aggregation=self.cv_aggregation,
+            )
             if scored is None:
                 break
             candidates, aggregated = scored
@@ -87,11 +112,8 @@ class CrossValForwardSelection(ForwardSelection):
         )
 
 
-class CrossValBackwardSelection(ForwardSelection):
+class CrossValBackwardSelection(_BaseCrossValSelection):
     """Cross-validated backward selection using Gram-only training updates."""
-
-    _default_criterion = BestRSSCriterion
-    _reject_ic = True
 
     def fit(
         self,
@@ -120,14 +142,26 @@ class CrossValBackwardSelection(ForwardSelection):
         criterion.update_current(
             float(
                 np.asarray(
-                    criterion.evaluate(_cv_rss(fold_states, data), len(full_active))
+                    criterion.evaluate(
+                        _cv_rss(
+                            fold_states,
+                            data,
+                            cv_aggregation=self.cv_aggregation,
+                        ),
+                        len(full_active),
+                    )
                 )
             )
         )
 
         steps = 0
         while fold_states[0].k and (max_steps is None or steps < max_steps):
-            aggregated = _cv_backward_scores(fold_states, data, self.tol)
+            aggregated = _cv_backward_scores(
+                fold_states,
+                data,
+                self.tol,
+                cv_aggregation=self.cv_aggregation,
+            )
             if aggregated is None:
                 break
             best_idx, best_score = criterion.best_candidate(
@@ -161,11 +195,8 @@ class CrossValBackwardSelection(ForwardSelection):
         )
 
 
-class CrossValMixedSelection(ForwardSelection):
+class CrossValMixedSelection(_BaseCrossValSelection):
     """Cross-validated mixed selection using Gram-only training updates."""
-
-    _default_criterion = BestRSSCriterion
-    _reject_ic = True
 
     def fit(
         self,
@@ -196,7 +227,18 @@ class CrossValMixedSelection(ForwardSelection):
             pinv_rcond=self.pinv_rcond,
         )
         criterion.update_current(
-            float(np.asarray(criterion.evaluate(_cv_rss(fold_states, data), 0)))
+            float(
+                np.asarray(
+                    criterion.evaluate(
+                        _cv_rss(
+                            fold_states,
+                            data,
+                            cv_aggregation=self.cv_aggregation,
+                        ),
+                        0,
+                    )
+                )
+            )
         )
 
         forward_steps = 0
@@ -206,7 +248,12 @@ class CrossValMixedSelection(ForwardSelection):
                 break
             if max_forward_steps is not None and forward_steps >= max_forward_steps:
                 break
-            scored = _cv_forward_scores(fold_states, data, self.tol)
+            scored = _cv_forward_scores(
+                fold_states,
+                data,
+                self.tol,
+                cv_aggregation=self.cv_aggregation,
+            )
             if scored is None:
                 break
             candidates, aggregated = scored
@@ -233,7 +280,12 @@ class CrossValMixedSelection(ForwardSelection):
             while True:
                 if max_total_steps is not None and total_steps >= max_total_steps:
                     break
-                aggregated = _cv_backward_scores(fold_states, data, self.tol)
+                aggregated = _cv_backward_scores(
+                    fold_states,
+                    data,
+                    self.tol,
+                    cv_aggregation=self.cv_aggregation,
+                )
                 if aggregated is None:
                     break
                 best_idx, best_score = criterion.best_candidate(

@@ -66,7 +66,11 @@ Backward downdate:
 
 ## Cross-Validation Contract
 - Fold supports are kept synchronized across folds.
-- CV selection objective is summed validation RSS across folds.
+- CV selection objective uses a configurable aggregation over fold validation
+  losses:
+  - `sum_rss` (default): summed fold RSS
+  - `mean_mse`: mean fold MSE
+  - `median_mse`: median fold MSE
 - Returned `CrossValSelectionState.beta` is a refit on full aggregated data at the selected support.
 
 ## Failure Semantics

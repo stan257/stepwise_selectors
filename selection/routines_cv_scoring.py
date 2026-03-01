@@ -2,11 +2,76 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 import numpy as np
 
 from .definitions import CrossValGramData
 from .incremental_solver import IncrementalSolver
 from .state_cv import CrossValSelectionState
+
+CVAggregation = Literal["sum_rss", "mean_mse", "median_mse"]
+
+
+def _normalize_cv_aggregation(cv_aggregation: str) -> CVAggregation:
+    """Normalize CV aggregation mode used by CV selectors.
+
+    Supported modes:
+    - `sum_rss`: sum per-fold validation RSS (default/backward-compatible).
+    - `mean_mse`: average per-fold validation MSE (equal fold weight).
+    - `median_mse`: median per-fold validation MSE (robust across folds).
+    """
+    if not isinstance(cv_aggregation, str):
+        raise TypeError("cv_aggregation must be a string.")
+    normalized = cv_aggregation.strip().lower()
+    match normalized:
+        case "sum_rss" | "mean_mse" | "median_mse":
+            return normalized
+        case _:
+            raise ValueError(
+                "cv_aggregation must be one of: mean_mse, median_mse, sum_rss."
+            )
+
+
+def _aggregate_cv_rss_vector(
+    fold_rss: np.ndarray,
+    fold_sizes: np.ndarray,
+    cv_aggregation: CVAggregation,
+) -> float:
+    """Aggregate per-fold RSS values into a scalar CV objective."""
+    fold_sizes_f = np.asarray(fold_sizes, dtype=float)
+    fold_rss_f = np.asarray(fold_rss, dtype=float)
+    match cv_aggregation:
+        case "sum_rss":
+            return float(np.sum(fold_rss_f))
+        case "mean_mse":
+            return float(np.mean(fold_rss_f / fold_sizes_f))
+        case "median_mse":
+            return float(np.median(fold_rss_f / fold_sizes_f))
+        case _:
+            raise ValueError(
+                "cv_aggregation must be one of: mean_mse, median_mse, sum_rss."
+            )
+
+
+def _aggregate_cv_rss_matrix(
+    rss_matrix: np.ndarray,
+    fold_sizes: np.ndarray,
+    cv_aggregation: CVAggregation,
+) -> np.ndarray:
+    """Aggregate per-fold candidate RSS matrix into candidate objective values."""
+    fold_sizes_f = np.asarray(fold_sizes, dtype=float)
+    match cv_aggregation:
+        case "sum_rss":
+            return np.sum(rss_matrix, axis=0)
+        case "mean_mse":
+            return np.mean(rss_matrix / fold_sizes_f[:, None], axis=0)
+        case "median_mse":
+            return np.median(rss_matrix / fold_sizes_f[:, None], axis=0)
+        case _:
+            raise ValueError(
+                "cv_aggregation must be one of: mean_mse, median_mse, sum_rss."
+            )
 
 
 def _build_fold_states(
@@ -70,20 +135,29 @@ def _assert_synced_active_sets(fold_states: list[IncrementalSolver]) -> None:
             )
 
 
-def _cv_rss(fold_states: list[IncrementalSolver], data: CrossValGramData) -> float:
+def _cv_rss(
+    fold_states: list[IncrementalSolver],
+    data: CrossValGramData,
+    *,
+    cv_aggregation: CVAggregation = "sum_rss",
+) -> float:
     """Compute summed validation RSS for the shared active set across folds.
 
     Preconditions:
     - fold states are synchronized (`_assert_synced_active_sets`).
 
     Postconditions:
-    - returns objective on `rss_cv` scale: sum of per-fold validation RSS.
+    - returns CV objective according to `cv_aggregation`.
     """
     _assert_synced_active_sets(fold_states)
     if not fold_states or not fold_states[0].active_set:
-        return float(np.sum(data.y_norm_folds))
+        return _aggregate_cv_rss_vector(
+            np.asarray(data.y_norm_folds, dtype=float),
+            data.fold_sizes,
+            cv_aggregation,
+        )
     idx = np.array(fold_states[0].active_set, dtype=int)
-    rss_sum = 0.0
+    fold_rss = np.empty(len(fold_states), dtype=float)
     for fold_idx, work_state in enumerate(fold_states):
         beta_S = work_state.beta_S[: work_state.k]
         G_val = data.gram_folds[fold_idx]
@@ -96,8 +170,8 @@ def _cv_rss(fold_states: list[IncrementalSolver], data: CrossValGramData) -> flo
             - 2.0 * float(beta_S @ c_val_S)
             + float(beta_S @ (G_val_SS @ beta_S))
         )
-        rss_sum += rss_k
-    return float(rss_sum)
+        fold_rss[fold_idx] = rss_k
+    return _aggregate_cv_rss_vector(fold_rss, data.fold_sizes, cv_aggregation)
 
 
 def _rebuild_states(
@@ -162,7 +236,11 @@ def _build_cv_state_from_active_set(
 
 
 def _cv_forward_scores(
-    fold_states: list[IncrementalSolver], data: CrossValGramData, tol: float
+    fold_states: list[IncrementalSolver],
+    data: CrossValGramData,
+    tol: float,
+    *,
+    cv_aggregation: CVAggregation = "sum_rss",
 ) -> tuple[list[int], np.ndarray] | None:
     """Return common candidates and aggregated (summed) validation RSS.
 
@@ -174,7 +252,8 @@ def _cv_forward_scores(
     - `tol` is positive and consistent with solver tolerance policy.
 
     Returns:
-    - `(candidates, aggregated_rss)` where aggregation is fold-summed RSS.
+    - `(candidates, aggregated_score)` where aggregation is controlled by
+      `cv_aggregation`.
     - `None` when no common valid candidate remains across folds.
     """
     _assert_synced_active_sets(fold_states)
@@ -229,13 +308,18 @@ def _cv_forward_scores(
         term5 = (beta_j**2) * g_val_jj
         rss_matrix[fold_idx] = y_norm_val + term1 + term2 + term3 + term4 + term5
 
-    # Sum across folds to match rss_cv scale.
-    aggregated = np.sum(rss_matrix, axis=0)
+    aggregated = _aggregate_cv_rss_matrix(
+        rss_matrix, data.fold_sizes, cv_aggregation
+    )
     return candidates, aggregated
 
 
 def _cv_backward_scores(
-    fold_states: list[IncrementalSolver], data: CrossValGramData, tol: float
+    fold_states: list[IncrementalSolver],
+    data: CrossValGramData,
+    tol: float,
+    *,
+    cv_aggregation: CVAggregation = "sum_rss",
 ) -> np.ndarray | None:
     """Compute aggregated CV backward scores using Gram-only downdates.
 
@@ -287,11 +371,14 @@ def _cv_backward_scores(
             )
             rss_matrix[fold_idx, local_idx] = rss
 
-    # Sum across folds to match rss_cv scale.
-    return np.sum(rss_matrix, axis=0)
+    return _aggregate_cv_rss_matrix(rss_matrix, data.fold_sizes, cv_aggregation)
 
 
 __all__ = [
+    "CVAggregation",
+    "_normalize_cv_aggregation",
+    "_aggregate_cv_rss_vector",
+    "_aggregate_cv_rss_matrix",
     "_build_fold_states",
     "_cv_rss",
     "_rebuild_states",

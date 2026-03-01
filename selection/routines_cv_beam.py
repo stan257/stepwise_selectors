@@ -21,6 +21,7 @@ from .routines_cv_scoring import (
     _cv_backward_scores,
     _cv_forward_scores,
     _cv_rss,
+    _normalize_cv_aggregation,
     _rebuild_states,
 )
 from .routines_greedy import ForwardSelection
@@ -52,8 +53,12 @@ def _cv_beam_forward_children(
     beam_width: int,
     data: CrossValGramData,
     tol: float,
+    *,
+    cv_aggregation: str = "sum_rss",
 ) -> list[CVBeam]:
-    scored = _cv_forward_scores(beam.states, data, tol)
+    scored = _cv_forward_scores(
+        beam.states, data, tol, cv_aggregation=cv_aggregation
+    )
     if scored is None:
         return []
     candidates, aggregated = scored
@@ -92,8 +97,11 @@ def _cv_beam_backward_children(
     tol: float,
     *,
     allow_worse: bool = False,
+    cv_aggregation: str = "sum_rss",
 ) -> list[CVBeam]:
-    aggregated = _cv_backward_scores(beam.states, data, tol)
+    aggregated = _cv_backward_scores(
+        beam.states, data, tol, cv_aggregation=cv_aggregation
+    )
     if aggregated is None or not len(aggregated):
         return []
     crit_scores = np.asarray(
@@ -129,10 +137,19 @@ def _cv_beam_backward_children(
 
 
 def _cv_beam_best_backward_child(
-    beam: CVBeam, data: CrossValGramData, tol: float
+    beam: CVBeam,
+    data: CrossValGramData,
+    tol: float,
+    *,
+    cv_aggregation: str = "sum_rss",
 ) -> CVBeam | None:
     for child in _cv_beam_backward_children(
-        beam, 1, data, tol, allow_worse=False
+        beam,
+        1,
+        data,
+        tol,
+        allow_worse=False,
+        cv_aggregation=cv_aggregation,
     ):
         if beam.criterion.is_improvement(child.score, beam.score):
             return child
@@ -145,9 +162,12 @@ class BeamCrossValForwardSelection(ForwardSelection):
     _default_criterion = BestRSSCriterion
     _reject_ic = True
 
-    def __init__(self, *, beam_width: int = 1, **kwargs):
+    def __init__(
+        self, *, beam_width: int = 1, cv_aggregation: str = "sum_rss", **kwargs
+    ):
         super().__init__(**kwargs)
         self.beam_width = validate_positive_int(beam_width, name="beam_width")
+        self.cv_aggregation = _normalize_cv_aggregation(cv_aggregation)
 
     def fit(
         self,
@@ -174,7 +194,16 @@ class BeamCrossValForwardSelection(ForwardSelection):
             pinv_rcond=self.pinv_rcond,
         )
         initial_score = float(
-            np.asarray(criterion.evaluate(_cv_rss(fold_states, data), 0))
+            np.asarray(
+                criterion.evaluate(
+                    _cv_rss(
+                        fold_states,
+                        data,
+                        cv_aggregation=self.cv_aggregation,
+                    ),
+                    0,
+                )
+            )
         )
         criterion.update_current(initial_score)
         beams = [CVBeam(fold_states, criterion, criterion.current_value)]
@@ -185,7 +214,11 @@ class BeamCrossValForwardSelection(ForwardSelection):
             for beam in beams:
                 candidates.extend(
                     _cv_beam_forward_children(
-                        beam, self.beam_width, data, self.tol
+                        beam,
+                        self.beam_width,
+                        data,
+                        self.tol,
+                        cv_aggregation=self.cv_aggregation,
                     )
                 )
             if not candidates:
@@ -212,11 +245,17 @@ class BeamCrossValBackwardSelection(ForwardSelection):
     _reject_ic = True
 
     def __init__(
-        self, *, beam_width: int = 1, allow_worse: bool = False, **kwargs
+        self,
+        *,
+        beam_width: int = 1,
+        allow_worse: bool = False,
+        cv_aggregation: str = "sum_rss",
+        **kwargs,
     ):
         super().__init__(**kwargs)
         self.beam_width = validate_positive_int(beam_width, name="beam_width")
         self.allow_worse = validate_bool(allow_worse, name="allow_worse")
+        self.cv_aggregation = _normalize_cv_aggregation(cv_aggregation)
 
     def fit(
         self,
@@ -246,7 +285,14 @@ class BeamCrossValBackwardSelection(ForwardSelection):
         )
         initial_score = float(
             np.asarray(
-                criterion.evaluate(_cv_rss(fold_states, data), len(full_active))
+                criterion.evaluate(
+                    _cv_rss(
+                        fold_states,
+                        data,
+                        cv_aggregation=self.cv_aggregation,
+                    ),
+                    len(full_active),
+                )
             )
         )
         criterion.update_current(initial_score)
@@ -263,6 +309,7 @@ class BeamCrossValBackwardSelection(ForwardSelection):
                         data,
                         self.tol,
                         allow_worse=self.allow_worse,
+                        cv_aggregation=self.cv_aggregation,
                     )
                 )
             if not candidates:
@@ -288,9 +335,12 @@ class BeamCrossValMixedSelection(ForwardSelection):
     _default_criterion = BestRSSCriterion
     _reject_ic = True
 
-    def __init__(self, *, beam_width: int = 1, **kwargs):
+    def __init__(
+        self, *, beam_width: int = 1, cv_aggregation: str = "sum_rss", **kwargs
+    ):
         super().__init__(**kwargs)
         self.beam_width = validate_positive_int(beam_width, name="beam_width")
+        self.cv_aggregation = _normalize_cv_aggregation(cv_aggregation)
 
     def fit(
         self,
@@ -323,7 +373,16 @@ class BeamCrossValMixedSelection(ForwardSelection):
             pinv_rcond=self.pinv_rcond,
         )
         initial_score = float(
-            np.asarray(criterion.evaluate(_cv_rss(fold_states, data), 0))
+            np.asarray(
+                criterion.evaluate(
+                    _cv_rss(
+                        fold_states,
+                        data,
+                        cv_aggregation=self.cv_aggregation,
+                    ),
+                    0,
+                )
+            )
         )
         criterion.update_current(initial_score)
         initial = CVBeam(fold_states, criterion, criterion.current_value)
@@ -342,7 +401,11 @@ class BeamCrossValMixedSelection(ForwardSelection):
             for beam in beams:
                 candidates.extend(
                     _cv_beam_forward_children(
-                        beam, self.beam_width, data, self.tol
+                        beam,
+                        self.beam_width,
+                        data,
+                        self.tol,
+                        cv_aggregation=self.cv_aggregation,
                     )
                 )
             if not candidates:
@@ -357,7 +420,12 @@ class BeamCrossValMixedSelection(ForwardSelection):
                 while True:
                     if max_total_steps is not None and total_ops >= max_total_steps:
                         break
-                    improved = _cv_beam_best_backward_child(beam, data, self.tol)
+                    improved = _cv_beam_best_backward_child(
+                        beam,
+                        data,
+                        self.tol,
+                        cv_aggregation=self.cv_aggregation,
+                    )
                     if improved is None:
                         break
                     beam = improved
