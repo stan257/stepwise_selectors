@@ -84,9 +84,10 @@ def _resolve_criterion(
         try:
             resolved = provider(**call_params)
         except TypeError as err:
+            provider_name = getattr(provider, "__name__", type(provider).__name__)
             raise TypeError(
                 f"{selector_name} could not construct criterion from "
-                f"{getattr(provider, '__name__', type(provider).__name__)}."
+                f"{provider_name}: {err}"
             ) from err
 
     return _validate_criterion_protocol(resolved, selector_name=selector_name)

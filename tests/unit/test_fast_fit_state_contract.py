@@ -33,6 +33,11 @@ def recording_criterion_kwargs_factory(**kwargs) -> RecordingRSSCriterion:
     return RecordingRSSCriterion(**kwargs)
 
 
+def raising_typeerror_factory(**kwargs):
+    _ = kwargs
+    raise TypeError("inner detail marker")
+
+
 NON_CV_SELECTOR_CASES = [
     pytest.param(
         ForwardSelection,
@@ -157,6 +162,14 @@ def test_forward_selection_accepts_kwargs_only_criterion_factory():
     selector.fit(data=data, max_steps=2)
     assert RecordingRSSCriterion.init_history
     assert RecordingRSSCriterion.init_history[-1] == (data.n_samples, data.gram.shape[0])
+
+
+def test_forward_selection_surfaces_factory_typeerror_detail():
+    data = make_regression_gram(4452, n=90, p=9)
+    selector = ForwardSelection(criterion=raising_typeerror_factory)
+
+    with pytest.raises(TypeError, match="inner detail marker"):
+        selector.fit(data=data, max_steps=1)
 
 
 def test_forward_selection_rejects_criterion_and_criterion_cls_together():

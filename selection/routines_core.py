@@ -8,6 +8,7 @@ from .routines_cv import (
     BeamCrossValMixedSelection,
 )
 from .routines_beam import (
+    Beam,
     BeamBackwardSelection,
     BeamForwardSelection,
     BeamMixedSelection,
