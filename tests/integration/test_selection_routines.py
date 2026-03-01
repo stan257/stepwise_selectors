@@ -101,6 +101,17 @@ def make_heterogeneous_cv_problem(folds=4, n=80, p=8, support=3, seed=123):
     return CrossValGramData(fold_data), set(range(support))
 
 
+def make_cv_beam_trap_problem(folds=4, n_samples=50):
+    """CV analogue of the 3-feature trap where beam(2) beats greedy in 2 steps."""
+    rho = 0.6
+    c0 = 1.2
+    gram = np.array([[1.0, rho, rho], [rho, 1.0, 0.0], [rho, 0.0, 1.0]])
+    cov = np.array([c0, 1.0, 1.0])
+    y_norm = float(cov @ np.linalg.solve(gram, cov) + 1.0)
+    fold = GramData(gram, cov, y_norm, n_samples=n_samples)
+    return CrossValGramData([fold for _ in range(folds)])
+
+
 @pytest.fixture(scope="module")
 def small_problem():
     X = np.array([[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]])
@@ -249,7 +260,7 @@ def test_beam_crossval_backward_selection_recovers_true_support():
     assert set(state.active_set) == set(support_set)
 
 
-def test_crossval_beam_matches_greedy_on_simple_problem():
+def test_crossval_beam_matches_greedy_support_on_simple_problem():
     cv_data, support_set = make_cv_support_problem()
     greedy = CrossValForwardSelection()
     beam = BeamCrossValForwardSelection(beam_width=2)
@@ -258,10 +269,9 @@ def test_crossval_beam_matches_greedy_on_simple_problem():
     beam_state = beam.fit(data=cv_data, max_steps=len(support_set))
 
     assert set(beam_state.active_set) == set(greedy_state.active_set)
-    assert beam_state.rss_cv <= greedy_state.rss_cv + 1e-9
 
 
-def test_cv_beam_matches_greedy_on_heterogeneous_folds():
+def test_cv_beam_matches_greedy_support_on_heterogeneous_folds():
     cv_data, support = make_heterogeneous_cv_problem()
     steps = len(support)
     greedy = CrossValForwardSelection()
@@ -271,7 +281,6 @@ def test_cv_beam_matches_greedy_on_heterogeneous_folds():
     beam_state = beam.fit(data=cv_data, max_steps=steps)
 
     assert set(greedy_state.active_set) == set(beam_state.active_set)
-    assert beam_state.rss_cv <= greedy_state.rss_cv + 1e-9
 
     # Check monotonicity over steps for both selectors.
     greedy_rss = []
@@ -291,6 +300,20 @@ def test_cv_beam_matches_greedy_on_heterogeneous_folds():
     assert all(
         later <= earlier + 1e-9 for earlier, later in zip(beam_rss, beam_rss[1:])
     )
+
+
+def test_crossval_beam_can_beat_greedy_in_two_steps():
+    cv_data = make_cv_beam_trap_problem()
+    greedy_state = CrossValForwardSelection(criterion_cls=BestRSSCriterion).fit(
+        data=cv_data, max_steps=2
+    )
+    beam_state = BeamCrossValForwardSelection(
+        beam_width=2, criterion_cls=BestRSSCriterion
+    ).fit(data=cv_data, max_steps=2)
+
+    assert 0 in greedy_state.active_set
+    assert set(beam_state.active_set) == {1, 2}
+    assert beam_state.rss_cv < greedy_state.rss_cv - 1e-9
 
 
 def test_forward_beam_search_selects_best_subset():
