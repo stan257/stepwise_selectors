@@ -17,7 +17,7 @@ from .interface_validation import (
     validate_optional_non_negative_int,
     validate_positive_finite_float,
 )
-from .routines_base import _resolve_criterion
+from .selector_validation import _resolve_criterion
 from .state_single import GroupedSelectionState
 
 

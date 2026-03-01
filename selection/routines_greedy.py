@@ -14,7 +14,7 @@ from .interface_validation import (
 )
 from .criteria import AICCriterion, CriterionProtocol
 from .definitions import GramData
-from .routines_base import (
+from .selector_validation import (
     _resolve_criterion,
     _validate_cv_criterion,
     _validate_state_target,

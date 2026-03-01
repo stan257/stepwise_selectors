@@ -15,7 +15,6 @@ from .interface_validation import (
     validate_optional_non_negative_int,
     validate_positive_int,
 )
-from .routines_base import _validate_cv_state_target
 from .routines_cv_scoring import (
     _build_fold_states,
     _build_cv_state_from_active_set,
@@ -25,6 +24,7 @@ from .routines_cv_scoring import (
     _rebuild_states,
 )
 from .routines_greedy import ForwardSelection
+from .selector_validation import _validate_cv_state_target
 from .state_cv import CrossValSelectionState
 from .topk import topk_indices
 

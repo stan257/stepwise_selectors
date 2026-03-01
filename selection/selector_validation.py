@@ -1,4 +1,4 @@
-"""Shared validation and criterion guards for fast selection routines."""
+"""Selector validation and criterion-construction helpers."""
 
 from __future__ import annotations
 
@@ -61,7 +61,9 @@ def _resolve_criterion(
     default_criterion_cls: Any,
     criterion_kwargs: dict[str, Any] | None,
 ) -> CriterionProtocol:
-    provider = criterion if criterion is not None else (criterion_cls or default_criterion_cls)
+    provider = (
+        criterion if criterion is not None else (criterion_cls or default_criterion_cls)
+    )
     params = dict(criterion_kwargs or {})
 
     if not inspect.isclass(provider) and isinstance(provider, CriterionProtocol):

@@ -14,7 +14,7 @@ from .interface_validation import (
     validate_optional_non_negative_int,
     validate_positive_int,
 )
-from .routines_base import _validate_state_target
+from .selector_validation import _validate_state_target
 from .routines_greedy import ForwardSelection
 from .forward_state import ForwardState
 from .state_single import SelectionState
