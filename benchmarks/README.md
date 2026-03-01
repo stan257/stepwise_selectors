@@ -4,6 +4,14 @@ Deterministic benchmark harness for evaluating selector behavior across fixed sp
 
 ## Quick Start
 
+Run smoke benchmark + threshold checks + report in one command:
+
+```bash
+python3 benchmarks/smoke.py
+```
+
+Equivalent manual steps are still available:
+
 Run all specs under `benchmarks/specs`:
 
 ```bash
