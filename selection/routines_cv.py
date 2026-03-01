@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from .beam_pruning import prune_unique_beams
 from .criteria import BestRSSCriterion, SelectionCriterion
 from .definitions import CrossValGramData
 from .interface_validation import (
@@ -15,6 +16,7 @@ from .interface_validation import (
 )
 from .routines_base import _validate_cv_state_target
 from .routines_cv_scoring import (
+    _build_fold_states,
     _build_cv_state_from_active_set,
     _cv_backward_scores,
     _cv_forward_scores,
@@ -48,20 +50,8 @@ class CVBeam:
 def _cv_beam_prune(
     beams: list[CVBeam], beam_limit: int
 ) -> list[CVBeam]:
-    if not beams:
-        return []
-    minimize = beams[0].criterion.minimize
-    seen = set()
-    result: list[CVBeam] = []
-    for beam in sorted(beams, key=lambda b: b.score, reverse=not minimize):
-        sig = beam.signature
-        if sig in seen:
-            continue
-        seen.add(sig)
-        result.append(beam)
-        if len(result) >= beam_limit:
-            break
-    return result
+    """Compatibility wrapper around shared beam-pruning logic."""
+    return prune_unique_beams(beams, beam_limit)
 
 
 def _cv_beam_forward_children(
@@ -163,10 +153,7 @@ class CrossValForwardSelection(ForwardSelection):
 
         max_steps = validate_optional_non_negative_int(max_steps, name="max_steps")
         criterion = self._init_criterion(data.make_full_data())
-        fold_states = [
-            ForwardState.create(data.train_data_for_fold(k), self.tol)
-            for k in range(data.n_folds)
-        ]
+        fold_states = _build_fold_states(data, tol=self.tol)
         criterion.update_current(
             float(np.asarray(criterion.evaluate(_cv_rss(fold_states, data), 0)))
         )
@@ -217,13 +204,8 @@ class CrossValBackwardSelection(ForwardSelection):
 
         max_steps = validate_optional_non_negative_int(max_steps, name="max_steps")
         criterion = self._init_criterion(data.make_full_data())
-        full_active = list(range(data.gram_total.shape[0]))
-        fold_states = [
-            ForwardState.from_active_set(
-                data.train_data_for_fold(k), full_active, self.tol
-            )
-            for k in range(data.n_folds)
-        ]
+        full_active = list(range(data.p))
+        fold_states = _build_fold_states(data, tol=self.tol, active_set=full_active)
         criterion.update_current(
             float(
                 np.asarray(
@@ -285,10 +267,7 @@ class CrossValMixedSelection(ForwardSelection):
             max_total_steps, name="max_total_steps"
         )
         criterion = self._init_criterion(data.make_full_data())
-        fold_states = [
-            ForwardState.create(data.train_data_for_fold(k), self.tol)
-            for k in range(data.n_folds)
-        ]
+        fold_states = _build_fold_states(data, tol=self.tol)
         criterion.update_current(
             float(np.asarray(criterion.evaluate(_cv_rss(fold_states, data), 0)))
         )
@@ -373,10 +352,7 @@ class BeamCrossValForwardSelection(ForwardSelection):
 
         max_steps = validate_optional_non_negative_int(max_steps, name="max_steps")
         criterion = self._init_criterion(data.make_full_data())
-        fold_states = [
-            ForwardState.create(data.train_data_for_fold(k), self.tol)
-            for k in range(data.n_folds)
-        ]
+        fold_states = _build_fold_states(data, tol=self.tol)
         initial_score = float(
             np.asarray(criterion.evaluate(_cv_rss(fold_states, data), 0))
         )
@@ -434,13 +410,8 @@ class BeamCrossValBackwardSelection(ForwardSelection):
 
         max_steps = validate_optional_non_negative_int(max_steps, name="max_steps")
         criterion = self._init_criterion(data.make_full_data())
-        full_active = list(range(data.gram_total.shape[0]))
-        fold_states = [
-            ForwardState.from_active_set(
-                data.train_data_for_fold(k), full_active, self.tol
-            )
-            for k in range(data.n_folds)
-        ]
+        full_active = list(range(data.p))
+        fold_states = _build_fold_states(data, tol=self.tol, active_set=full_active)
         initial_score = float(
             np.asarray(
                 criterion.evaluate(_cv_rss(fold_states, data), len(full_active))
@@ -507,10 +478,7 @@ class BeamCrossValMixedSelection(ForwardSelection):
             max_total_steps, name="max_total_steps"
         )
         criterion = self._init_criterion(data.make_full_data())
-        fold_states = [
-            ForwardState.create(data.train_data_for_fold(k), self.tol)
-            for k in range(data.n_folds)
-        ]
+        fold_states = _build_fold_states(data, tol=self.tol)
         initial_score = float(
             np.asarray(criterion.evaluate(_cv_rss(fold_states, data), 0))
         )

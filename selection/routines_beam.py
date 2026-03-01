@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from .beam_pruning import prune_unique_beams
 from .criteria import SelectionCriterion
 from .definitions import GramData
 from .interface_validation import (
@@ -39,20 +40,8 @@ class Beam:
 
 
 def _beam_prune(beams: list[Beam], beam_limit: int) -> list[Beam]:
-    if not beams:
-        return []
-    minimize = beams[0].criterion.minimize
-    seen = set()
-    result: list[Beam] = []
-    for beam in sorted(beams, key=lambda b: b.score, reverse=not minimize):
-        sig = beam.signature
-        if sig in seen:
-            continue
-        seen.add(sig)
-        result.append(beam)
-        if len(result) >= beam_limit:
-            break
-    return result
+    """Compatibility wrapper around shared beam-pruning logic."""
+    return prune_unique_beams(beams, beam_limit)
 
 
 def _beam_forward_children(beam: Beam, beam_width: int) -> list[Beam]:

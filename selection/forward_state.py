@@ -3,26 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from numbers import Integral
 
 import numpy as np
 
 from .definitions import GramData
-
-
-def _validate_active_set_indices(active_set: list[int], p: int) -> list[int]:
-    """Validate and normalize active-set indices."""
-    normalized: list[int] = []
-    for idx in active_set:
-        if isinstance(idx, bool) or not isinstance(idx, Integral):
-            raise TypeError("active_set indices must be integers.")
-        idx_int = int(idx)
-        if idx_int < 0 or idx_int >= p:
-            raise ValueError(f"active_set index {idx_int} is out of range for p={p}.")
-        normalized.append(idx_int)
-    if len(set(normalized)) != len(normalized):
-        raise ValueError("active_set contains duplicate feature indices.")
-    return normalized
+from .index_validation import validate_feature_indices
 
 
 @dataclass
@@ -66,7 +51,9 @@ class ForwardState:
         cls, data: GramData, active_set: list[int], tol: float
     ) -> "ForwardState":
         p = data.gram.shape[0]
-        normalized_active = _validate_active_set_indices(list(active_set), p)
+        normalized_active = validate_feature_indices(
+            list(active_set), p, context="active_set"
+        )
         if not normalized_active:
             return cls.create(data, tol)
         k = len(normalized_active)

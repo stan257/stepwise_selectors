@@ -9,6 +9,21 @@ from .forward_state import ForwardState
 from .state import CrossValSelectionState
 
 
+def _build_fold_states(
+    data: CrossValGramData, *, tol: float, active_set: list[int] | None = None
+) -> list[ForwardState]:
+    """Build per-fold ForwardState objects for a shared active set."""
+    if active_set is None:
+        return [
+            ForwardState.create(data.train_data_for_fold(k), tol)
+            for k in range(data.n_folds)
+        ]
+    return [
+        ForwardState.from_active_set(data.train_data_for_fold(k), active_set, tol)
+        for k in range(data.n_folds)
+    ]
+
+
 def _assert_synced_active_sets(fold_states: list[ForwardState]) -> None:
     """Require identical active sets across all fold states."""
     if not fold_states:
@@ -49,10 +64,7 @@ def _rebuild_states(
     data: CrossValGramData, active_set: list[int], tol: float
 ) -> list[ForwardState]:
     """Rebuild fold states from scratch to limit numerical drift."""
-    return [
-        ForwardState.from_active_set(data.train_data_for_fold(k), active_set, tol)
-        for k in range(data.n_folds)
-    ]
+    return _build_fold_states(data, tol=tol, active_set=active_set)
 
 
 def _build_cv_state_from_active_set(
@@ -185,6 +197,7 @@ def _cv_backward_scores(
 
 
 __all__ = [
+    "_build_fold_states",
     "_cv_rss",
     "_rebuild_states",
     "_build_cv_state_from_active_set",
