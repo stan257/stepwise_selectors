@@ -9,7 +9,7 @@ import numpy as np
 from .beam_pruning import prune_unique_beams
 from .criteria import BestRSSCriterion, CriterionProtocol
 from .definitions import CrossValGramData
-from .forward_state import IncrementalSolver
+from .incremental_solver import IncrementalSolver
 from .interface_validation import (
     validate_bool,
     validate_optional_non_negative_int,

@@ -20,7 +20,7 @@ from .selector_validation import (
     _validate_cv_criterion,
     _validate_state_target,
 )
-from .forward_state import IncrementalSolver
+from .incremental_solver import IncrementalSolver
 from .state_single import SelectionState
 
 

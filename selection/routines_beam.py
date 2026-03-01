@@ -16,7 +16,7 @@ from .interface_validation import (
 )
 from .selector_validation import _validate_state_target
 from .routines_greedy import ForwardSelection
-from .forward_state import IncrementalSolver
+from .incremental_solver import IncrementalSolver
 from .state_single import SelectionState
 from .topk import topk_indices
 

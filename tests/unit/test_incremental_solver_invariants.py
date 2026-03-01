@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from selection.definitions import GramData
-from selection.forward_state import IncrementalSolver
+from selection.incremental_solver import IncrementalSolver
 from selection.state_single import SelectionState
 
 
@@ -54,7 +54,7 @@ def test_random_steps_preserve_active_set_and_rss_consistency():
         ([0, 1.5], TypeError, "integers"),
     ],
 )
-def test_forward_state_from_active_set_rejects_invalid_indices(
+def test_incremental_solver_from_active_set_rejects_invalid_indices(
     active_set, error_type, match
 ):
     data = GramData(
@@ -69,7 +69,7 @@ def test_forward_state_from_active_set_rejects_invalid_indices(
 
 
 @pytest.mark.parametrize("seed", [303, 304, 305])
-def test_forward_state_from_active_set_matches_selection_state(seed: int):
+def test_incremental_solver_from_active_set_matches_selection_state(seed: int):
     rng = np.random.default_rng(seed)
     n, p = 160, 24
     X = rng.standard_normal((n, p))

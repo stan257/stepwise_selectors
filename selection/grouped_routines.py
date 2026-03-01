@@ -10,7 +10,7 @@ import numpy as np
 from .constants import ABS_TOL
 from .criteria import AICCriterion, CriterionProtocol
 from .definitions import GramData
-from .forward_state import IncrementalSolver
+from .incremental_solver import IncrementalSolver
 from .interface_validation import (
     validate_choice,
     validate_non_negative_finite_float,

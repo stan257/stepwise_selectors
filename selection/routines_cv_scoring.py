@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 from .definitions import CrossValGramData
-from .forward_state import IncrementalSolver
+from .incremental_solver import IncrementalSolver
 from .state_cv import CrossValSelectionState
 
 

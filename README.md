@@ -96,7 +96,7 @@ print(gstate.active_groups, gstate.active_set, gstate.beta, gstate.rss)
 - Recommended adapter boundary:
   - keep feature engineering and scaling outside this package;
   - treat this package as a pure model-selection engine over fixed sufficient statistics.
-- For non-Python ports, `selection/routines_*`, `selection/state_single.py`, `selection/state_cv.py`, and `selection/forward_state.py` define the core algebraic behavior to mirror.
+- For non-Python ports, `selection/routines_*`, `selection/state_single.py`, `selection/state_cv.py`, and `selection/incremental_solver.py` define the core algebraic behavior to mirror.
 
 ## Failure Semantics
 - Input schema/type violations raise `TypeError`/`ValueError` at construction time where possible.

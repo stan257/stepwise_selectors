@@ -13,7 +13,7 @@ import pytest
 
 from selection.criteria import AICCriterion, BestRSSCriterion
 from selection.definitions import CrossValGramData, GramData
-from selection.forward_state import IncrementalSolver
+from selection.incremental_solver import IncrementalSolver
 from selection.routines import (
     BackwardSelection,
     CrossValForwardSelection,

@@ -79,7 +79,7 @@ These classes remain the output interface for `.fit(...)` results and some valid
 ## Core module layout
 The implementation is split by responsibility:
 
-- `selection/forward_state.py`
+- `selection/incremental_solver.py`
   - `IncrementalSolver` and its QR/Gram rank-one update and downdate machinery.
 
 - `selection/routines_greedy.py`
@@ -207,7 +207,7 @@ This is the current architecture baseline: no separate legacy `beam_search.py`, 
 
 ## Porting notes
 - Core algorithmic behavior lives in:
-  - `selection/forward_state.py` (QR/inverse-Gram state updates),
+  - `selection/incremental_solver.py` (QR/inverse-Gram state updates),
   - `selection/state_single.py` and `selection/state_cv.py` (reference state materialization),
   - `selection/routines_cv_scoring.py` (fold-aggregated scoring formulas).
 - The package is intentionally light on dependencies; porting effort is mostly linear-algebra API translation plus state-management semantics.

@@ -1,7 +1,7 @@
 import numpy as np
 
 from selection.definitions import GramData
-from selection.forward_state import IncrementalSolver
+from selection.incremental_solver import IncrementalSolver
 
 
 def test_backward_step_matches_direct_rss_for_active_set():
