@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from numbers import Integral
 
 import numpy as np
 
@@ -48,6 +49,7 @@ def _build_forward_cache(
     The cache stores residual variances/correlations needed for a rank-one
     update, avoiding recomputation when applying a chosen candidate.
     """
+    block_size = _validate_block_size(block_size)
     # Reuse a shared mask buffer to mark inactive candidates.
     mask = state.mask_buf
     # active_mask tracks active features; invert it to get candidate positions.
@@ -189,6 +191,15 @@ def _backward_components(
     return removed_var, new_active_set_indices, K_new, beta_S_new, float(rss_new)
 
 
+def _validate_block_size(block_size: int) -> int:
+    if isinstance(block_size, bool) or not isinstance(block_size, Integral):
+        raise TypeError("block_size must be an integer.")
+    block_size_int = int(block_size)
+    if block_size_int <= 0:
+        raise ValueError("block_size must be a positive integer.")
+    return block_size_int
+
+
 @dataclass
 class SelectionState:
     # Fixed sufficient statistics
@@ -225,6 +236,7 @@ class SelectionState:
         self.solver_policy = policy
         self.ridge_alpha = ridge
         self.pinv_rcond = rcond
+        self.block_size = _validate_block_size(self.block_size)
         self.p = self.data.gram.shape[0]
         self.gram_diag = np.diag(self.data.gram)
         self.beta = np.zeros(self.p)
@@ -334,7 +346,8 @@ class SelectionState:
         self, tol: float | None = None
     ) -> ForwardDeltaCache | None:
         tol_value = ABS_TOL if tol is None else float(tol)
-        return _build_forward_cache(self, tol_value, block_size=self.block_size)
+        block_size = _validate_block_size(self.block_size)
+        return _build_forward_cache(self, tol_value, block_size=block_size)
 
     def clone(self) -> "SelectionState":
         """Clone mutable state while reusing shared read-only data."""

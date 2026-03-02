@@ -16,6 +16,23 @@ def make_random_state(n=30, p=5, seed=0):
     return SelectionState(data)
 
 
+def test_selection_state_rejects_non_positive_block_size_at_init():
+    rng = np.random.default_rng(123)
+    X = rng.standard_normal((20, 4))
+    y = rng.standard_normal(20)
+    data = GramData(X.T @ X, X.T @ y, y @ y, n_samples=20)
+    with pytest.raises(ValueError, match="positive integer"):
+        SelectionState(data, block_size=0)
+
+
+def test_selection_state_rejects_non_positive_block_size_before_forward_cache():
+    state = make_random_state(p=4)
+    state.init_from_active_set([0])
+    state.block_size = -1
+    with pytest.raises(ValueError, match="positive integer"):
+        state.compute_forward_deltas()
+
+
 def test_selection_state_validates_input_shapes():
     G = np.eye(2)
     c = np.array([1.0, 2.0, 3.0])

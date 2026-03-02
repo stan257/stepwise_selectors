@@ -152,6 +152,16 @@ class CrossValGramData:
             raise IndexError("Fold index out of range.")
         return self.folds[k]
 
+    def _warn_if_uncentered_for_train_fold(self, k: int) -> bool:
+        return all(
+            fold.warn_if_uncentered
+            for fold_idx, fold in enumerate(self.folds)
+            if fold_idx != k
+        )
+
+    def _warn_if_uncentered_for_full_data(self) -> bool:
+        return all(fold.warn_if_uncentered for fold in self.folds)
+
     def train_data_for_fold(self, k: int) -> GramData:
         if not (0 <= k < self.n_folds):
             raise IndexError("Fold index out of range.")
@@ -172,6 +182,7 @@ class CrossValGramData:
             cov=cov_train,
             y_norm=y_norm_train,
             n_samples=n_samples_train,
+            warn_if_uncentered=self._warn_if_uncentered_for_train_fold(k),
         )
 
     def make_full_data(self) -> GramData:
@@ -188,4 +199,5 @@ class CrossValGramData:
             cov=self.cov_total,
             y_norm=self.y_norm_total,
             n_samples=int(self.n_samples_total),
+            warn_if_uncentered=self._warn_if_uncentered_for_full_data(),
         )
