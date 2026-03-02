@@ -11,27 +11,31 @@ from .criteria import (
     HQICCriterion,
     SelectionCriterion,
 )
-from .definitions import CrossValGramData, GramData
-from .grouped_routines import (
+from .core.definitions import CrossValGramData, GramData
+from .core.state_cv import CrossValSelectionState
+from .core.state_single import GroupedSelectionState, SelectionState
+from .selectors.grouped_routines import (
     GroupBackwardSelection,
     GroupForwardSelection,
 )
-from .routines import (
-    BackwardSelection,
+from .selectors.routines_beam import (
     BeamBackwardSelection,
+    BeamForwardSelection,
+    BeamMixedSelection,
+)
+from .selectors.routines_cv import (
     BeamCrossValBackwardSelection,
     BeamCrossValForwardSelection,
     BeamCrossValMixedSelection,
-    BeamForwardSelection,
-    BeamMixedSelection,
     CrossValBackwardSelection,
     CrossValForwardSelection,
     CrossValMixedSelection,
+)
+from .selectors.routines_greedy import (
+    BackwardSelection,
     ForwardSelection,
     MixedSelection,
 )
-from .state_cv import CrossValSelectionState
-from .state_single import GroupedSelectionState, SelectionState
 
 __all__ = [
     "AICCriterion",

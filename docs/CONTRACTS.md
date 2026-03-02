@@ -12,11 +12,11 @@ This keeps responsibilities clear without scattering repetitive validation logic
 
 These are responsible for type/shape/range/schema checks:
 
-- `selection.definitions.GramData`
-- `selection.definitions.CrossValGramData`
-- selector constructors in `selection.routines*` and `selection.grouped_routines`
-- selector entrypoints (`fit(...)`) via `selection.selector_validation`
-- parameter validators in `selection.interface_validation` and `selection.index_validation`
+- `selection.GramData`
+- `selection.CrossValGramData`
+- selector constructors exported from `selection`
+- selector entrypoints (`fit(...)`) via selector validation utilities
+- parameter validators in `selection.validation.interface_validation` and `selection.validation.index_validation`
 
 Boundary misuse should raise clear `TypeError`/`ValueError`.
 
@@ -24,9 +24,9 @@ Boundary misuse should raise clear `TypeError`/`ValueError`.
 
 These primarily assume contract-satisfying inputs:
 
-- `selection.incremental_solver`
-- `selection.routines_cv_scoring`
-- helper algebra in `selection.state_ops` and `selection.solvers`
+- `selection.core.incremental_solver`
+- `selection.selectors.routines_cv_scoring`
+- helper algebra in `selection.core.state_ops` and `selection.core.solvers`
 
 Internal checks are retained only for numerical safety, e.g.:
 

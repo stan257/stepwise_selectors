@@ -2,10 +2,10 @@ import copy
 import numpy as np
 import pytest
 
-from selection.definitions import GramData
-from selection.definitions import CrossValGramData
-from selection.state_cv import CrossValSelectionState
-from selection.state_single import SelectionState
+from selection import GramData
+from selection import CrossValGramData
+from selection import CrossValSelectionState
+from selection import SelectionState
 
 
 def make_random_state(n=30, p=5, seed=0):

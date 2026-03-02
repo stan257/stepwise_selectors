@@ -2,8 +2,8 @@ import numpy as np
 import pytest
 
 from selection.criteria import BestRSSCriterion
-from selection.definitions import CrossValGramData, GramData
-from selection.routines import BackwardSelection, CrossValForwardSelection, ForwardSelection
+from selection import CrossValGramData, GramData
+from selection import BackwardSelection, CrossValForwardSelection, ForwardSelection
 
 
 def _ill_conditioned_gram(p: int, cond_exponent: float = 6.0, seed: int = 0):

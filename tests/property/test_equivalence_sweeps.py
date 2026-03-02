@@ -2,8 +2,8 @@ import numpy as np
 import pytest
 
 from selection.criteria import BestRSSCriterion
-from selection.definitions import GramData
-from selection.routines import (
+from selection import GramData
+from selection import (
     BackwardSelection,
     BeamBackwardSelection,
     BeamCrossValBackwardSelection,
@@ -17,7 +17,7 @@ from selection.routines import (
     ForwardSelection,
     MixedSelection,
 )
-from selection.grouped_routines import GroupBackwardSelection, GroupForwardSelection
+from selection import GroupBackwardSelection, GroupForwardSelection
 from tests.helpers import (
     explicit_beta_rss,
     explicit_cv_rss,

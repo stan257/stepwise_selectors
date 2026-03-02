@@ -2,11 +2,11 @@ import numpy as np
 
 from selection.criteria import BestRSSCriterion
 from selection.core.incremental_solver import IncrementalSolver
-from selection.definitions import GramData
-from selection.routines import BeamBackwardSelection, BeamForwardSelection, BeamMixedSelection
+from selection import GramData
+from selection import BeamBackwardSelection, BeamForwardSelection, BeamMixedSelection
 from selection.selectors.beam_pruning import prune_unique_beams
 from selection.selectors.routines_beam import Beam
-from selection.state_single import SelectionState
+from selection import SelectionState
 from tests.integration._selection_routines_helpers import (
     expected_indices,
     make_diagonal_problem,

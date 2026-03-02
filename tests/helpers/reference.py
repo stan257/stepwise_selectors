@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from selection.definitions import CrossValGramData, GramData
+from selection import CrossValGramData, GramData
 
 
 def make_regression_gram(

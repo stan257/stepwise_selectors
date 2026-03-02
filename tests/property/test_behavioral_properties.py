@@ -12,19 +12,19 @@ import numpy as np
 import pytest
 
 from selection.criteria import AICCriterion, BestRSSCriterion
-from selection.definitions import CrossValGramData, GramData
-from selection.incremental_solver import IncrementalSolver
-from selection.routines import (
+from selection import CrossValGramData, GramData
+from selection.core.incremental_solver import IncrementalSolver
+from selection import (
     BackwardSelection,
     CrossValForwardSelection,
     ForwardSelection,
     MixedSelection,
 )
-from selection.grouped_routines import (
+from selection import (
     GroupBackwardSelection,
     GroupForwardSelection,
 )
-from selection.state_single import SelectionState
+from selection import SelectionState
 from tests.helpers import explicit_beta_rss, explicit_cv_rss, make_regression_gram
 
 

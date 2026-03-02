@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from selection.definitions import CrossValGramData, GramData
+from selection import CrossValGramData, GramData
 
 
 def generate_esl_gramdata(

@@ -12,8 +12,8 @@ from selection.criteria import (
     GCVCriterion,
     HQICCriterion,
 )
-from selection.definitions import GramData
-from selection.state_single import SelectionState
+from selection import GramData
+from selection import SelectionState
 
 
 def make_state():

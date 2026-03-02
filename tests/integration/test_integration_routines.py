@@ -9,9 +9,9 @@ from selection.criteria import (
     GCVCriterion,
     HQICCriterion,
 )
-from selection.definitions import CrossValGramData, GramData
-from selection.grouped_routines import GroupForwardSelection
-from selection.routines import (
+from selection import CrossValGramData, GramData
+from selection import GroupForwardSelection
+from selection import (
     BeamCrossValBackwardSelection,
     BeamForwardSelection,
     CrossValForwardSelection,

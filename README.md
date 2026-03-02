@@ -31,12 +31,9 @@ Lightweight linear-model selection routines built on precomputed Gram statistics
 
 ## Public API Boundary
 - Stable import surface:
-  - `selection.routines`
-  - `selection.grouped_routines`
-  - `selection.definitions`
-  - `selection.criteria`
-  - `selection` (package-level re-exports)
-- Internal modules in `selection/*` outside those entrypoints are implementation details and may change without compatibility guarantees.
+  - `selection` (package-level re-exports; primary public API)
+  - `selection.criteria` (criterion classes/protocols)
+- Internal modules in `selection/core/*` and `selection/selectors/*` are implementation details and may change without compatibility guarantees.
 
 ## Selector guide
 - Use `ForwardSelection` when you want a fast, deterministic baseline and a single support path.
@@ -68,8 +65,8 @@ pytest -m regression
 ```
 4) Use selection routines:
 ```python
-from selection.definitions import GramData
-from selection.routines import ForwardSelection
+from selection import GramData
+from selection import ForwardSelection
 
 data = GramData(gram, cov, y_norm, n_samples)
 state = ForwardSelection().fit(data=data)
@@ -79,7 +76,7 @@ print(state.active_set, state.beta, state.rss)
 ### Grouped selection
 Pass feature groups as lists of indices:
 ```python
-from selection.grouped_routines import GroupForwardSelection
+from selection import GroupForwardSelection
 
 groups = [[0, 1], [2, 3]]  # add/remove as units
 gstate = GroupForwardSelection(groups).fit(data=data)
@@ -89,7 +86,7 @@ print(gstate.active_groups, gstate.active_set, gstate.beta, gstate.rss)
 
 ## Notes
 - The code operates on Gram statistics (`X.T @ X`, `X.T @ y`, `y.T @ y`) and does not depend on raw design matrices.
-- `selection.routines` and `selection.grouped_routines` expose the default implementations.
+- Selector classes are exposed from `selection` directly (for example `ForwardSelection`, `GroupForwardSelection`).
 - For cross-validation, provide per-fold `GramData` via `CrossValGramData`.
 - `GramData` accepts array-like inputs for `gram` and `cov` and stores contiguous NumPy arrays internally.
 - CV output states expose `beta` as a post-selection refit on full-data Gram statistics at the selected support.
@@ -106,12 +103,12 @@ print(gstate.active_groups, gstate.active_set, gstate.beta, gstate.rss)
 - The package is NumPy-only and operates on Gram statistics, so it ports cleanly into most scientific Python codebases.
 - Minimal integration contract:
   - construct `GramData` (or `CrossValGramData`) from your preprocessing pipeline;
-  - call selectors from `selection.routines`;
+  - call selectors from `selection`;
   - consume output state fields (`active_set`, `beta`, `rss` or `rss_cv`).
 - Recommended adapter boundary:
   - keep feature engineering and scaling outside this package;
   - treat this package as a pure model-selection engine over fixed sufficient statistics.
-- For non-Python ports, `selection/routines_*`, `selection/state_single.py`, `selection/state_cv.py`, and `selection/incremental_solver.py` define the core algebraic behavior to mirror.
+- For non-Python ports, `selection/selectors/routines_*`, `selection/core/state_single.py`, `selection/core/state_cv.py`, and `selection/core/incremental_solver.py` define the core algebraic behavior to mirror.
 
 ## Failure Semantics
 - Input schema/type violations raise `TypeError`/`ValueError` at construction time where possible.

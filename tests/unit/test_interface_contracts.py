@@ -1,10 +1,10 @@
 import numpy as np
 import pytest
 
-from selection.definitions import GramData
-from selection.grouped_routines import GroupForwardSelection
-import selection.routines as routines
-from selection.routines import (
+from selection import GramData
+from selection import GroupForwardSelection
+import selection as routines
+from selection import (
     BackwardSelection,
     BeamBackwardSelection,
     BeamCrossValBackwardSelection,
@@ -18,7 +18,7 @@ from tests.helpers import make_cv_problem, make_regression_gram
 
 def test_routines_all_symbols_are_resolvable():
     for name in routines.__all__:
-        assert hasattr(routines, name), f"selection.routines missing {name}"
+        assert hasattr(routines, name), f"selection missing {name}"
 
 
 NON_CV_STEP_SELECTORS = [

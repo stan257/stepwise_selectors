@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from selection.routines_cv_scoring import (
+from selection.selectors.routines_cv_scoring import (
     _aggregate_cv_rss_matrix,
     _build_fold_states,
     _cv_backward_scores,

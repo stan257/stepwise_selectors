@@ -42,9 +42,9 @@ Primary entrypoint:
 ## Validation And Failure Semantics
 
 Validation layers:
-1. `selection.definitions` and selector interfaces reject schema/type/range misuse.
+1. `selection.GramData` / `selection.CrossValGramData` and selector interfaces reject schema/type/range misuse.
 2. Selector validation utilities normalize and guard runtime parameters.
-3. Numerical kernels (`selection.solvers`, incremental updates) retain targeted safety checks for unstable linear algebra paths.
+3. Numerical kernels (`selection.core.solvers`, incremental updates) retain targeted safety checks for unstable linear algebra paths.
 
 Expected failures:
 - Boundary misuse: `TypeError` / `ValueError`
@@ -55,9 +55,6 @@ Expected failures:
 
 Stable public import surfaces:
 - `selection`
-- `selection.routines`
-- `selection.grouped_routines`
-- `selection.definitions`
 - `selection.criteria`
 
 Everything else under `selection/` is internal and may change without compatibility guarantees.
@@ -70,8 +67,8 @@ Add a new criterion:
 3. Add unit tests for score behavior and selector integration.
 
 Add a new selector:
-1. Implement in `selection/routines*.py` (or grouped counterpart).
-2. Expose through `selection/routines.py` (or grouped exports).
+1. Implement in `selection/selectors/routines*.py` (or grouped counterpart).
+2. Expose through `selection/__init__.py`.
 3. Add contract tests for state fields, stopping behavior, and failure semantics.
 4. Optionally add benchmark method config for comparative runs.
 

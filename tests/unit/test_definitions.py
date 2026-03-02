@@ -3,7 +3,7 @@ import warnings
 import numpy as np
 import pytest
 
-from selection.definitions import CrossValGramData, GramData
+from selection import CrossValGramData, GramData
 
 
 def test_gramdata_rejects_nonsymmetric_gram_with_absolute_tolerance():

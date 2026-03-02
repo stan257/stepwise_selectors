@@ -168,7 +168,7 @@ Additional support-recovery options:
 
 - `name`: method label in output rows.
 - exactly one of:
-  - `selector`: selector class name from `selection.routines`
+  - `selector`: selector class name from `selection`
   - `baseline`: baseline name from `benchmarks.baselines`
 
 For selectors:

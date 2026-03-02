@@ -1,7 +1,7 @@
 import numpy as np
 
 from selection.criteria import BestRSSCriterion
-from selection.routines import (
+from selection import (
     BackwardSelection,
     BeamCrossValBackwardSelection,
     BeamCrossValForwardSelection,

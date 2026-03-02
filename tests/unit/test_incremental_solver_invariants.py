@@ -1,9 +1,9 @@
 import numpy as np
 import pytest
 
-from selection.definitions import GramData
-from selection.incremental_solver import IncrementalSolver
-from selection.state_single import SelectionState
+from selection import GramData
+from selection.core.incremental_solver import IncrementalSolver
+from selection import SelectionState
 
 
 def test_random_steps_preserve_active_set_and_rss_consistency():

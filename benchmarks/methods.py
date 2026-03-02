@@ -15,8 +15,8 @@ from selection.criteria import (
     GCVCriterion,
     HQICCriterion,
 )
-from selection.definitions import CrossValGramData, GramData
-from selection.routines import (
+from selection import CrossValGramData, GramData
+from selection import (
     BackwardSelection,
     BeamBackwardSelection,
     BeamCrossValBackwardSelection,

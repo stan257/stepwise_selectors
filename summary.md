@@ -188,7 +188,7 @@ Notable files:
 
 ## Data-flow summary
 1. Build `GramData` / `CrossValGramData`.
-2. Run a selector from `selection.routines` (default public entrypoint).
+2. Run a selector from `selection` (default public entrypoint).
 3. Internal optimization runs on Gram-only states.
 4. Final result is materialized as `SelectionState` or `CrossValSelectionState` with `active_set` and RSS metrics; CV `beta` is a full-data post-selection refit.
 
@@ -204,13 +204,13 @@ This is the current architecture baseline: no separate legacy `beam_search.py`, 
   - grouped routines currently expose greedy add/drop policies only;
   - extension work should preserve complete-group support semantics.
 - Alternate frontends:
-  - maintain `selection.routines` as primary user-facing import path.
+  - maintain `selection` as the primary user-facing import path.
 
 ---
 
 ## Porting notes
 - Core algorithmic behavior lives in:
-  - `selection/incremental_solver.py` (QR/inverse-Gram state updates),
-  - `selection/state_single.py` and `selection/state_cv.py` (reference state materialization),
-  - `selection/routines_cv_scoring.py` (fold-aggregated scoring formulas).
+  - `selection/core/incremental_solver.py` (QR/inverse-Gram state updates),
+  - `selection/core/state_single.py` and `selection/core/state_cv.py` (reference state materialization),
+  - `selection/selectors/routines_cv_scoring.py` (fold-aggregated scoring formulas).
 - The package is intentionally light on dependencies; porting effort is mostly linear-algebra API translation plus state-management semantics.

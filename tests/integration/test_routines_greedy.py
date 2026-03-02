@@ -2,8 +2,8 @@ import numpy as np
 import pytest
 
 from selection.criteria import BestRSSCriterion
-from selection.definitions import GramData
-from selection.routines import BackwardSelection, ForwardSelection, MixedSelection
+from selection import GramData
+from selection import BackwardSelection, ForwardSelection, MixedSelection
 from tests.integration._selection_routines_helpers import (
     esl_book,
     expected_indices,

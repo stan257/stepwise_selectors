@@ -2,14 +2,14 @@ import numpy as np
 import pytest
 
 from selection.criteria import BestRSSCriterion
-from selection.definitions import GramData
-from selection.routines import (
+from selection import GramData
+from selection import (
     BeamCrossValMixedSelection,
     BeamMixedSelection,
     ForwardSelection,
     MixedSelection,
 )
-from selection.state_single import SelectionState
+from selection import SelectionState
 from tests.helpers import make_cv_problem, make_regression_gram
 
 

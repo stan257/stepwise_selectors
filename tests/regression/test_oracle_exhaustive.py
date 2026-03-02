@@ -12,8 +12,8 @@ from selection.criteria import (
     GCVCriterion,
     HQICCriterion,
 )
-from selection.definitions import GramData
-from selection.routines import BeamForwardSelection, ForwardSelection
+from selection import GramData
+from selection import BeamForwardSelection, ForwardSelection
 
 
 def _explicit_rss(X: np.ndarray, y: np.ndarray, subset: tuple[int, ...]) -> tuple[float, np.ndarray]:

@@ -2,9 +2,9 @@ import numpy as np
 import pytest
 
 from selection.criteria import BestRSSCriterion
-from selection.definitions import CrossValGramData, GramData
-from selection.routines import BackwardSelection, CrossValBackwardSelection, ForwardSelection
-from selection.state_single import SelectionState
+from selection import CrossValGramData, GramData
+from selection import BackwardSelection, CrossValBackwardSelection, ForwardSelection
+from selection import SelectionState
 
 
 def _make_rank_deficient_data() -> GramData:

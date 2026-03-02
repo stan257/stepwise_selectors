@@ -2,8 +2,8 @@ import numpy as np
 import pytest
 
 from selection.criteria import BestRSSCriterion
-from selection.definitions import CrossValGramData, GramData
-from selection.routines import (
+from selection import CrossValGramData, GramData
+from selection import (
     BackwardSelection,
     CrossValBackwardSelection,
     CrossValForwardSelection,

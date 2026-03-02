@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from selection.definitions import GramData
+from selection import GramData
 
 
 @dataclass(frozen=True)

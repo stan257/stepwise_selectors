@@ -2,8 +2,8 @@ import numpy as np
 import pytest
 
 from selection.criteria import AICCriterion, BestRSSCriterion, GCVCriterion
-from selection.definitions import CrossValGramData, GramData
-from selection.routines import (
+from selection import CrossValGramData, GramData
+from selection import (
     BeamCrossValBackwardSelection,
     BeamCrossValForwardSelection,
     BeamCrossValMixedSelection,
@@ -11,7 +11,7 @@ from selection.routines import (
     CrossValForwardSelection,
     CrossValMixedSelection,
 )
-from selection.state_cv import CrossValSelectionState
+from selection import CrossValSelectionState
 from tests.helpers import explicit_beta_from_active, explicit_cv_rss, make_cv_problem
 
 

@@ -1,9 +1,9 @@
 import numpy as np
 import pytest
 from selection.criteria import AICCriterion, BestRSSCriterion
-from selection.definitions import GramData
-from selection.grouped_routines import GroupBackwardSelection, GroupForwardSelection
-from selection.state_single import GroupedSelectionState
+from selection import GramData
+from selection import GroupBackwardSelection, GroupForwardSelection
+from selection import GroupedSelectionState
 
 
 class GroupRecordingCriterion(BestRSSCriterion):
