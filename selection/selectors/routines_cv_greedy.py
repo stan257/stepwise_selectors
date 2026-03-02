@@ -170,11 +170,12 @@ class CrossValBackwardSelection(_BaseCrossValSelection):
             if not criterion.is_improvement(best_score):
                 break
             try:
-                for state_k in fold_states:
+                cloned = [state_k.clone() for state_k in fold_states]
+                for state_k in cloned:
                     state_k.apply_backward(best_idx)
                 fold_states = _rebuild_states(
                     data,
-                    fold_states[0].active_set,
+                    cloned[0].active_set,
                     self.tol,
                     solver_policy=self.solver_policy,
                     ridge_alpha=self.ridge_alpha,
@@ -294,11 +295,12 @@ class CrossValMixedSelection(_BaseCrossValSelection):
                 if not criterion.is_improvement(best_score):
                     break
                 try:
-                    for state_k in fold_states:
+                    cloned = [state_k.clone() for state_k in fold_states]
+                    for state_k in cloned:
                         state_k.apply_backward(best_idx)
                     fold_states = _rebuild_states(
                         data,
-                        fold_states[0].active_set,
+                        cloned[0].active_set,
                         self.tol,
                         solver_policy=self.solver_policy,
                         ridge_alpha=self.ridge_alpha,
