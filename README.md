@@ -99,6 +99,8 @@ print(gstate.active_groups, gstate.active_set, gstate.beta, gstate.rss)
 - CV selectors reject criteria with `cv_compatible=False` to avoid double regularization on top of held-out RSS.
 - Backward beam selectors are improvement-only by default; set `allow_worse=True` to force removals under a step budget.
 - Selector hyperparameters are validated strictly (fail-fast): no implicit coercion for `beam_width`, `allow_worse`, step budgets, or `tol`.
+- `SelectionState.block_size` (forward-candidate block evaluation size) must be a positive integer; non-positive values raise a contract error before scoring.
+- `CrossValGramData.train_data_for_fold(...)` and `make_full_data()` preserve fold-level `warn_if_uncentered` opt-out; derived data warns only when all contributing folds have warnings enabled.
 
 ## Portability And Embedding
 - The package is NumPy-only and operates on Gram statistics, so it ports cleanly into most scientific Python codebases.
@@ -114,7 +116,7 @@ print(gstate.active_groups, gstate.active_set, gstate.beta, gstate.rss)
 ## Failure Semantics
 - Input schema/type violations raise `TypeError`/`ValueError` at construction time where possible.
 - Numerically unstable active-set operations raise `np.linalg.LinAlgError` or return `inf` candidate scores (for screened candidates).
-- CV routines require synchronized fold supports internally; desync now fails fast with a `ValueError`.
+- CV routines require synchronized fold supports internally; invariant desync now fails fast with a `RuntimeError`.
 
 ## Assumptions And Limitations (Research Use)
 - The package does **not** fit an intercept automatically. If your model needs one, include a constant feature before building Gram statistics, or center `X`/`y` and fit a no-intercept model.

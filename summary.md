@@ -32,6 +32,7 @@ This document summarizes the current `selection` package architecture. It is int
 - `GramData`
   - Holds `gram = X^T X`, `cov = X^T y`, `y_norm = y^T y`, and `n_samples`.
   - Enforces shape/type/positivity invariants in `__post_init__`.
+  - Supports `warn_if_uncentered` (default `True`) to surface likely uncentered-data misuse.
 
 - `CrossValGramData`
   - Holds per-fold `GramData` and aggregates (`gram_total`, `cov_total`, `y_norm_total`).
@@ -40,6 +41,7 @@ This document summarizes the current `selection` package architecture. It is int
     - `train_data_for_fold(k)` via complement subtraction
     - `make_full_data()`
   - Validates fold consistency and sample counts.
+  - Preserves fold-level `warn_if_uncentered` policy when deriving train/full `GramData`.
 
 ---
 
@@ -49,6 +51,7 @@ This document summarizes the current `selection` package architecture. It is int
 
 - `SelectionState`
   - Reference state with active set, full coefficients, active-set coefficients, inverse Gram (`K`), and RSS.
+  - Validates `block_size > 0` for block-wise forward cache construction.
   - Key methods:
     - `init_empty()`, `init_full()`
     - `compute_forward_deltas()`, `apply_forward_step()`
@@ -124,7 +127,7 @@ The implementation is split by responsibility:
 Important behavior:
 - CV candidate scoring uses summed fold validation RSS (same scale as `rss_cv`).
 - `BeamCrossValBackwardSelection` is improvement-only by default; `allow_worse=True` enables forced removals.
-- Beam pruning deduplicates by active-set bitmask signatures.
+- Beam pruning deduplicates by active-set signatures (`frozenset[int]` support keys).
 - Rebuilds from active set are used after accepted moves to limit numerical drift.
 - Warm starts are intentionally disallowed for beam/CV selectors where state reconstruction assumptions are strict.
 

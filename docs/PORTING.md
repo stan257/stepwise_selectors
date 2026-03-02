@@ -76,6 +76,7 @@ Backward downdate:
 ## Failure Semantics
 - Input-shape/type/index errors: `TypeError` / `ValueError`
 - Ill-posed linear algebra during factorization or refit: `np.linalg.LinAlgError`
+- Cross-validation active-set synchronization violations: `RuntimeError`
 - Numerically invalid backward removals are screened (e.g., candidate RSS becomes `inf`) or rejected via `ValueError` in step application paths.
 
 ## Compatibility Notes
