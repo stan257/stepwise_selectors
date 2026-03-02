@@ -41,7 +41,7 @@ class GroupedSelectionState:
 
 
 def _build_forward_cache(
-    state: "SelectionState", tol: float
+    state: "SelectionState", tol: float, block_size: int = FORWARD_BLOCK_SIZE
 ) -> ForwardDeltaCache | None:
     """Compute forward-candidate deltas using block Gram projections.
 
@@ -90,8 +90,8 @@ def _build_forward_cache(
     resid_corr = np.empty(num_candidates, dtype=float)
 
     # Block evaluation avoids materializing the full G_Sc matrix at once.
-    for start in range(0, num_candidates, FORWARD_BLOCK_SIZE):
-        end = min(start + FORWARD_BLOCK_SIZE, num_candidates)
+    for start in range(0, num_candidates, block_size):
+        end = min(start + block_size, num_candidates)
         cand_block = candidates[start:end]
         g_block = state.data.gram[np.ix_(idx_S, cand_block)]
         proj_block = state.K @ g_block
@@ -196,6 +196,7 @@ class SelectionState:
     solver_policy: str = "strict"
     ridge_alpha: float = 1e-8
     pinv_rcond: float = 1e-12
+    block_size: int = FORWARD_BLOCK_SIZE
     p: int = field(init=False)
     gram_diag: np.ndarray = field(init=False)
 
@@ -333,7 +334,7 @@ class SelectionState:
         self, tol: float | None = None
     ) -> ForwardDeltaCache | None:
         tol_value = ABS_TOL if tol is None else float(tol)
-        return _build_forward_cache(self, tol_value)
+        return _build_forward_cache(self, tol_value, block_size=self.block_size)
 
     def clone(self) -> "SelectionState":
         """Clone mutable state while reusing shared read-only data."""
@@ -342,6 +343,7 @@ class SelectionState:
         clone.solver_policy = self.solver_policy
         clone.ridge_alpha = self.ridge_alpha
         clone.pinv_rcond = self.pinv_rcond
+        clone.block_size = self.block_size
         clone.p = self.p
         clone.gram_diag = self.gram_diag
         clone.beta = self.beta.copy()

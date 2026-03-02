@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+import warnings
 
 import numpy as np
 from numbers import Real, Integral
@@ -11,6 +12,7 @@ class GramData:
     y_norm: float
     n_samples: int
     dtype: np.dtype | None = None
+    warn_if_uncentered: bool = True
 
     def __post_init__(self):
         # Ensure contiguous storage (and optional casting) for BLAS-friendly access.
@@ -55,6 +57,18 @@ class GramData:
             raise ValueError("y_norm must be non-negative.")
         if self.n_samples <= 0:
             raise ValueError("n_samples must be a positive integer.")
+        if self.warn_if_uncentered:
+            gram_diag = np.diag(self.gram)
+            scale = np.sqrt(gram_diag * self.y_norm)
+            nonzero = scale > 0
+            if np.any(nonzero) and np.any(np.abs(self.cov[nonzero]) > 0.1 * scale[nonzero]):
+                warnings.warn(
+                    "GramData: cov entries are large relative to gram diagonal and y_norm. "
+                    "Ensure X and y are mean-centred before computing Gram statistics; "
+                    "an uncentred model produces incorrect coefficients.",
+                    UserWarning,
+                    stacklevel=2,
+                )
 
 
 @dataclass

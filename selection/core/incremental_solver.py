@@ -232,7 +232,7 @@ class IncrementalSolver:
         valid_rss = rss_new > -self.tol
         if not np.any(valid_rss):
             return None
-        return candidates[valid_rss], rss_new[valid_rss]
+        return candidates[valid_rss], np.maximum(rss_new[valid_rss], 0.0)
 
     def _prepare_forward_step(
         self, feat_idx: int

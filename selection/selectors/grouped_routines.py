@@ -37,6 +37,11 @@ def _validate_group_feature_bounds(groups: Sequence[Sequence[int]], p: int) -> N
                 raise ValueError(
                     f"Group {group_idx} feature index {feat} is out of range for p={p}."
                 )
+    all_indices = [feat for group in groups for feat in group]
+    if len(all_indices) != len(set(all_indices)):
+        raise ValueError(
+            "Groups must be disjoint; one or more feature indices appear in multiple groups."
+        )
 
 
 def _flatten_group_indices(groups: Iterable[int], group_map: Sequence[Sequence[int]]):

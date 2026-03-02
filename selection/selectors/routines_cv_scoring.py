@@ -47,6 +47,7 @@ def _aggregate_cv_rss_vector(
         case "mean_mse":
             return float(np.mean(fold_rss_f / fold_sizes_f))
         case "median_mse":
+            # Equal weight per fold, not sample-weighted; small folds count the same as large ones.
             return float(np.median(fold_rss_f / fold_sizes_f))
         case _:
             raise ValueError(
@@ -67,6 +68,7 @@ def _aggregate_cv_rss_matrix(
         case "mean_mse":
             return np.mean(rss_matrix / fold_sizes_f[:, None], axis=0)
         case "median_mse":
+            # Equal weight per fold, not sample-weighted; small folds count the same as large ones.
             return np.median(rss_matrix / fold_sizes_f[:, None], axis=0)
         case _:
             raise ValueError(
