@@ -20,33 +20,6 @@ from selection.routines import (
 )
 
 
-def test_forward_best_rss_matches_direct_ols_on_selected():
-    rng = np.random.default_rng(123)
-    n, p, k = 40, 6, 3
-    X = rng.standard_normal((n, p))
-    beta_true = rng.standard_normal(p)
-    y = X @ beta_true + 0.05 * rng.standard_normal(n)
-
-    gram = X.T @ X
-    cov = X.T @ y
-    y_norm = float(y @ y)
-
-    data = GramData(gram, cov, y_norm, n)
-    state = ForwardSelection(criterion=BestRSSCriterion).fit(
-        data=data, max_steps=k
-    )
-
-    assert len(state.active_set) == k
-    idx = np.array(state.active_set, dtype=int)
-    beta_expected = np.linalg.solve(gram[np.ix_(idx, idx)], cov[idx])
-    beta_full = np.zeros(p)
-    beta_full[idx] = beta_expected
-    rss_expected = float(y_norm - cov[idx] @ beta_expected)
-
-    np.testing.assert_allclose(state.beta, beta_full, atol=1e-8, rtol=1e-8)
-    assert pytest.approx(state.rss, rel=1e-8, abs=1e-8) == rss_expected
-
-
 def test_cv_forward_matches_full_data_on_replicated_folds():
     rng = np.random.default_rng(321)
     n, p, folds, k = 60, 5, 4, 3

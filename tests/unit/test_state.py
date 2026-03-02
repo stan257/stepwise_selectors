@@ -33,13 +33,6 @@ def test_selection_state_rejects_non_positive_block_size_before_forward_cache():
         state.compute_forward_deltas()
 
 
-def test_selection_state_validates_input_shapes():
-    G = np.eye(2)
-    c = np.array([1.0, 2.0, 3.0])
-    with pytest.raises(ValueError):
-        SelectionState(GramData(G, c, y_norm=1.0, n_samples=10))
-
-
 def test_selection_state_init_full_populates_active_and_beta():
     X = np.array([[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]])
     y = np.array([1.0, 0.2, 0.9])

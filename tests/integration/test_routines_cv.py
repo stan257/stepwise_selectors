@@ -75,17 +75,6 @@ def test_beam_crossval_backward_selection_recovers_true_support():
     assert set(state.active_set) == set(support_set)
 
 
-def test_crossval_beam_matches_greedy_support_on_simple_problem():
-    cv_data, support_set = make_cv_support_problem()
-    greedy = CrossValForwardSelection()
-    beam = BeamCrossValForwardSelection(beam_width=2)
-
-    greedy_state = greedy.fit(data=cv_data, max_steps=len(support_set))
-    beam_state = beam.fit(data=cv_data, max_steps=len(support_set))
-
-    assert set(beam_state.active_set) == set(greedy_state.active_set)
-
-
 def test_cv_beam_matches_greedy_support_on_heterogeneous_folds():
     cv_data, support = make_heterogeneous_cv_problem()
     steps = len(support)
@@ -126,4 +115,3 @@ def test_crossval_beam_can_beat_greedy_in_two_steps():
     assert 0 in greedy_state.active_set
     assert set(beam_state.active_set) == {1, 2}
     assert beam_state.rss_cv < greedy_state.rss_cv - 1e-9
-

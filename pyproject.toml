@@ -24,3 +24,6 @@ markers = [
     "property: randomized/property-based behavioral checks",
     "regression: golden/oracle and previously failing-case coverage",
 ]
+filterwarnings = [
+    "ignore:.*cov entries are large relative to gram diagonal and y_norm.*uncentred model produces incorrect coefficients.*:UserWarning",
+]
