@@ -108,3 +108,29 @@ def test_cv_state_rejects_desynced_fold_active_sets():
 
     with pytest.raises(RuntimeError, match="identical active_set across folds"):
         cv_state._sync_active_set()
+
+
+def test_cv_state_normalizes_solver_params_for_full_refit():
+    rng = np.random.default_rng(654)
+    fold_data = []
+    for _ in range(3):
+        X = rng.standard_normal((40, 4))
+        y = rng.standard_normal(40)
+        fold_data.append(GramData(X.T @ X, X.T @ y, y @ y, n_samples=40))
+
+    cv_state = CrossValSelectionState(
+        CrossValGramData(fold_data),
+        solver_policy="RIDGE",
+        ridge_alpha="1e-3",
+        pinv_rcond="1e-10",
+    )
+    assert cv_state.solver_policy == "ridge"
+    assert cv_state.ridge_alpha == pytest.approx(1e-3)
+    assert cv_state.pinv_rcond == pytest.approx(1e-10)
+
+    for fold_state in cv_state.train_states:
+        fold_state.init_from_active_set([0])
+    cv_state._sync_active_set()
+
+    rss_cv = cv_state.recompute_oos_rss()
+    assert np.isfinite(rss_cv)
