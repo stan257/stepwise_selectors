@@ -4,6 +4,8 @@ import pytest
 from selection.criteria import BestRSSCriterion
 from selection import GramData
 from selection import (
+    BackwardSelection,
+    BeamBackwardSelection,
     BeamCrossValMixedSelection,
     BeamMixedSelection,
     ForwardSelection,
@@ -52,6 +54,22 @@ NON_CV_SELECTOR_CASES = [
 ]
 
 
+NON_CV_SOLVER_COMPAT_CASES = [
+    pytest.param(
+        BackwardSelection,
+        {"criterion": BestRSSCriterion},
+        {"max_steps": 0},
+        id="backward",
+    ),
+    pytest.param(
+        BeamBackwardSelection,
+        {"criterion": BestRSSCriterion, "beam_width": 2},
+        {"max_steps": 0},
+        id="beam_backward",
+    ),
+]
+
+
 @pytest.mark.parametrize("selector_cls,selector_kwargs,fit_kwargs", NON_CV_SELECTOR_CASES)
 def test_non_cv_selector_rejects_mismatched_state_data(
     selector_cls, selector_kwargs, fit_kwargs
@@ -81,6 +99,59 @@ def test_non_cv_selector_reuses_matching_state(
     assert result.active_set == expected.active_set
     np.testing.assert_allclose(result.beta, expected.beta, atol=1e-8, rtol=1e-8)
     assert result.rss == pytest.approx(expected.rss, rel=1e-8, abs=1e-8)
+
+
+@pytest.mark.parametrize(
+    "selector_cls,selector_kwargs,fit_kwargs", NON_CV_SOLVER_COMPAT_CASES
+)
+def test_non_cv_selector_rejects_mismatched_state_solver_policy(
+    selector_cls, selector_kwargs, fit_kwargs
+):
+    data = make_regression_gram(334, n=80, p=8)
+    state = SelectionState(data, solver_policy="ridge", ridge_alpha=1e-6)
+
+    selector = selector_cls(
+        **selector_kwargs,
+        solver_policy="strict",
+    )
+    with pytest.raises(ValueError, match=r"state\.solver_policy"):
+        selector.fit(state=state, data=data, **fit_kwargs)
+
+
+@pytest.mark.parametrize(
+    "selector_cls,selector_kwargs,fit_kwargs", NON_CV_SOLVER_COMPAT_CASES
+)
+def test_non_cv_selector_rejects_mismatched_state_ridge_alpha(
+    selector_cls, selector_kwargs, fit_kwargs
+):
+    data = make_regression_gram(335, n=80, p=8)
+    state = SelectionState(data, solver_policy="ridge", ridge_alpha=1e-3)
+
+    selector = selector_cls(
+        **selector_kwargs,
+        solver_policy="ridge",
+        ridge_alpha=1e-6,
+    )
+    with pytest.raises(ValueError, match=r"state\.ridge_alpha"):
+        selector.fit(state=state, data=data, **fit_kwargs)
+
+
+@pytest.mark.parametrize(
+    "selector_cls,selector_kwargs,fit_kwargs", NON_CV_SOLVER_COMPAT_CASES
+)
+def test_non_cv_selector_rejects_mismatched_state_pinv_rcond(
+    selector_cls, selector_kwargs, fit_kwargs
+):
+    data = make_regression_gram(336, n=80, p=8)
+    state = SelectionState(data, solver_policy="pinv", pinv_rcond=1e-6)
+
+    selector = selector_cls(
+        **selector_kwargs,
+        solver_policy="pinv",
+        pinv_rcond=1e-10,
+    )
+    with pytest.raises(ValueError, match=r"state\.pinv_rcond"):
+        selector.fit(state=state, data=data, **fit_kwargs)
 
 
 @pytest.mark.parametrize(
