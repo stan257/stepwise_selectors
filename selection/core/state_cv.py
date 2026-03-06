@@ -4,6 +4,7 @@ import numpy as np
 
 from .constants import ABS_TOL
 from .definitions import CrossValGramData
+from .state_ops import validate_solver_params
 from .state_single import ForwardDeltaCache, SelectionState, _backward_components
 from .solvers import solve_active_system
 
@@ -22,6 +23,12 @@ class CrossValSelectionState:
     rss_cv: float = field(init=False)
 
     def __post_init__(self):
+        policy, ridge, rcond = validate_solver_params(
+            self.solver_policy, self.ridge_alpha, self.pinv_rcond
+        )
+        self.solver_policy = policy
+        self.ridge_alpha = ridge
+        self.pinv_rcond = rcond
         self.p = self.data.gram_total.shape[0]
         self.n_folds = self.data.n_folds
         self.beta = np.zeros(self.p, dtype=float)
