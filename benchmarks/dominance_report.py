@@ -128,10 +128,16 @@ def _pairwise_dominance(grouped: dict[str, list[dict]]) -> tuple[list[str], dict
         rows = grouped[scenario_name]
         mse_by_method = {str(r["method_name"]): float(r["mean_test_mse"]) for r in rows}
         for a in methods:
+            mse_a = mse_by_method.get(a)
+            if mse_a is None:
+                continue
             for b in methods:
                 if a == b:
                     continue
-                if mse_by_method[a] < mse_by_method[b]:
+                mse_b = mse_by_method.get(b)
+                if mse_b is None:
+                    continue
+                if mse_a < mse_b:
                     matrix[(a, b)] += 1
     return methods, matrix
 
