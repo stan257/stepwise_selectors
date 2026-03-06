@@ -49,3 +49,40 @@ def test_build_dominance_markdown_contains_sections():
     assert "## Pairwise Dominance Counts" in md
     assert "forward_bic" in md
     assert "topk_abs_cov" in md
+
+
+def test_build_dominance_markdown_handles_missing_methods_per_scenario():
+    payload = {
+        "rows": [
+            {
+                "scenario_name": "s1",
+                "difficulty": "easy",
+                "method_name": "m1",
+                "mean_test_mse": 1.0,
+                "mean_support_f1": 0.9,
+                "mean_pairwise_jaccard": 0.8,
+            },
+            {
+                "scenario_name": "s2",
+                "difficulty": "hard",
+                "method_name": "m1",
+                "mean_test_mse": 2.0,
+                "mean_support_f1": 0.4,
+                "mean_pairwise_jaccard": 0.3,
+            },
+            {
+                "scenario_name": "s2",
+                "difficulty": "hard",
+                "method_name": "m2",
+                "mean_test_mse": 1.5,
+                "mean_support_f1": 0.6,
+                "mean_pairwise_jaccard": 0.5,
+            },
+        ]
+    }
+    md = build_dominance_markdown(payload)
+    assert "m1" in md
+    assert "m2" in md
+    # For pairwise counts, only shared scenarios should contribute.
+    assert "| m1 | - | 0 |" in md
+    assert "| m2 | 1 | - |" in md
