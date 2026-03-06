@@ -156,6 +156,9 @@ def _validate_cv_state_target(
     data: CrossValGramData,
     *,
     selector_name: str,
+    solver_policy: str | None = None,
+    ridge_alpha: float | None = None,
+    pinv_rcond: float | None = None,
 ) -> CrossValSelectionState | None:
     if state is None:
         return None
@@ -165,6 +168,21 @@ def _validate_cv_state_target(
         )
     if state.data is not data:
         raise ValueError(f"{selector_name} requires `state.data` to match `data`.")
+    if solver_policy is not None and state.solver_policy != solver_policy:
+        raise ValueError(
+            f"{selector_name} requires `state.solver_policy` to match the selector "
+            f"(`{state.solver_policy}` != `{solver_policy}`)."
+        )
+    if ridge_alpha is not None and float(state.ridge_alpha) != float(ridge_alpha):
+        raise ValueError(
+            f"{selector_name} requires `state.ridge_alpha` to match the selector "
+            f"({state.ridge_alpha} != {ridge_alpha})."
+        )
+    if pinv_rcond is not None and float(state.pinv_rcond) != float(pinv_rcond):
+        raise ValueError(
+            f"{selector_name} requires `state.pinv_rcond` to match the selector "
+            f"({state.pinv_rcond} != {pinv_rcond})."
+        )
     return state
 
 
