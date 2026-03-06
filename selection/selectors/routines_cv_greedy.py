@@ -43,7 +43,12 @@ class CrossValForwardSelection(_BaseCrossValSelection):
         max_steps: int | None = None,
     ) -> CrossValSelectionState:
         result_state = _validate_cv_state_target(
-            state, data, selector_name=type(self).__name__
+            state,
+            data,
+            selector_name=type(self).__name__,
+            solver_policy=self.solver_policy,
+            ridge_alpha=self.ridge_alpha,
+            pinv_rcond=self.pinv_rcond,
         )
         if result_state is not None and result_state.active_set:
             raise ValueError("CrossValForwardSelection does not support warm starts.")
@@ -123,7 +128,12 @@ class CrossValBackwardSelection(_BaseCrossValSelection):
         max_steps: int | None = None,
     ) -> CrossValSelectionState:
         result_state = _validate_cv_state_target(
-            state, data, selector_name=type(self).__name__
+            state,
+            data,
+            selector_name=type(self).__name__,
+            solver_policy=self.solver_policy,
+            ridge_alpha=self.ridge_alpha,
+            pinv_rcond=self.pinv_rcond,
         )
         if result_state is not None and result_state.active_set:
             raise ValueError("CrossValBackwardSelection does not support warm starts.")
@@ -207,7 +217,12 @@ class CrossValMixedSelection(_BaseCrossValSelection):
         max_total_steps: int | None = None,
     ) -> CrossValSelectionState:
         result_state = _validate_cv_state_target(
-            state, data, selector_name=type(self).__name__
+            state,
+            data,
+            selector_name=type(self).__name__,
+            solver_policy=self.solver_policy,
+            ridge_alpha=self.ridge_alpha,
+            pinv_rcond=self.pinv_rcond,
         )
         if result_state is not None and result_state.active_set:
             raise ValueError("CrossValMixedSelection does not support warm starts.")

@@ -117,6 +117,22 @@ CV_SELECTOR_STATE_CONTRACT_CASES = [
 ]
 
 
+CV_SELECTOR_SOLVER_COMPAT_CASES = [
+    pytest.param(
+        CrossValBackwardSelection,
+        {"criterion": BestRSSCriterion},
+        {"max_steps": 0},
+        id="cv_backward",
+    ),
+    pytest.param(
+        BeamCrossValBackwardSelection,
+        {"criterion": BestRSSCriterion, "beam_width": 2},
+        {"max_steps": 0},
+        id="cv_beam_backward",
+    ),
+]
+
+
 @pytest.mark.parametrize(
     "selector_cls,selector_kwargs,fit_kwargs", CV_SELECTOR_STATE_CONTRACT_CASES
 )
@@ -151,6 +167,68 @@ def test_cv_selector_reuses_matching_state(
     assert result.active_set == expected.active_set
     np.testing.assert_allclose(result.beta, expected.beta, atol=1e-8, rtol=1e-8)
     assert result.rss_cv == pytest.approx(expected.rss_cv, rel=1e-8, abs=1e-8)
+
+
+@pytest.mark.parametrize(
+    "selector_cls,selector_kwargs,fit_kwargs", CV_SELECTOR_SOLVER_COMPAT_CASES
+)
+def test_cv_selector_rejects_mismatched_state_solver_policy(
+    selector_cls, selector_kwargs, fit_kwargs
+):
+    cv_data = make_cv_problem(seed=334)
+    state = CrossValSelectionState(cv_data, solver_policy="strict")
+
+    selector = selector_cls(
+        **selector_kwargs,
+        solver_policy="ridge",
+        ridge_alpha=1e-6,
+    )
+    with pytest.raises(ValueError, match=r"state\.solver_policy"):
+        selector.fit(state=state, data=cv_data, **fit_kwargs)
+
+
+@pytest.mark.parametrize(
+    "selector_cls,selector_kwargs,fit_kwargs", CV_SELECTOR_SOLVER_COMPAT_CASES
+)
+def test_cv_selector_rejects_mismatched_state_ridge_alpha(
+    selector_cls, selector_kwargs, fit_kwargs
+):
+    cv_data = make_cv_problem(seed=335)
+    state = CrossValSelectionState(
+        cv_data,
+        solver_policy="ridge",
+        ridge_alpha=1e-3,
+    )
+
+    selector = selector_cls(
+        **selector_kwargs,
+        solver_policy="ridge",
+        ridge_alpha=1e-6,
+    )
+    with pytest.raises(ValueError, match=r"state\.ridge_alpha"):
+        selector.fit(state=state, data=cv_data, **fit_kwargs)
+
+
+@pytest.mark.parametrize(
+    "selector_cls,selector_kwargs,fit_kwargs", CV_SELECTOR_SOLVER_COMPAT_CASES
+)
+def test_cv_selector_rejects_mismatched_state_pinv_rcond(
+    selector_cls, selector_kwargs, fit_kwargs
+):
+    cv_data = make_cv_problem(seed=336)
+    state = CrossValSelectionState(
+        cv_data,
+        solver_policy="pinv",
+        pinv_rcond=1e-6,
+    )
+
+    selector = selector_cls(
+        **selector_kwargs,
+        solver_policy="pinv",
+        pinv_rcond=1e-10,
+    )
+    with pytest.raises(ValueError, match=r"state\.pinv_rcond"):
+        selector.fit(state=state, data=cv_data, **fit_kwargs)
 
 
 CV_SELECTOR_VALIDATION_CASES = [

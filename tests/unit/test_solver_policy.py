@@ -4,7 +4,7 @@ import pytest
 from selection.criteria import BestRSSCriterion
 from selection import CrossValGramData, GramData
 from selection import BackwardSelection, CrossValBackwardSelection, ForwardSelection
-from selection import SelectionState
+from selection import CrossValSelectionState, SelectionState
 
 
 def _make_rank_deficient_data() -> GramData:
@@ -77,6 +77,18 @@ def test_cv_backward_selection_non_strict_handles_singular_full_active_set(
     result = selector.fit(data=data, max_steps=1)
     assert np.isfinite(result.beta).all()
     assert np.isfinite(result.rss_cv)
+
+
+def test_cv_backward_selection_rejects_mismatched_state_solver_policy():
+    data = _make_rank_deficient_cv_data()
+    selector = CrossValBackwardSelection(
+        solver_policy="ridge",
+        ridge_alpha=1e-6,
+        pinv_rcond=1e-10,
+    )
+    strict_state = CrossValSelectionState(data, solver_policy="strict")
+    with pytest.raises(ValueError, match=r"state\.solver_policy"):
+        selector.fit(state=strict_state, data=data, max_steps=0)
 
 
 @pytest.mark.parametrize(
