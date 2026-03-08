@@ -62,7 +62,12 @@ Backward downdate:
 - Candidate feature order is ascending index order.
 - Criterion object determines best candidate from score arrays.
 - Default criterion implementations use NumPy `argmin`/`argmax`, so exact ties choose the first candidate in order.
-- A step is accepted only if `criterion.is_improvement(...)` passes tolerance checks.
+- Forward-like selectors are budget-driven by default:
+  - forward selectors require `max_steps`
+  - mixed selectors require `max_forward_steps`
+  - once a valid best candidate exists, it is accepted even if the criterion worsens
+- Legacy forward self-stopping remains available with `stop_on_no_improvement=True`; in that mode a step is accepted only if `criterion.is_improvement(...)` passes tolerance checks.
+- Backward selectors and mixed backward cleanup remain improvement-driven.
 
 ## Cross-Validation Contract
 - Fold supports are kept synchronized across folds.

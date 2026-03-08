@@ -69,7 +69,7 @@ from selection import GramData
 from selection import ForwardSelection
 
 data = GramData(gram, cov, y_norm, n_samples)
-state = ForwardSelection().fit(data=data)
+state = ForwardSelection().fit(data=data, max_steps=5)
 print(state.active_set, state.beta, state.rss)
 ```
 
@@ -79,7 +79,7 @@ Pass feature groups as lists of indices:
 from selection import GroupForwardSelection
 
 groups = [[0, 1], [2, 3]]  # add/remove as units
-gstate = GroupForwardSelection(groups).fit(data=data)
+gstate = GroupForwardSelection(groups).fit(data=data, max_steps=2)
 print(gstate.active_groups, gstate.active_set, gstate.beta, gstate.rss)
 ```
 
@@ -94,6 +94,9 @@ print(gstate.active_groups, gstate.active_set, gstate.beta, gstate.rss)
 - Selector constructors accept `criterion` (string key, class, instance, or factory). Built-in keys: `rss`, `aic`, `aicc`, `bic`, `hqic`, `ebic`, `gcv`.
 - CV selectors accept `cv_aggregation` with options `sum_rss` (default), `mean_mse`, and `median_mse`.
 - CV selectors reject criteria with `cv_compatible=False` to avoid double regularization on top of held-out RSS.
+- Forward-like selectors are budget-driven by default: pass `max_steps` (or `max_forward_steps` for mixed selectors).
+- Legacy forward self-stopping is still available with `stop_on_no_improvement=True`.
+- Backward selectors and mixed backward cleanup remain improvement-driven.
 - Backward beam selectors are improvement-only by default; set `allow_worse=True` to force removals under a step budget.
 - Selector hyperparameters are validated strictly (fail-fast): no implicit coercion for `beam_width`, `allow_worse`, step budgets, or `tol`.
 - `SelectionState.block_size` (forward-candidate block evaluation size) must be a positive integer; non-positive values raise a contract error before scoring.
@@ -125,7 +128,7 @@ print(gstate.active_groups, gstate.active_set, gstate.beta, gstate.rss)
   - `mean_mse`: mean fold validation MSE
   - `median_mse`: median fold validation MSE
   `CrossValSelectionState.rss_cv` remains reported on summed-RSS scale, and `CrossValSelectionState.beta` is a post-selection refit on full aggregated data (not fold-averaged coefficients).
-- Improvement checks use absolute+relative tolerances. Very small numerical differences can intentionally stop additional steps.
+- Improvement checks use absolute+relative tolerances. They gate backward moves and legacy forward self-stop mode (`stop_on_no_improvement=True`), but not the default budget-driven forward path.
 - Grouped routines require disjoint groups with integer feature indices; selected support is the union of complete groups (`GroupedSelectionState.active_set`).
 
 ## Reproducibility Guidance
