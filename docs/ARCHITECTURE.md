@@ -20,6 +20,11 @@ where to extend behavior safely.
 3. Run `fit(...)` to produce state (`SelectionState`, `CrossValSelectionState`, `GroupedSelectionState`).
 4. Consume state fields (`active_set`, `beta`, `rss`/`rss_cv`) in downstream pipelines.
 
+Selector control-flow note:
+- Forward-like selectors are budget-driven by default and require explicit forward budgets.
+- `stop_on_no_improvement=True` restores the legacy forward self-stop behavior.
+- Backward selectors and mixed backward cleanup remain improvement-driven.
+
 Key design principle:
 - Boundary components validate aggressively.
 - Internal kernels assume validated inputs and focus on numerical updates.

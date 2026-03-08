@@ -18,6 +18,10 @@ from ..validation.selector_validation import _validate_state_target
 from .routines_greedy import ForwardSelection
 from ..core.incremental_solver import IncrementalSolver
 from ..core.state_single import SelectionState
+from .forward_budget_policy import (
+    resolve_forward_budget,
+    should_accept_forward_candidate,
+)
 from .topk import topk_indices
 
 
@@ -35,7 +39,12 @@ class Beam:
     def signature(self) -> frozenset[int]:
         return self._signature
 
-def _beam_forward_children(beam: Beam, beam_width: int) -> list[Beam]:
+def _beam_forward_children(
+    beam: Beam,
+    beam_width: int,
+    *,
+    stop_on_no_improvement: bool,
+) -> list[Beam]:
     scored = beam.state.candidate_scores()
     if scored is None:
         return []
@@ -45,7 +54,12 @@ def _beam_forward_children(beam: Beam, beam_width: int) -> list[Beam]:
     children: list[Beam] = []
     for idx in order:
         candidate_score = float(crit_scores[idx])
-        if not beam.criterion.is_improvement(candidate_score, beam.score):
+        if not should_accept_forward_candidate(
+            criterion=beam.criterion,
+            candidate_score=candidate_score,
+            incumbent_score=beam.score,
+            stop_on_no_improvement=stop_on_no_improvement,
+        ):
             continue
         feat_idx = int(cand_idx[idx])
         child_state = beam.state.clone()
@@ -116,7 +130,12 @@ class BeamForwardSelection(ForwardSelection):
         if result_state is not None and result_state.active_set:
             raise ValueError("BeamForwardSelection does not support warm starts.")
 
-        max_steps = validate_optional_non_negative_int(max_steps, name="max_steps")
+        max_steps = resolve_forward_budget(
+            budget=max_steps,
+            budget_name="max_steps",
+            selector_name=type(self).__name__,
+            stop_on_no_improvement=self.stop_on_no_improvement,
+        )
         criterion = self._init_criterion(data)
         initial = Beam(
             IncrementalSolver.create(
@@ -135,7 +154,13 @@ class BeamForwardSelection(ForwardSelection):
         while beams and (max_steps is None or steps < max_steps):
             candidates: list[Beam] = []
             for beam in beams:
-                candidates.extend(_beam_forward_children(beam, self.beam_width))
+                candidates.extend(
+                    _beam_forward_children(
+                        beam,
+                        self.beam_width,
+                        stop_on_no_improvement=self.stop_on_no_improvement,
+                    )
+                )
 
             if not candidates:
                 break
@@ -257,8 +282,11 @@ class BeamMixedSelection(ForwardSelection):
         if result_state is not None and result_state.active_set:
             raise ValueError("BeamMixedSelection does not support warm starts.")
 
-        max_forward_steps = validate_optional_non_negative_int(
-            max_forward_steps, name="max_forward_steps"
+        max_forward_steps = resolve_forward_budget(
+            budget=max_forward_steps,
+            budget_name="max_forward_steps",
+            selector_name=type(self).__name__,
+            stop_on_no_improvement=self.stop_on_no_improvement,
         )
         max_total_steps = validate_optional_non_negative_int(
             max_total_steps, name="max_total_steps"
@@ -288,7 +316,13 @@ class BeamMixedSelection(ForwardSelection):
                 break
             candidates: list[Beam] = []
             for beam in beams:
-                candidates.extend(_beam_forward_children(beam, self.beam_width))
+                candidates.extend(
+                    _beam_forward_children(
+                        beam,
+                        self.beam_width,
+                        stop_on_no_improvement=self.stop_on_no_improvement,
+                    )
+                )
             if not candidates:
                 break
             beams = prune_unique_beams(candidates, self.beam_width)

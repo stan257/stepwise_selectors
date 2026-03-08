@@ -6,9 +6,13 @@ from selection import GroupForwardSelection
 import selection as routines
 from selection import (
     BackwardSelection,
+    BeamCrossValForwardSelection,
     BeamBackwardSelection,
     BeamCrossValBackwardSelection,
     BeamCrossValMixedSelection,
+    BeamForwardSelection,
+    BeamMixedSelection,
+    CrossValMixedSelection,
     CrossValForwardSelection,
     ForwardSelection,
     MixedSelection,
@@ -33,8 +37,139 @@ CV_STEP_SELECTORS = [
 
 MIXED_SELECTORS = [
     pytest.param(lambda: MixedSelection(), "non_cv", id="mixed"),
+    pytest.param(lambda: BeamMixedSelection(beam_width=2), "non_cv", id="beam_mixed"),
+    pytest.param(lambda: CrossValMixedSelection(), "cv", id="cv_mixed"),
     pytest.param(
         lambda: BeamCrossValMixedSelection(beam_width=2), "cv", id="cv_beam_mixed"
+    ),
+]
+
+FORWARD_REQUIRED_BUDGET_CASES = [
+    pytest.param(
+        lambda: ForwardSelection(),
+        lambda: make_regression_gram(210, n=80, p=8),
+        {},
+        r"ForwardSelection defaults to budget-driven search; max_steps is required",
+        id="forward",
+    ),
+    pytest.param(
+        lambda: BeamForwardSelection(beam_width=2),
+        lambda: make_regression_gram(211, n=80, p=8),
+        {},
+        r"BeamForwardSelection defaults to budget-driven search; max_steps is required",
+        id="beam_forward",
+    ),
+    pytest.param(
+        lambda: CrossValForwardSelection(),
+        lambda: make_cv_problem(seed=212, folds=3, n=80, p=8),
+        {},
+        r"CrossValForwardSelection defaults to budget-driven search; max_steps is required",
+        id="cv_forward",
+    ),
+    pytest.param(
+        lambda: BeamCrossValForwardSelection(beam_width=2),
+        lambda: make_cv_problem(seed=213, folds=3, n=80, p=8),
+        {},
+        r"BeamCrossValForwardSelection defaults to budget-driven search; max_steps is required",
+        id="cv_beam_forward",
+    ),
+    pytest.param(
+        lambda: MixedSelection(),
+        lambda: make_regression_gram(214, n=80, p=8),
+        {},
+        r"MixedSelection defaults to budget-driven search; max_forward_steps is required",
+        id="mixed",
+    ),
+    pytest.param(
+        lambda: BeamMixedSelection(beam_width=2),
+        lambda: make_regression_gram(215, n=80, p=8),
+        {},
+        r"BeamMixedSelection defaults to budget-driven search; max_forward_steps is required",
+        id="beam_mixed",
+    ),
+    pytest.param(
+        lambda: CrossValMixedSelection(),
+        lambda: make_cv_problem(seed=216, folds=3, n=80, p=8),
+        {},
+        r"CrossValMixedSelection defaults to budget-driven search; max_forward_steps is required",
+        id="cv_mixed",
+    ),
+    pytest.param(
+        lambda: BeamCrossValMixedSelection(beam_width=2),
+        lambda: make_cv_problem(seed=217, folds=3, n=80, p=8),
+        {},
+        r"BeamCrossValMixedSelection defaults to budget-driven search; max_forward_steps is required",
+        id="cv_beam_mixed",
+    ),
+    pytest.param(
+        lambda: GroupForwardSelection([[0], [1], [2], [3]]),
+        lambda: make_regression_gram(218, n=80, p=4),
+        {},
+        r"GroupForwardSelection defaults to budget-driven search; max_steps is required",
+        id="group_forward",
+    ),
+]
+
+LEGACY_FORWARD_NO_BUDGET_CASES = [
+    pytest.param(
+        lambda: ForwardSelection(stop_on_no_improvement=True),
+        lambda: make_regression_gram(310, n=80, p=8),
+        {},
+        id="forward",
+    ),
+    pytest.param(
+        lambda: BeamForwardSelection(beam_width=2, stop_on_no_improvement=True),
+        lambda: make_regression_gram(311, n=80, p=8),
+        {},
+        id="beam_forward",
+    ),
+    pytest.param(
+        lambda: CrossValForwardSelection(stop_on_no_improvement=True),
+        lambda: make_cv_problem(seed=312, folds=3, n=80, p=8),
+        {},
+        id="cv_forward",
+    ),
+    pytest.param(
+        lambda: BeamCrossValForwardSelection(
+            beam_width=2, stop_on_no_improvement=True
+        ),
+        lambda: make_cv_problem(seed=313, folds=3, n=80, p=8),
+        {},
+        id="cv_beam_forward",
+    ),
+    pytest.param(
+        lambda: MixedSelection(stop_on_no_improvement=True),
+        lambda: make_regression_gram(314, n=80, p=8),
+        {"max_total_steps": 6},
+        id="mixed",
+    ),
+    pytest.param(
+        lambda: BeamMixedSelection(beam_width=2, stop_on_no_improvement=True),
+        lambda: make_regression_gram(315, n=80, p=8),
+        {"max_total_steps": 6},
+        id="beam_mixed",
+    ),
+    pytest.param(
+        lambda: CrossValMixedSelection(stop_on_no_improvement=True),
+        lambda: make_cv_problem(seed=316, folds=3, n=80, p=8),
+        {"max_total_steps": 6},
+        id="cv_mixed",
+    ),
+    pytest.param(
+        lambda: BeamCrossValMixedSelection(
+            beam_width=2, stop_on_no_improvement=True
+        ),
+        lambda: make_cv_problem(seed=317, folds=3, n=80, p=8),
+        {"max_total_steps": 6},
+        id="cv_beam_mixed",
+    ),
+    pytest.param(
+        lambda: GroupForwardSelection(
+            [[0], [1], [2], [3]], stop_on_no_improvement=True
+        ),
+        lambda: make_regression_gram(318, n=80, p=4),
+        {},
+        id="group_forward",
     ),
 ]
 
@@ -59,6 +194,32 @@ def test_cv_step_selectors_reject_invalid_max_steps():
             selector.fit(data=data, max_steps=-1)
         with pytest.raises(TypeError, match="max_steps must be an integer or None"):
             selector.fit(data=data, max_steps=True)
+
+
+@pytest.mark.parametrize(
+    "selector_factory,data_factory,fit_kwargs,match",
+    FORWARD_REQUIRED_BUDGET_CASES,
+)
+def test_forward_like_selectors_require_budget_by_default(
+    selector_factory, data_factory, fit_kwargs, match
+):
+    selector = selector_factory()
+    data = data_factory()
+    with pytest.raises(ValueError, match=match):
+        selector.fit(data=data, **fit_kwargs)
+
+
+@pytest.mark.parametrize(
+    "selector_factory,data_factory,fit_kwargs",
+    LEGACY_FORWARD_NO_BUDGET_CASES,
+)
+def test_forward_like_selectors_allow_legacy_no_budget(
+    selector_factory, data_factory, fit_kwargs
+):
+    selector = selector_factory()
+    data = data_factory()
+    state = selector.fit(data=data, **fit_kwargs)
+    assert state is not None
 
 
 @pytest.mark.parametrize("selector_factory,kind", MIXED_SELECTORS)
@@ -123,6 +284,51 @@ def test_backward_selectors_reject_non_bool_allow_worse(selector_cls, kwargs):
 )
 def test_selectors_reject_invalid_tol(selector_factory):
     with pytest.raises((TypeError, ValueError), match="tol must"):
+        selector_factory()
+
+
+@pytest.mark.parametrize(
+    "selector_factory",
+    [
+        pytest.param(lambda: ForwardSelection(stop_on_no_improvement=1), id="forward"),
+        pytest.param(
+            lambda: BeamForwardSelection(beam_width=2, stop_on_no_improvement="yes"),
+            id="beam_forward",
+        ),
+        pytest.param(
+            lambda: CrossValForwardSelection(stop_on_no_improvement=1),
+            id="cv_forward",
+        ),
+        pytest.param(
+            lambda: BeamCrossValForwardSelection(
+                beam_width=2, stop_on_no_improvement="yes"
+            ),
+            id="cv_beam_forward",
+        ),
+        pytest.param(lambda: MixedSelection(stop_on_no_improvement=1), id="mixed"),
+        pytest.param(
+            lambda: BeamMixedSelection(beam_width=2, stop_on_no_improvement="yes"),
+            id="beam_mixed",
+        ),
+        pytest.param(
+            lambda: CrossValMixedSelection(stop_on_no_improvement=1), id="cv_mixed"
+        ),
+        pytest.param(
+            lambda: BeamCrossValMixedSelection(
+                beam_width=2, stop_on_no_improvement="yes"
+            ),
+            id="cv_beam_mixed",
+        ),
+        pytest.param(
+            lambda: GroupForwardSelection([[0], [1]], stop_on_no_improvement="yes"),
+            id="group_forward",
+        ),
+    ],
+)
+def test_forward_like_selectors_reject_non_bool_stop_on_no_improvement(
+    selector_factory,
+):
+    with pytest.raises(TypeError, match="stop_on_no_improvement must be a bool"):
         selector_factory()
 
 

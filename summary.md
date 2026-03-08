@@ -126,7 +126,12 @@ The implementation is split by responsibility:
 
 Important behavior:
 - CV candidate scoring uses summed fold validation RSS (same scale as `rss_cv`).
+- Forward-like selectors are budget-driven by default:
+  - pass `max_steps` for forward selectors,
+  - pass `max_forward_steps` for mixed selectors.
+- `stop_on_no_improvement=True` restores the legacy improvement-gated forward stop rule.
 - `BeamCrossValBackwardSelection` is improvement-only by default; `allow_worse=True` enables forced removals.
+- Backward selectors and mixed backward cleanup remain improvement-driven.
 - Beam pruning deduplicates by active-set signatures (`frozenset[int]` support keys).
 - Rebuilds from active set are used after accepted moves to limit numerical drift.
 - Warm starts are intentionally disallowed for beam/CV selectors where state reconstruction assumptions are strict.

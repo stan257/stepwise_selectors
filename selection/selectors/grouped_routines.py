@@ -13,12 +13,14 @@ from ..core.definitions import GramData
 from ..core.incremental_solver import IncrementalSolver
 from ..validation.interface_validation import (
     validate_choice,
+    validate_bool,
     validate_non_negative_finite_float,
     validate_optional_non_negative_int,
     validate_positive_finite_float,
 )
 from ..validation.selector_validation import _resolve_criterion
 from ..core.state_single import GroupedSelectionState
+from .forward_budget_policy import resolve_forward_budget
 
 
 def _normalize_group_feature_index(feat: int) -> int:
@@ -101,8 +103,9 @@ def _select_best_group_move(
     groups: Sequence[Sequence[int]],
     criterion: CriterionProtocol,
     apply_group_move: Callable[[IncrementalSolver, Sequence[int]], None],
+    stop_on_no_improvement: bool = True,
 ) -> tuple[int | None, float | None, IncrementalSolver | None]:
-    """Evaluate candidate group moves and return the best improving move."""
+    """Evaluate candidate group moves and return the best valid move."""
     best_group = None
     best_candidate_score = None
     best_candidate_state = None
@@ -116,10 +119,12 @@ def _select_best_group_move(
         score_cand = float(
             np.asarray(criterion.evaluate(candidate_state.rss, candidate_state.k))
         )
-        if not criterion.is_improvement(score_cand):
+        if stop_on_no_improvement and not criterion.is_improvement(score_cand):
             continue
-        if best_candidate_score is None or criterion.is_improvement(
-            score_cand, best_candidate_score
+        if best_candidate_score is None or (
+            score_cand < best_candidate_score
+            if criterion.minimize
+            else score_cand > best_candidate_score
         ):
             best_group = g
             best_candidate_score = score_cand
@@ -193,10 +198,21 @@ class BaseGroupedSelection:
 class GroupForwardSelection(BaseGroupedSelection):
     """Greedy forward selection over groups using Gram-only updates."""
 
+    def __init__(self, groups: Sequence[Sequence[int]], *, stop_on_no_improvement: bool = False, **kwargs):
+        super().__init__(groups, **kwargs)
+        self.stop_on_no_improvement = validate_bool(
+            stop_on_no_improvement, name="stop_on_no_improvement"
+        )
+
     def fit(
         self, *, data: GramData, max_steps: int | None = None
     ) -> GroupedSelectionState:
-        max_steps = validate_optional_non_negative_int(max_steps, name="max_steps")
+        max_steps = resolve_forward_budget(
+            budget=max_steps,
+            budget_name="max_steps",
+            selector_name=type(self).__name__,
+            stop_on_no_improvement=self.stop_on_no_improvement,
+        )
         _validate_group_feature_bounds(self.groups, data.gram.shape[0])
         criterion = self._init_criterion(data)
         active: list[int] = []
@@ -220,6 +236,7 @@ class GroupForwardSelection(BaseGroupedSelection):
                     groups=self.groups,
                     criterion=criterion,
                     apply_group_move=_apply_group_forward,
+                    stop_on_no_improvement=self.stop_on_no_improvement,
                 )
             )
 
@@ -272,6 +289,7 @@ class GroupBackwardSelection(BaseGroupedSelection):
                     groups=self.groups,
                     criterion=criterion,
                     apply_group_move=_apply_group_backward,
+                    stop_on_no_improvement=True,
                 )
             )
 

@@ -20,6 +20,12 @@ These are responsible for type/shape/range/schema checks:
 
 Boundary misuse should raise clear `TypeError`/`ValueError`.
 
+Forward-like selector boundary contract:
+- `ForwardSelection`, `BeamForwardSelection`, `CrossValForwardSelection`, `BeamCrossValForwardSelection`, and `GroupForwardSelection` require explicit `max_steps` by default.
+- `MixedSelection`, `BeamMixedSelection`, `CrossValMixedSelection`, and `BeamCrossValMixedSelection` require explicit `max_forward_steps` by default.
+- `stop_on_no_improvement=True` restores the legacy forward self-stopping behavior and allows omitted forward budgets.
+- Backward-only selectors are unchanged.
+
 ## Internal Components (assume valid inputs)
 
 These primarily assume contract-satisfying inputs:

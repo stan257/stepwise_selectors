@@ -117,7 +117,9 @@ def test_information_criteria_choose_expected_size_on_diagonal():
         expected_k = int(np.argmin(values))
 
         state = ForwardSelection(
-            criterion=crit_cls, criterion_kwargs=kwargs
+            criterion=crit_cls,
+            criterion_kwargs=kwargs,
+            stop_on_no_improvement=True,
         ).fit(data=data, max_steps=p)
 
         assert len(state.active_set) == expected_k
@@ -137,7 +139,7 @@ def test_mixed_selection_matches_exhaustive_aic_on_diagonal():
     n_samples = 100
 
     data = GramData(gram, cov, y_norm, n_samples)
-    mixed_state = MixedSelection().fit(data=data)
+    mixed_state = MixedSelection(stop_on_no_improvement=True).fit(data=data)
 
     best_aic = None
     best_sets = []

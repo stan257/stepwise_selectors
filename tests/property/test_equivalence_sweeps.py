@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from selection.criteria import BestRSSCriterion
-from selection import GramData
+from selection import CrossValGramData, GramData
 from selection import (
     BackwardSelection,
     BeamBackwardSelection,
@@ -52,6 +52,30 @@ def _assert_cv_states_match(lhs, rhs) -> None:
     assert lhs.active_set == rhs.active_set
     np.testing.assert_allclose(lhs.beta, rhs.beta, atol=1e-8, rtol=1e-8)
     assert lhs.rss_cv == pytest.approx(rhs.rss_cv, rel=1e-8, abs=1e-8)
+
+
+def _make_strong_signal_diagonal_problem(p: int = 8, n_samples: int = 80) -> GramData:
+    cov = np.linspace(3.0, 1.6, num=p)
+    gram = np.eye(p)
+    y_norm = float(np.sum(cov**2) + 5.0)
+    return GramData(gram, cov, y_norm, n_samples)
+
+
+def _make_strong_signal_cv_problem(
+    p: int = 8, n_samples: int = 80, folds: int = 3
+):
+    base = _make_strong_signal_diagonal_problem(p=p, n_samples=n_samples)
+    fold_data = [
+        GramData(
+            base.gram.copy(),
+            base.cov.copy(),
+            base.y_norm,
+            base.n_samples,
+            warn_if_uncentered=False,
+        )
+        for _ in range(folds)
+    ]
+    return CrossValGramData(fold_data)
 
 
 @pytest.mark.parametrize("seed", [0, 1])
@@ -260,3 +284,121 @@ def test_cv_beam_mixed_budget_matches_greedy_when_width_one(
         max_total_steps=max_total_steps,
     )
     _assert_cv_states_match(beam, greedy)
+
+
+@pytest.mark.parametrize(
+    "selector_factory,fit_kwargs",
+    [
+        pytest.param(
+            lambda stop=False: ForwardSelection(
+                criterion=BestRSSCriterion,
+                stop_on_no_improvement=stop,
+            ),
+            {"max_steps": 3},
+            id="forward",
+        ),
+        pytest.param(
+            lambda stop=False: BeamForwardSelection(
+                beam_width=2,
+                criterion=BestRSSCriterion,
+                stop_on_no_improvement=stop,
+            ),
+            {"max_steps": 3},
+            id="beam_forward",
+        ),
+        pytest.param(
+            lambda stop=False: MixedSelection(
+                criterion=BestRSSCriterion,
+                stop_on_no_improvement=stop,
+            ),
+            {"max_forward_steps": 3, "max_total_steps": 3},
+            id="mixed",
+        ),
+        pytest.param(
+            lambda stop=False: BeamMixedSelection(
+                beam_width=2,
+                criterion=BestRSSCriterion,
+                stop_on_no_improvement=stop,
+            ),
+            {"max_forward_steps": 3, "max_total_steps": 3},
+            id="beam_mixed",
+        ),
+    ],
+)
+def test_single_dataset_budget_mode_matches_legacy_when_steps_improve(
+    selector_factory, fit_kwargs
+):
+    data = _make_strong_signal_diagonal_problem()
+
+    budget = selector_factory().fit(data=data, **fit_kwargs)
+    legacy = selector_factory(stop=True).fit(data=data, **fit_kwargs)
+
+    _assert_states_match(budget, legacy)
+
+
+def test_group_budget_mode_matches_legacy_when_steps_improve():
+    data = _make_strong_signal_diagonal_problem(p=6)
+    groups = [[idx] for idx in range(6)]
+
+    budget = GroupForwardSelection(groups, criterion=BestRSSCriterion).fit(
+        data=data, max_steps=3
+    )
+    legacy = GroupForwardSelection(
+        groups,
+        criterion=BestRSSCriterion,
+        stop_on_no_improvement=True,
+    ).fit(data=data, max_steps=3)
+
+    assert budget.active_groups == legacy.active_groups
+    _assert_group_state_consistent(budget, data, groups)
+    _assert_group_state_consistent(legacy, data, groups)
+
+
+@pytest.mark.parametrize(
+    "selector_factory,fit_kwargs",
+    [
+        pytest.param(
+            lambda stop=False: CrossValForwardSelection(
+                criterion=BestRSSCriterion,
+                stop_on_no_improvement=stop,
+            ),
+            {"max_steps": 3},
+            id="cv_forward",
+        ),
+        pytest.param(
+            lambda stop=False: BeamCrossValForwardSelection(
+                beam_width=2,
+                criterion=BestRSSCriterion,
+                stop_on_no_improvement=stop,
+            ),
+            {"max_steps": 3},
+            id="cv_beam_forward",
+        ),
+        pytest.param(
+            lambda stop=False: CrossValMixedSelection(
+                criterion=BestRSSCriterion,
+                stop_on_no_improvement=stop,
+            ),
+            {"max_forward_steps": 3, "max_total_steps": 3},
+            id="cv_mixed",
+        ),
+        pytest.param(
+            lambda stop=False: BeamCrossValMixedSelection(
+                beam_width=2,
+                criterion=BestRSSCriterion,
+                stop_on_no_improvement=stop,
+            ),
+            {"max_forward_steps": 3, "max_total_steps": 3},
+            id="cv_beam_mixed",
+        ),
+    ],
+)
+def test_cv_budget_mode_matches_legacy_when_steps_improve(
+    selector_factory, fit_kwargs
+):
+    cv_data = _make_strong_signal_cv_problem()
+
+    budget = selector_factory().fit(data=cv_data, **fit_kwargs)
+    legacy = selector_factory(stop=True).fit(data=cv_data, **fit_kwargs)
+
+    _assert_cv_states_match(budget, legacy)
