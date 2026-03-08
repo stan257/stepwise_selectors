@@ -292,11 +292,15 @@ def test_mixed_selection_improves_over_pure_forward():
     data = GramData(X.T @ X, X.T @ y, y @ y, n_samples)
 
     # Pure forward with AIC.
-    forward_state = ForwardSelection(criterion=AICCriterion).fit(data=data)
+    forward_state = ForwardSelection(
+        criterion=AICCriterion, stop_on_no_improvement=True
+    ).fit(data=data)
 
     # Mixed with AIC: backward refinement after each forward step can remove
     # features that became redundant, allowing a strictly better model.
-    mixed_state = MixedSelection(criterion=AICCriterion).fit(
+    mixed_state = MixedSelection(
+        criterion=AICCriterion, stop_on_no_improvement=True
+    ).fit(
         data=data, max_total_steps=30
     )
 

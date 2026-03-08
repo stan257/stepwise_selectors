@@ -12,8 +12,16 @@ from tests.integration._selection_routines_helpers import (
 )
 
 
+def make_non_improving_aic_problem():
+    gram = np.eye(2)
+    cov = np.array([3.0, 0.1])
+    y_norm = 10.0
+    n_samples = 10
+    return GramData(gram, cov, y_norm, n_samples)
+
+
 def test_forward_selects_strongest_variable(small_problem):
-    state = ForwardSelection().fit(data=small_problem)
+    state = ForwardSelection().fit(data=small_problem, max_steps=1)
 
     assert state.active_set == [0]
     assert np.isclose(state.beta[0], 0.95, atol=1e-6)
@@ -27,7 +35,9 @@ def test_backward_prunes_to_best_single_variable(small_problem):
 
 
 def test_forward_with_best_rss_matches_standard(small_problem):
-    state = ForwardSelection(criterion=BestRSSCriterion).fit(data=small_problem)
+    state = ForwardSelection(criterion=BestRSSCriterion).fit(
+        data=small_problem, max_steps=2
+    )
 
     assert set(state.active_set) == {0, 1}
     np.testing.assert_allclose(
@@ -113,6 +123,30 @@ def test_mixed_selection_matches_direct_solution():
     assert pytest.approx(state.rss, rel=1e-8, abs=1e-8) == rss_expected
 
 
+def test_forward_budget_mode_continues_through_non_improving_step():
+    data = make_non_improving_aic_problem()
+
+    budget_state = ForwardSelection().fit(data=data, max_steps=2)
+    legacy_state = ForwardSelection(stop_on_no_improvement=True).fit(data=data)
+
+    assert budget_state.active_set == [0, 1]
+    assert legacy_state.active_set == [0]
+
+
+def test_mixed_budget_mode_continues_through_non_improving_forward_step():
+    data = make_non_improving_aic_problem()
+
+    budget_state = MixedSelection().fit(
+        data=data, max_forward_steps=2, max_total_steps=2
+    )
+    legacy_state = MixedSelection(stop_on_no_improvement=True).fit(
+        data=data, max_total_steps=2
+    )
+
+    assert budget_state.active_set == [0, 1]
+    assert legacy_state.active_set == [0]
+
+
 def test_forward_then_backward_returns_to_empty_state():
     gram, cov, y_norm, n_samples = make_diagonal_problem(p=10)
     data = GramData(gram, cov, y_norm, n_samples)
@@ -128,4 +162,3 @@ def test_forward_then_backward_returns_to_empty_state():
     assert forward_state.active_set == []
     np.testing.assert_allclose(forward_state.beta, np.zeros_like(forward_state.beta))
     assert pytest.approx(forward_state.rss, rel=1e-9, abs=1e-9) == y_norm
-

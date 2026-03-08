@@ -19,6 +19,10 @@ from .routines_cv_scoring import (
 from .routines_greedy import ForwardSelection
 from ..validation.selector_validation import _validate_cv_state_target
 from ..core.state_cv import CrossValSelectionState
+from .forward_budget_policy import (
+    resolve_forward_budget,
+    should_accept_forward_candidate,
+)
 
 
 class _BaseCrossValSelection(ForwardSelection):
@@ -53,7 +57,12 @@ class CrossValForwardSelection(_BaseCrossValSelection):
         if result_state is not None and result_state.active_set:
             raise ValueError("CrossValForwardSelection does not support warm starts.")
 
-        max_steps = validate_optional_non_negative_int(max_steps, name="max_steps")
+        max_steps = resolve_forward_budget(
+            budget=max_steps,
+            budget_name="max_steps",
+            selector_name=type(self).__name__,
+            stop_on_no_improvement=self.stop_on_no_improvement,
+        )
         criterion = self._init_criterion(data.make_full_data())
         fold_states = _build_fold_states(
             data,
@@ -91,7 +100,12 @@ class CrossValForwardSelection(_BaseCrossValSelection):
             best_idx, best_score = criterion.best_candidate(
                 aggregated, len(fold_states[0].active_set) + 1
             )
-            if not criterion.is_improvement(best_score):
+            if not should_accept_forward_candidate(
+                criterion=criterion,
+                candidate_score=best_score,
+                incumbent_score=criterion.current_value,
+                stop_on_no_improvement=self.stop_on_no_improvement,
+            ):
                 break
             feat_idx = candidates[best_idx]
             for state_k in fold_states:
@@ -227,8 +241,11 @@ class CrossValMixedSelection(_BaseCrossValSelection):
         if result_state is not None and result_state.active_set:
             raise ValueError("CrossValMixedSelection does not support warm starts.")
 
-        max_forward_steps = validate_optional_non_negative_int(
-            max_forward_steps, name="max_forward_steps"
+        max_forward_steps = resolve_forward_budget(
+            budget=max_forward_steps,
+            budget_name="max_forward_steps",
+            selector_name=type(self).__name__,
+            stop_on_no_improvement=self.stop_on_no_improvement,
         )
         max_total_steps = validate_optional_non_negative_int(
             max_total_steps, name="max_total_steps"
@@ -275,7 +292,12 @@ class CrossValMixedSelection(_BaseCrossValSelection):
             best_idx, best_score = criterion.best_candidate(
                 aggregated, len(fold_states[0].active_set) + 1
             )
-            if not criterion.is_improvement(best_score):
+            if not should_accept_forward_candidate(
+                criterion=criterion,
+                candidate_score=best_score,
+                incumbent_score=criterion.current_value,
+                stop_on_no_improvement=self.stop_on_no_improvement,
+            ):
                 break
             feat_idx = candidates[best_idx]
             for state_k in fold_states:

@@ -22,6 +22,10 @@ from ..validation.selector_validation import (
 )
 from ..core.incremental_solver import IncrementalSolver
 from ..core.state_single import SelectionState
+from .forward_budget_policy import (
+    resolve_forward_budget,
+    should_accept_forward_candidate,
+)
 
 
 class ForwardSelection:
@@ -42,6 +46,7 @@ class ForwardSelection:
         solver_policy: str = "strict",
         ridge_alpha: float = 1e-8,
         pinv_rcond: float = 1e-12,
+        stop_on_no_improvement: bool = False,
         criterion=None,
         criterion_kwargs=None,
     ):
@@ -56,6 +61,9 @@ class ForwardSelection:
         )
         self.pinv_rcond = validate_positive_finite_float(
             pinv_rcond, name="pinv_rcond"
+        )
+        self.stop_on_no_improvement = validate_bool(
+            stop_on_no_improvement, name="stop_on_no_improvement"
         )
         self.criterion = (
             self._default_criterion
@@ -141,7 +149,12 @@ class ForwardSelection:
         if result_state is not None and result_state.active_set:
             raise ValueError("ForwardSelection does not support warm starts.")
 
-        max_steps = validate_optional_non_negative_int(max_steps, name="max_steps")
+        max_steps = resolve_forward_budget(
+            budget=max_steps,
+            budget_name="max_steps",
+            selector_name=type(self).__name__,
+            stop_on_no_improvement=self.stop_on_no_improvement,
+        )
         criterion = self._init_criterion(data)
         work_state = IncrementalSolver.create(
             data,
@@ -159,7 +172,12 @@ class ForwardSelection:
             best_idx, best_score = criterion.best_candidate(
                 rss_new, work_state.k + 1
             )
-            if not criterion.is_improvement(best_score):
+            if not should_accept_forward_candidate(
+                criterion=criterion,
+                candidate_score=best_score,
+                incumbent_score=criterion.current_value,
+                stop_on_no_improvement=self.stop_on_no_improvement,
+            ):
                 break
             feat_idx = int(candidates[best_idx])
             work_state.apply_forward(feat_idx)
@@ -291,8 +309,11 @@ class MixedSelection(ForwardSelection):
         if result_state is not None and result_state.active_set:
             raise ValueError("MixedSelection does not support warm starts.")
 
-        max_forward_steps = validate_optional_non_negative_int(
-            max_forward_steps, name="max_forward_steps"
+        max_forward_steps = resolve_forward_budget(
+            budget=max_forward_steps,
+            budget_name="max_forward_steps",
+            selector_name=type(self).__name__,
+            stop_on_no_improvement=self.stop_on_no_improvement,
         )
         max_total_steps = validate_optional_non_negative_int(
             max_total_steps, name="max_total_steps"
@@ -320,7 +341,12 @@ class MixedSelection(ForwardSelection):
             best_idx, best_score = criterion.best_candidate(
                 rss_new, work_state.k + 1
             )
-            if not criterion.is_improvement(best_score):
+            if not should_accept_forward_candidate(
+                criterion=criterion,
+                candidate_score=best_score,
+                incumbent_score=criterion.current_value,
+                stop_on_no_improvement=self.stop_on_no_improvement,
+            ):
                 break
             feat_idx = int(candidates[best_idx])
             work_state.apply_forward(feat_idx)

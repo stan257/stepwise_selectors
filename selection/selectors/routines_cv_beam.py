@@ -27,6 +27,10 @@ from .routines_cv_scoring import (
 from .routines_greedy import ForwardSelection
 from ..validation.selector_validation import _validate_cv_state_target
 from ..core.state_cv import CrossValSelectionState
+from .forward_budget_policy import (
+    resolve_forward_budget,
+    should_accept_forward_candidate,
+)
 from .topk import topk_indices
 
 
@@ -51,6 +55,7 @@ def _cv_beam_forward_children(
     data: CrossValGramData,
     tol: float,
     *,
+    stop_on_no_improvement: bool,
     cv_aggregation: str = "sum_rss",
 ) -> list[CVBeam]:
     scored = _cv_forward_scores(
@@ -66,7 +71,12 @@ def _cv_beam_forward_children(
     children: list[CVBeam] = []
     for idx in order:
         candidate_score = float(crit_scores[idx])
-        if not beam.criterion.is_improvement(candidate_score, beam.score):
+        if not should_accept_forward_candidate(
+            criterion=beam.criterion,
+            candidate_score=candidate_score,
+            incumbent_score=beam.score,
+            stop_on_no_improvement=stop_on_no_improvement,
+        ):
             continue
         feat_idx = int(candidates[idx])
         child_states = [state.clone() for state in beam.states]
@@ -186,7 +196,12 @@ class BeamCrossValForwardSelection(ForwardSelection):
                 "BeamCrossValForwardSelection does not support warm starts."
             )
 
-        max_steps = validate_optional_non_negative_int(max_steps, name="max_steps")
+        max_steps = resolve_forward_budget(
+            budget=max_steps,
+            budget_name="max_steps",
+            selector_name=type(self).__name__,
+            stop_on_no_improvement=self.stop_on_no_improvement,
+        )
         criterion = self._init_criterion(data.make_full_data())
         fold_states = _build_fold_states(
             data,
@@ -220,6 +235,7 @@ class BeamCrossValForwardSelection(ForwardSelection):
                         self.beam_width,
                         data,
                         self.tol,
+                        stop_on_no_improvement=self.stop_on_no_improvement,
                         cv_aggregation=self.cv_aggregation,
                     )
                 )
@@ -370,8 +386,11 @@ class BeamCrossValMixedSelection(ForwardSelection):
                 "BeamCrossValMixedSelection does not support warm starts."
             )
 
-        max_forward_steps = validate_optional_non_negative_int(
-            max_forward_steps, name="max_forward_steps"
+        max_forward_steps = resolve_forward_budget(
+            budget=max_forward_steps,
+            budget_name="max_forward_steps",
+            selector_name=type(self).__name__,
+            stop_on_no_improvement=self.stop_on_no_improvement,
         )
         max_total_steps = validate_optional_non_negative_int(
             max_total_steps, name="max_total_steps"
@@ -417,6 +436,7 @@ class BeamCrossValMixedSelection(ForwardSelection):
                         self.beam_width,
                         data,
                         self.tol,
+                        stop_on_no_improvement=self.stop_on_no_improvement,
                         cv_aggregation=self.cv_aggregation,
                     )
                 )

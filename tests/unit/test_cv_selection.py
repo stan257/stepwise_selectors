@@ -24,6 +24,44 @@ def incompatible_criterion_factory(*, n_samples: int, p: int) -> IncompatibleCri
     return IncompatibleCriterion()
 
 
+def make_cv_non_improving_forward_problem() -> CrossValGramData:
+    x1 = np.array(
+        [
+            [0.12573, -0.132105],
+            [0.640423, 0.1049],
+            [-0.535669, 0.361595],
+            [1.304, 0.947081],
+            [-0.703735, -1.265421],
+            [-0.623274, 0.041326],
+            [-2.325031, -0.218792],
+            [-1.245911, -0.732267],
+        ]
+    )
+    x2 = np.array(
+        [
+            [-0.544259, -0.3163],
+            [0.411631, 1.042513],
+            [-0.128535, 1.366463],
+            [-0.665195, 0.35151],
+            [0.90347, 0.094012],
+            [-0.743499, -0.921725],
+            [-0.457726, 0.220195],
+            [-1.009618, -0.209176],
+        ]
+    )
+    y1 = np.array(
+        [0.093885, 0.748592, -0.492738, 1.375075, -0.834501, -0.649197, -2.168236, -0.947225]
+    )
+    y2 = np.array(
+        [-1.428672, 2.799442, 2.873567, 0.194088, 1.144386, -2.649735, 0.274269, -1.035918]
+    )
+    folds = [
+        GramData(x1.T @ x1, x1.T @ y1, float(y1 @ y1), n_samples=len(y1), warn_if_uncentered=False),
+        GramData(x2.T @ x2, x2.T @ y2, float(y2 @ y2), n_samples=len(y2), warn_if_uncentered=False),
+    ]
+    return CrossValGramData(folds)
+
+
 def test_crossvalgramdata_requires_at_least_two_folds():
     rng = np.random.default_rng(42)
     X = rng.standard_normal((20, 4))
@@ -75,6 +113,53 @@ def test_cv_state_exposes_full_data_postselection_beta():
         data=cv_data, max_steps=0
     )
     np.testing.assert_allclose(empty.beta, np.zeros_like(empty.beta), atol=0.0, rtol=0.0)
+
+
+def test_cv_forward_budget_mode_continues_through_non_improving_step():
+    cv_data = make_cv_non_improving_forward_problem()
+
+    budget_state = CrossValForwardSelection(criterion=BestRSSCriterion).fit(
+        data=cv_data, max_steps=2
+    )
+    legacy_state = CrossValForwardSelection(
+        criterion=BestRSSCriterion, stop_on_no_improvement=True
+    ).fit(data=cv_data)
+
+    assert len(budget_state.active_set) == 2
+    assert len(legacy_state.active_set) == 1
+    assert budget_state.rss_cv > legacy_state.rss_cv
+
+
+def test_cv_beam_forward_budget_mode_continues_through_non_improving_step():
+    cv_data = make_cv_non_improving_forward_problem()
+
+    budget_state = BeamCrossValForwardSelection(
+        beam_width=2, criterion=BestRSSCriterion
+    ).fit(data=cv_data, max_steps=2)
+    legacy_state = BeamCrossValForwardSelection(
+        beam_width=2,
+        criterion=BestRSSCriterion,
+        stop_on_no_improvement=True,
+    ).fit(data=cv_data)
+
+    assert len(budget_state.active_set) == 2
+    assert len(legacy_state.active_set) == 1
+    assert budget_state.rss_cv > legacy_state.rss_cv
+
+
+def test_cv_mixed_budget_mode_continues_through_non_improving_forward_step():
+    cv_data = make_cv_non_improving_forward_problem()
+
+    budget_state = CrossValMixedSelection(criterion=BestRSSCriterion).fit(
+        data=cv_data, max_forward_steps=2, max_total_steps=2
+    )
+    legacy_state = CrossValMixedSelection(
+        criterion=BestRSSCriterion, stop_on_no_improvement=True
+    ).fit(data=cv_data, max_total_steps=2)
+
+    assert len(budget_state.active_set) == 2
+    assert len(legacy_state.active_set) == 1
+    assert budget_state.rss_cv > legacy_state.rss_cv
 
 
 @pytest.mark.parametrize(

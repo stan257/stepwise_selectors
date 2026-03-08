@@ -13,6 +13,14 @@ from tests.integration._selection_routines_helpers import (
 )
 
 
+def make_non_improving_aic_problem():
+    gram = np.eye(2)
+    cov = np.array([3.0, 0.1])
+    y_norm = 10.0
+    n_samples = 10
+    return GramData(gram, cov, y_norm, n_samples)
+
+
 def test_forward_beam_search_selects_best_subset():
     gram, cov, y_norm, n_samples = make_diagonal_problem(6)
     selector = BeamForwardSelection(beam_width=3)
@@ -126,3 +134,15 @@ def test_rank_deficient_backward_recovers_full_rank_subset():
     assert len(beam_state.active_set) == 2
     inv_beam = np.linalg.inv(gram[np.ix_(beam_state.active_set, beam_state.active_set)])
     assert np.isfinite(inv_beam).all()
+
+
+def test_forward_beam_budget_mode_continues_through_non_improving_step():
+    data = make_non_improving_aic_problem()
+
+    budget_state = BeamForwardSelection(beam_width=2).fit(data=data, max_steps=2)
+    legacy_state = BeamForwardSelection(
+        beam_width=2, stop_on_no_improvement=True
+    ).fit(data=data)
+
+    assert budget_state.active_set == [0, 1]
+    assert legacy_state.active_set == [0]

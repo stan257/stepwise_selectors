@@ -34,6 +34,15 @@ def make_group_problem():
     return GramData(gram, cov, y_norm, n_samples), groups
 
 
+def make_group_non_improving_aic_problem():
+    gram = np.eye(2)
+    cov = np.array([3.0, 0.1])
+    y_norm = 10.0
+    n_samples = 10
+    groups = [[0], [1]]
+    return GramData(gram, cov, y_norm, n_samples), groups
+
+
 def _active_features(active_groups: list[int], groups: list[list[int]]) -> list[int]:
     active = []
     for group_idx in active_groups:
@@ -119,3 +128,15 @@ def test_group_forward_accepts_criterion_factory_with_auto_params():
     selector.fit(data=data, max_steps=1)
     assert GroupRecordingCriterion.calls
     assert GroupRecordingCriterion.calls[-1] == (data.n_samples, data.gram.shape[0])
+
+
+def test_group_forward_budget_mode_continues_through_non_improving_step():
+    data, groups = make_group_non_improving_aic_problem()
+
+    budget_state = GroupForwardSelection(groups).fit(data=data, max_steps=2)
+    legacy_state = GroupForwardSelection(
+        groups, stop_on_no_improvement=True
+    ).fit(data=data)
+
+    assert budget_state.active_groups == [0, 1]
+    assert legacy_state.active_groups == [0]

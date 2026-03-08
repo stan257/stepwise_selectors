@@ -46,7 +46,7 @@ def test_forward_handles_tiny_rss_without_nan():
     y_norm = 1.0
 
     data = GramData(gram, cov, y_norm, n_samples=5)
-    state = ForwardSelection().fit(data=data)
+    state = ForwardSelection(stop_on_no_improvement=True).fit(data=data)
 
     assert len(state.active_set) == 1
     assert np.isfinite(state.rss)
@@ -82,7 +82,7 @@ def test_forward_tiny_y_norm_stops_cleanly():
     y_norm = 1e-12
 
     data = GramData(gram, cov, y_norm, n_samples=50)
-    state = ForwardSelection().fit(data=data, max_steps=1)
+    state = ForwardSelection(stop_on_no_improvement=True).fit(data=data)
 
     # AIC penalty should prevent adding the tiny-signal feature.
     assert state.active_set == []
@@ -97,7 +97,7 @@ def test_forward_large_p_zero_cov_stops_immediately():
     y_norm = 10.0
 
     data = GramData(gram, cov, y_norm, n_samples=100)
-    state = ForwardSelection().fit(data=data, max_steps=5)
+    state = ForwardSelection(stop_on_no_improvement=True).fit(data=data)
 
     assert state.active_set == []
     assert np.isfinite(state.rss)

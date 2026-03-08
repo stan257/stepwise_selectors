@@ -110,7 +110,9 @@ def test_forward_matches_exhaustive_across_criteria():
                     best_sets.add(subset)
 
         state = ForwardSelection(
-            criterion=crit_cls, criterion_kwargs=kwargs
+            criterion=crit_cls,
+            criterion_kwargs=kwargs,
+            stop_on_no_improvement=True,
         ).fit(data=data, max_steps=p)
 
         chosen = tuple(sorted(state.active_set))
