@@ -83,6 +83,23 @@ gstate = GroupForwardSelection(groups).fit(data=data, max_steps=2)
 print(gstate.active_groups, gstate.active_set, gstate.beta, gstate.rss)
 ```
 
+## Migration
+- Old forward-style calls without explicit budgets now fail by default:
+```python
+ForwardSelection().fit(data=data)  # raises
+MixedSelection().fit(data=data)    # raises
+```
+- New default usage is budget-driven:
+```python
+ForwardSelection().fit(data=data, max_steps=8)
+MixedSelection().fit(data=data, max_forward_steps=8, max_total_steps=16)
+```
+- If you want the previous early-stop semantics, opt in explicitly:
+```python
+ForwardSelection(stop_on_no_improvement=True).fit(data=data)
+MixedSelection(stop_on_no_improvement=True).fit(data=data)
+```
+
 
 ## Notes
 - The code operates on Gram statistics (`X.T @ X`, `X.T @ y`, `y.T @ y`) and does not depend on raw design matrices.

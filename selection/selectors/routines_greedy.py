@@ -126,7 +126,8 @@ class ForwardSelection:
         - `data` must be a validated `GramData`.
         - if `state` is provided, it must be a `SelectionState` bound to `data`
           and currently empty (no warm start).
-        - `max_steps` is `None` or a non-negative integer.
+        - `max_steps` is a non-negative integer by default.
+        - `max_steps=None` is allowed only when `stop_on_no_improvement=True`.
 
         Postconditions:
         - returns a `SelectionState` on the selected support.
@@ -291,7 +292,10 @@ class MixedSelection(ForwardSelection):
 
         Preconditions:
         - same data/state boundary requirements as other greedy selectors.
-        - step budgets are `None` or non-negative integers.
+        - `max_forward_steps` is a non-negative integer by default.
+        - `max_forward_steps=None` is allowed only when
+          `stop_on_no_improvement=True`.
+        - `max_total_steps` is `None` or a non-negative integer.
 
         Postconditions:
         - applies at most one forward move per outer iteration, then zero or
