@@ -8,6 +8,15 @@ import numpy as np
 
 from selection import GramData
 
+from .market_chunks import (
+    MarketChunkConfig,
+    MarketChunkDataset,
+    generate_market_gram_chunks_known,
+    generate_market_gram_chunks_unknown,
+    load_market_chunk_dataset,
+    save_market_chunk_dataset,
+)
+
 
 @dataclass(frozen=True)
 class BenchmarkDataset:
@@ -285,3 +294,17 @@ def build_dataset(config: dict) -> BenchmarkDataset:
             return build_synthetic_support_recovery_dataset(config)
         case _:
             raise ValueError(f"Unsupported dataset kind: {kind!r}")
+
+
+__all__ = [
+    "BenchmarkDataset",
+    "MarketChunkConfig",
+    "MarketChunkDataset",
+    "build_dataset",
+    "build_synthetic_linear_dataset",
+    "build_synthetic_support_recovery_dataset",
+    "generate_market_gram_chunks_known",
+    "generate_market_gram_chunks_unknown",
+    "load_market_chunk_dataset",
+    "save_market_chunk_dataset",
+]

@@ -87,6 +87,38 @@ Treat this as a reproducible snapshot, not a fixed theorem: rerun with the comma
 Suggested report paragraph:
 "On a seven-scenario synthetic benchmark suite (easy through very-hard regimes, including collinear decoys, misspecification, and oracle-check cases), Gram-based selector methods consistently outperformed naive covariance ranking, with winner-level test-MSE improvements of approximately 62% to 95% over `TopKAbsCovBaseline`. Relative to external sparse baselines (`LassoCV` and adaptive lasso), the selector family achieved better predictive accuracy across scenarios, while maintaining near-oracle performance in the tractable small-`p` setting. Beam search provided additional gains in decoy-heavy collinearity regimes, indicating practical value beyond single-path greedy selection."
 
+## Chunked Market Benchmarks
+
+For sequential nonstationary experiments, use the market chunk generator. It
+emits one centered `GramData` object per chunk and reserves the final chunk as a
+natural out-of-sample holdout.
+
+```python
+from benchmarks.market_chunks import (
+    MarketChunkConfig,
+    generate_market_gram_chunks_unknown,
+)
+
+dataset = generate_market_gram_chunks_unknown(
+    MarketChunkConfig(n_chunks=11, bars_per_chunk=2500)
+)
+```
+
+Persist and reload chunk datasets with the shared NPZ schema:
+
+```bash
+python3 scripts/generate_market_chunks.py --flavor unknown --output benchmarks/results/market_chunks_unknown.npz
+```
+
+Run a budget sweep over forward, CV-forward, and beam-forward selectors:
+
+```bash
+python3 scripts/run_market_budget_sweep.py
+```
+
+Use `benchmarks.forward_exact_k` when comparing routines at a fixed support
+budget instead of allowing each selector's native stopping rule to choose `k`.
+
 ## Artifact Versioning Policy
 
 - Do not commit raw `benchmarks/results/stability_rows*.jsonl` files (large and run-specific).
