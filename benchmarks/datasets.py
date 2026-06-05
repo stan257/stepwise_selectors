@@ -7,7 +7,6 @@ from dataclasses import dataclass
 import numpy as np
 
 from selection import GramData
-
 from .market_chunks import (
     MarketChunkConfig,
     MarketChunkDataset,
@@ -15,6 +14,29 @@ from .market_chunks import (
     generate_market_gram_chunks_unknown,
     load_market_chunk_dataset,
     save_market_chunk_dataset,
+)
+from .microstructure_chunks import (
+    CANONICAL_MICROSTRUCTURE_FEATURE_NAMES,
+    L1MicrostructureSimulator,
+    apply_microstructure_preset,
+    MicrostructureChunkConfig,
+    MicrostructureChunkDataset,
+    MicrostructureFeatureRegistry,
+    MicrostructureFeatureSpec,
+    MicrostructureFeatureTable,
+    MicrostructureObservables,
+    build_microstructure_feature_table,
+    build_microstructure_target,
+    default_microstructure_feature_registry,
+    generate_microstructure_gram_chunks_known,
+    generate_microstructure_gram_chunks_unknown,
+    load_microstructure_chunk_dataset,
+    microstructure_feature_registry,
+    microstructure_preset_names,
+    save_microstructure_chunk_dataset,
+    simulate_microstructure_observables,
+    supported_microstructure_feature_counts,
+    validate_microstructure_config,
 )
 
 
@@ -300,11 +322,32 @@ __all__ = [
     "BenchmarkDataset",
     "MarketChunkConfig",
     "MarketChunkDataset",
-    "build_dataset",
+    "MicrostructureChunkConfig",
+    "MicrostructureChunkDataset",
+    "MicrostructureFeatureRegistry",
+    "MicrostructureFeatureSpec",
+    "MicrostructureFeatureTable",
+    "MicrostructureObservables",
     "build_synthetic_linear_dataset",
     "build_synthetic_support_recovery_dataset",
+    "build_dataset",
+    "CANONICAL_MICROSTRUCTURE_FEATURE_NAMES",
+    "L1MicrostructureSimulator",
+    "apply_microstructure_preset",
+    "build_microstructure_feature_table",
+    "build_microstructure_target",
+    "default_microstructure_feature_registry",
     "generate_market_gram_chunks_known",
     "generate_market_gram_chunks_unknown",
+    "generate_microstructure_gram_chunks_known",
+    "generate_microstructure_gram_chunks_unknown",
     "load_market_chunk_dataset",
+    "load_microstructure_chunk_dataset",
+    "microstructure_feature_registry",
+    "microstructure_preset_names",
     "save_market_chunk_dataset",
+    "save_microstructure_chunk_dataset",
+    "simulate_microstructure_observables",
+    "supported_microstructure_feature_counts",
+    "validate_microstructure_config",
 ]

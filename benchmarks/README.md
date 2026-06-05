@@ -119,6 +119,46 @@ python3 scripts/run_market_budget_sweep.py
 Use `benchmarks.forward_exact_k` when comparing routines at a fixed support
 budget instead of allowing each selector's native stopping rule to choose `k`.
 
+## Microstructure Stress Benchmark
+
+The microstructure benchmark is a synthetic selector stress test with
+L1-order-book-shaped covariates. It simulates event-time spread, queue depth,
+imbalance, signed flow, OFI, microprice deviation, and engineered feature banks
+with `64`, `128`, or `192` columns.
+
+Important caveat: this is not yet a realistic L1 price-prediction benchmark.
+The current simulator often produces sparse or zero mid-price movement, so the
+target is dominated by injected synthetic signal over microstructure-shaped
+features. Treat results as evidence about selector behavior under structured
+nonstationary covariates, not as market microstructure performance claims.
+
+```python
+from benchmarks.microstructure_chunks import (
+    MicrostructureChunkConfig,
+    apply_microstructure_preset,
+    generate_microstructure_gram_chunks_unknown,
+)
+
+config = apply_microstructure_preset(
+    MicrostructureChunkConfig(n_chunks=11, events_per_chunk=5000),
+    preset="unknown_multiscale_192",
+)
+dataset = generate_microstructure_gram_chunks_unknown(config)
+```
+
+Generate and inspect datasets from the command line:
+
+```bash
+python3 scripts/generate_microstructure_chunks.py --flavor unknown --preset unknown_multiscale_192 --output benchmarks/results/microstructure_chunks_unknown.npz
+python3 scripts/inspect_microstructure_features.py --n-features 192
+```
+
+Run matched-budget sweeps over forward, CV-forward, and beam-forward selectors:
+
+```bash
+python3 scripts/run_microstructure_budget_sweep.py --selection-mode exact_k --preset unknown_multiscale_192
+```
+
 ## Artifact Versioning Policy
 
 - Do not commit raw `benchmarks/results/stability_rows*.jsonl` files (large and run-specific).
