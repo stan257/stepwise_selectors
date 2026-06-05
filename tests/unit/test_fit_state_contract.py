@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from selection.criteria import BestRSSCriterion
-from selection import GramData
+from selection import CrossValGramData, GramData
 from selection import (
     BackwardSelection,
     BeamBackwardSelection,
@@ -197,6 +197,49 @@ def test_cv_beam_mixed_selector_respects_zero_total_budget():
         beam_width=3, criterion=BestRSSCriterion
     ).fit(data=cv_data, max_forward_steps=5, max_total_steps=0)
     assert state.active_set == []
+
+
+def test_beam_mixed_total_step_budget_is_independent_of_beam_width():
+    data = GramData(
+        gram=np.eye(6),
+        cov=np.array([6.0, 5.0, 4.0, 3.0, 2.0, 1.0]),
+        y_norm=100.0,
+        n_samples=200,
+        warn_if_uncentered=False,
+    )
+
+    expected = BeamMixedSelection(
+        beam_width=1, criterion=BestRSSCriterion
+    ).fit(data=data, max_forward_steps=6, max_total_steps=2)
+    assert sorted(expected.active_set) == [0, 1]
+
+    for beam_width in (2, 3, 4):
+        state = BeamMixedSelection(
+            beam_width=beam_width, criterion=BestRSSCriterion
+        ).fit(data=data, max_forward_steps=6, max_total_steps=2)
+        assert sorted(state.active_set) == sorted(expected.active_set)
+
+
+def test_cv_beam_mixed_total_step_budget_is_independent_of_beam_width():
+    fold = GramData(
+        gram=np.eye(6),
+        cov=np.array([6.0, 5.0, 4.0, 3.0, 2.0, 1.0]),
+        y_norm=100.0,
+        n_samples=50,
+        warn_if_uncentered=False,
+    )
+    cv_data = CrossValGramData([fold, fold, fold])
+
+    expected = BeamCrossValMixedSelection(
+        beam_width=1, criterion=BestRSSCriterion
+    ).fit(data=cv_data, max_forward_steps=6, max_total_steps=2)
+    assert sorted(expected.active_set) == [0, 1]
+
+    for beam_width in (2, 3, 4):
+        state = BeamCrossValMixedSelection(
+            beam_width=beam_width, criterion=BestRSSCriterion
+        ).fit(data=cv_data, max_forward_steps=6, max_total_steps=2)
+        assert sorted(state.active_set) == sorted(expected.active_set)
 
 
 def test_forward_selection_accepts_named_rss_criterion_key():

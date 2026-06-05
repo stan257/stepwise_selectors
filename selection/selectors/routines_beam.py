@@ -30,6 +30,8 @@ class Beam:
     state: IncrementalSolver
     criterion: CriterionProtocol
     score: float
+    forward_steps: int = 0  # accepted forward moves on this beam path
+    total_steps: int = 0  # accepted forward/backward moves on this beam path
     _signature: frozenset[int] = field(default_factory=frozenset)
 
     def __post_init__(self) -> None:
@@ -66,7 +68,15 @@ def _beam_forward_children(
         child_state.apply_forward(feat_idx)
         child_criterion = beam.criterion.clone()
         child_criterion.update_current(candidate_score)
-        children.append(Beam(child_state, child_criterion, candidate_score))
+        children.append(
+            Beam(
+                child_state,
+                child_criterion,
+                candidate_score,
+                forward_steps=beam.forward_steps + 1,
+                total_steps=beam.total_steps + 1,
+            )
+        )
     return children
 
 
@@ -94,7 +104,15 @@ def _beam_backward_children(
             continue
         child_criterion = beam.criterion.clone()
         child_criterion.update_current(candidate_score)
-        children.append(Beam(child_state, child_criterion, candidate_score))
+        children.append(
+            Beam(
+                child_state,
+                child_criterion,
+                candidate_score,
+                forward_steps=beam.forward_steps,
+                total_steps=beam.total_steps + 1,
+            )
+        )
     return children
 
 
@@ -307,15 +325,20 @@ class BeamMixedSelection(ForwardSelection):
         best = initial
         sel = min if criterion.minimize else max
 
-        forward_steps = 0
-        total_ops = 0
         while True:
-            if max_total_steps is not None and total_ops >= max_total_steps:
-                break
-            if max_forward_steps is not None and forward_steps >= max_forward_steps:
+            expandable = [
+                beam
+                for beam in beams
+                if (max_total_steps is None or beam.total_steps < max_total_steps)
+                and (
+                    max_forward_steps is None
+                    or beam.forward_steps < max_forward_steps
+                )
+            ]
+            if not expandable:
                 break
             candidates: list[Beam] = []
-            for beam in beams:
+            for beam in expandable:
                 candidates.extend(
                     _beam_forward_children(
                         beam,
@@ -327,19 +350,19 @@ class BeamMixedSelection(ForwardSelection):
                 break
             beams = prune_unique_beams(candidates, self.beam_width)
             best = sel(beams, key=lambda b: b.score)
-            forward_steps += 1
-            total_ops += len(beams)
 
             new_beams: list[Beam] = []
             for beam in beams:
                 while True:
-                    if max_total_steps is not None and total_ops >= max_total_steps:
+                    if (
+                        max_total_steps is not None
+                        and beam.total_steps >= max_total_steps
+                    ):
                         break
                     improved = _beam_best_backward_child(beam)
                     if improved is None:
                         break
                     beam = improved
-                    total_ops += 1
                 best = sel([best, beam], key=lambda b: b.score)
                 new_beams.append(beam)
             beams = new_beams
